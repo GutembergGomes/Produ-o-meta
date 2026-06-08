@@ -1,0 +1,3237 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Produção Diária - Usina Cambuí</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #edf3f0;
+      --surface: #ffffff;
+      --surface-2: #f7faf8;
+      --ink: #16211b;
+      --muted: #61736a;
+      --line: #d6dfda;
+      --line-strong: #9daf9f;
+      --green: #2f6f3a;
+      --green-dark: #244f2c;
+      --blue: #245a84;
+      --red: #b21e34;
+      --shadow: 0 18px 55px rgba(25, 44, 34, .12);
+      --radius: 8px;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      min-height: 40px;
+      border: 0;
+      border-radius: 7px;
+      padding: 0 14px;
+      font-weight: 760;
+      cursor: pointer;
+      transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible {
+      outline: 3px solid rgba(36, 90, 132, .25);
+      outline-offset: 2px;
+    }
+
+    input,
+    select {
+      width: 100%;
+      min-height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 8px 10px;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    input[readonly],
+    input:disabled {
+      background: #edf4ef;
+      color: #587065;
+      font-weight: 760;
+    }
+
+    label {
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+
+    .app-header {
+      background: #f9fbfa;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .header-inner {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 18px 20px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: center;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.45rem, 2.6vw, 2.3rem);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: .96rem;
+    }
+
+    .plant-lock {
+      display: grid;
+      gap: 3px;
+      align-content: center;
+      min-width: 190px;
+      min-height: 58px;
+      padding: 9px 14px;
+      border-left: 5px solid var(--green);
+      background: #e9f2ea;
+      border-radius: var(--radius);
+    }
+
+    .plant-lock span {
+      color: var(--green-dark);
+      font-size: .72rem;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+
+    .plant-lock strong {
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+
+    .nav-band {
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .nav-inner {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .nav-tab {
+      background: transparent;
+      color: #274233;
+      border: 1px solid transparent;
+    }
+
+    .nav-tab[aria-selected="true"] {
+      background: #e4eee7;
+      border-color: #c9d8ce;
+      color: var(--green-dark);
+    }
+
+    .main {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 20px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .view[hidden] {
+      display: none !important;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .filter-bar {
+      display: grid;
+      grid-template-columns: minmax(180px, 240px) 1fr auto;
+      gap: 12px;
+      align-items: end;
+      padding: 14px 16px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .filter-note {
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .actions,
+    .table-actions,
+    .history-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .btn-primary {
+      background: var(--green);
+      color: white;
+      box-shadow: 0 8px 20px rgba(47, 111, 58, .24);
+    }
+
+    .btn-primary:hover {
+      background: var(--green-dark);
+    }
+
+    .btn-secondary {
+      background: #e7ece9;
+      color: #22372c;
+    }
+
+    .btn-secondary:hover {
+      background: #dce5df;
+    }
+
+    .btn-link {
+      min-height: 34px;
+      padding: 0 10px;
+      color: var(--blue);
+      background: transparent;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .stat {
+      min-height: 98px;
+      display: grid;
+      align-content: space-between;
+      gap: 8px;
+      padding: 14px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+
+    .stat strong {
+      font-size: clamp(1.25rem, 2.2vw, 1.9rem);
+      line-height: 1;
+    }
+
+    .stat small {
+      color: var(--muted);
+    }
+
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      align-items: start;
+    }
+
+    .dashboard-chart-grid {
+      display: grid;
+      grid-template-columns: minmax(260px, .8fr) minmax(320px, 1fr) minmax(320px, 1fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .goal-overview {
+      display: grid;
+      gap: 16px;
+    }
+
+    .goal-main {
+      display: grid;
+      gap: 8px;
+    }
+
+    .goal-main strong {
+      font-size: clamp(1.7rem, 3vw, 2.6rem);
+      line-height: 1;
+    }
+
+    .goal-main span,
+    .chart-subtitle,
+    .rank-subtitle {
+      color: var(--muted);
+      font-size: .86rem;
+      font-weight: 720;
+    }
+
+    .meter-track,
+    .chart-track,
+    .rank-track {
+      width: 100%;
+      height: 12px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #dfe8e3;
+    }
+
+    .meter-fill,
+    .chart-fill,
+    .rank-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: var(--green);
+    }
+
+    .meter-fill.over,
+    .chart-fill.over,
+    .rank-fill.over {
+      background: var(--blue);
+    }
+
+    .goal-metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .goal-metric {
+      min-height: 72px;
+      display: grid;
+      gap: 5px;
+      align-content: center;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+    }
+
+    .goal-metric span {
+      color: var(--muted);
+      font-size: .72rem;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+
+    .goal-metric strong {
+      font-size: 1.15rem;
+      line-height: 1;
+    }
+
+    .chart-list {
+      display: grid;
+      gap: 13px;
+    }
+
+    .chart-row {
+      display: grid;
+      gap: 6px;
+    }
+
+    .chart-row-head,
+    .rank-headline,
+    .rank-values {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+    }
+
+    .chart-row-head strong,
+    .rank-headline strong {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .chart-row-head span,
+    .rank-values {
+      color: var(--muted);
+      font-size: .82rem;
+      font-weight: 760;
+      white-space: nowrap;
+    }
+
+    .chart-track {
+      height: 10px;
+    }
+
+    .rank-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .rank-item {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 12px;
+      align-items: center;
+      padding: 11px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+    }
+
+    .rank-position {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 999px;
+      background: #e4eee7;
+      color: var(--green-dark);
+      font-weight: 950;
+    }
+
+    .rank-main {
+      display: grid;
+      gap: 7px;
+      min-width: 0;
+    }
+
+    .rank-track {
+      height: 9px;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #e7ece9;
+      color: #22372c;
+      font-size: .75rem;
+      font-weight: 850;
+      white-space: nowrap;
+    }
+
+    .status-pill.good {
+      background: #dff0e3;
+      color: var(--green-dark);
+    }
+
+    .status-pill.alert {
+      background: #fae5e8;
+      color: var(--red);
+    }
+
+    .goal-main .status-pill {
+      justify-self: start;
+    }
+
+    .front-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      padding: 16px;
+    }
+
+    .front-card {
+      min-height: 82px;
+      display: grid;
+      align-content: center;
+      gap: 5px;
+      padding: 12px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      color: var(--ink);
+      text-align: left;
+      box-shadow: none;
+    }
+
+    .front-card:hover,
+    .front-card[aria-pressed="true"] {
+      background: #e9f2ea;
+      border-color: #a9c3af;
+    }
+
+    .front-card strong {
+      font-size: 1rem;
+      line-height: 1.15;
+    }
+
+    .front-card span {
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 760;
+    }
+
+    .front-workspace {
+      margin: 0 16px 16px;
+      border: 1px solid #c9d8ce;
+      border-radius: var(--radius);
+      background: #f7faf8;
+      overflow: hidden;
+    }
+
+    .front-workspace[hidden] {
+      display: none !important;
+    }
+
+    .workspace-head {
+      min-height: 54px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: #edf6ef;
+    }
+
+    .workspace-head h3 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .workspace-head p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    .manual-grid {
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) minmax(150px, 220px) minmax(220px, 1.2fr) auto;
+      gap: 12px;
+      align-items: end;
+      padding: 14px;
+    }
+
+    .workspace-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      padding: 0 14px 14px;
+    }
+
+    .workspace-hint {
+      color: var(--muted);
+      font-size: .88rem;
+      line-height: 1.35;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      min-height: 58px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      background: var(--surface-2);
+    }
+
+    .panel-head h2 {
+      margin: 0;
+      font-size: 1rem;
+      line-height: 1.2;
+    }
+
+    .panel-body {
+      padding: 16px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 900px;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      padding: 9px 8px;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    th {
+      background: #e2e8e4;
+      color: #1f2b24;
+      font-size: .78rem;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    tbody tr:nth-child(even) {
+      background: #f2f7fa;
+    }
+
+    td input,
+    td select {
+      min-height: 36px;
+      padding: 7px 8px;
+    }
+
+    .type-select {
+      min-width: 190px;
+    }
+
+    .front-input {
+      min-width: 160px;
+    }
+
+    .fleet-input {
+      min-width: 190px;
+    }
+
+    .number-input {
+      min-width: 120px;
+      text-align: right;
+    }
+
+    .note-input {
+      min-width: 220px;
+    }
+
+    .row-buttons {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+
+    .icon-button {
+      width: 34px;
+      min-width: 34px;
+      height: 34px;
+      min-height: 34px;
+      padding: 0;
+      border-radius: 7px;
+      background: #e9efec;
+      color: #1c2c23;
+    }
+
+    .icon-button.delete {
+      background: #fae5e8;
+      color: var(--red);
+    }
+
+    .summary-list {
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .summary-item {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 10px;
+      display: grid;
+      gap: 5px;
+      background: #fff;
+    }
+
+    .summary-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .summary-line strong,
+    .summary-line span {
+      font-weight: 900;
+    }
+
+    .empty-state {
+      padding: 28px 16px;
+      text-align: center;
+      color: var(--muted);
+      background: #fff;
+      border: 1px dashed var(--line-strong);
+      border-radius: var(--radius);
+    }
+
+    .file-input {
+      display: none;
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      max-width: min(420px, calc(100vw - 36px));
+      background: #16211b;
+      color: #fff;
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      box-shadow: var(--shadow);
+      transform: translateY(90px);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform .2s ease, opacity .2s ease;
+      z-index: 20;
+    }
+
+    .toast.visible {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    @media (max-width: 1240px) {
+      .stats-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .dashboard-chart-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .front-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .manual-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .header-inner,
+      .filter-bar {
+        grid-template-columns: 1fr;
+      }
+
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .front-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .actions,
+      .table-actions,
+      .history-actions {
+        justify-content: flex-start;
+      }
+
+      .rank-headline,
+      .rank-values {
+        display: grid;
+        gap: 5px;
+      }
+
+      .main,
+      .header-inner,
+      .nav-inner {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+    }
+
+    @media print {
+      body {
+        background: white;
+      }
+
+      .nav-band,
+      .filter-bar,
+      .table-actions,
+      .history-actions,
+      .row-buttons,
+      .toast {
+        display: none !important;
+      }
+
+      .main,
+      .header-inner {
+        max-width: none;
+      }
+
+      .panel,
+      .stat {
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <div>
+        <h1>Produção Diária da Cambuí</h1>
+        <p class="subtitle">Colheita própria por frota de colhedora, colheita terceira por frente e transporte por tipo.</p>
+      </div>
+      <div class="plant-lock" aria-label="Usina fixa">
+        <span>Usina fixa</span>
+        <strong>Cambuí</strong>
+      </div>
+    </div>
+  </header>
+
+  <nav class="nav-band" aria-label="Navegação principal">
+    <div class="nav-inner">
+      <button class="nav-tab" type="button" data-view="dashboard" aria-selected="true">Dashboard</button>
+      <button class="nav-tab" type="button" data-view="entry" aria-selected="false">Lançamento Diário</button>
+      <button class="nav-tab" type="button" data-view="targets" aria-selected="false">Metas Diárias</button>
+      <button class="nav-tab" type="button" data-view="history" aria-selected="false">Histórico</button>
+    </div>
+  </nav>
+
+  <main class="main">
+    <section class="view" id="dashboardView">
+      <div class="filter-bar">
+        <div class="field">
+          <label for="dashboardDate">Data analisada</label>
+          <input id="dashboardDate" type="date">
+        </div>
+        <div class="filter-note" id="dashboardSource">Nenhum lançamento salvo para esta data.</div>
+        <div class="actions">
+          <button class="btn-secondary" id="todayDashboardBtn" type="button">Hoje</button>
+          <button class="btn-secondary" id="latestDashboardBtn" type="button">Último salvo</button>
+          <button class="btn-secondary" id="printBtn" type="button">Imprimir</button>
+        </div>
+      </div>
+
+      <section class="stats-grid" aria-label="Indicadores do dashboard">
+        <article class="stat">
+          <span>Produção total</span>
+          <strong id="dashTotal">0</strong>
+          <small>Todos os lançamentos do dia</small>
+        </article>
+        <article class="stat">
+          <span>Frentes próprias</span>
+          <strong id="dashOwnHarvest">0</strong>
+          <small>4001, 4002 e 4003</small>
+        </article>
+        <article class="stat">
+          <span>Frentes terceiras</span>
+          <strong id="dashThirdHarvest">0</strong>
+          <small>4007 e 4009</small>
+        </article>
+        <article class="stat">
+          <span>Transporte próprio</span>
+          <strong id="dashOwnTransport">0</strong>
+          <small>Produção diária</small>
+        </article>
+        <article class="stat">
+          <span>Transporte terceiro</span>
+          <strong id="dashThirdTransport">0</strong>
+          <small>Produção diária</small>
+        </article>
+        <article class="stat">
+          <span>Meta total</span>
+          <strong id="dashTarget">0</strong>
+          <small id="dashTargetStatus">0% atingido</small>
+        </article>
+      </section>
+
+      <section class="dashboard-chart-grid" aria-label="Gráficos do dashboard">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Meta do dia</h2>
+          </div>
+          <div class="panel-body" id="goalOverviewWrap"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Produção por tipo</h2>
+          </div>
+          <div class="panel-body" id="typeChartWrap"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Produção por frente</h2>
+          </div>
+          <div class="panel-body" id="frontChartWrap"></div>
+        </section>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Ranking das colhedoras próprias</h2>
+        </div>
+        <div class="panel-body" id="harvesterRankingWrap"></div>
+      </section>
+
+      <section class="dashboard-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Resumo por tipo</h2>
+          </div>
+          <div class="table-wrap" id="typeSummaryWrap"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Resumo por frente</h2>
+          </div>
+          <div class="table-wrap" id="frontSummaryWrap"></div>
+        </section>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Lançamentos do dia</h2>
+        </div>
+        <div class="table-wrap" id="dashboardRowsWrap"></div>
+      </section>
+    </section>
+
+    <section class="view" id="entryView" hidden>
+      <div class="filter-bar">
+        <div class="field">
+          <label for="entryDate">Data do lançamento</label>
+          <input id="entryDate" type="date">
+        </div>
+        <div class="field">
+          <label for="plantName">Unidade</label>
+          <input id="plantName" type="text" value="Usina Cambuí" readonly>
+        </div>
+        <div class="actions">
+          <button class="btn-secondary" id="loadDateBtn" type="button">Carregar data</button>
+          <button class="btn-primary" id="saveBtn" type="button">Salvar dia</button>
+        </div>
+      </div>
+
+      <section class="stats-grid" aria-label="Prévia do lançamento">
+        <article class="stat">
+          <span>Produção total</span>
+          <strong id="entryTotal">0</strong>
+          <small>Prévia do dia</small>
+        </article>
+        <article class="stat">
+          <span>Colheita própria</span>
+          <strong id="entryOwnHarvest">0</strong>
+          <small>Por frota</small>
+        </article>
+        <article class="stat">
+          <span>Colheita terceira</span>
+          <strong id="entryThirdHarvest">0</strong>
+          <small>Por frente</small>
+        </article>
+        <article class="stat">
+          <span>Transporte próprio</span>
+          <strong id="entryOwnTransport">0</strong>
+          <small>Diário</small>
+        </article>
+        <article class="stat">
+          <span>Transporte terceiro</span>
+          <strong id="entryThirdTransport">0</strong>
+          <small>Diário</small>
+        </article>
+        <article class="stat">
+          <span>Meta total</span>
+          <strong id="entryTarget">0</strong>
+          <small id="entryTargetStatus">0% atingido</small>
+        </article>
+      </section>
+
+      <section class="panel" aria-label="Lançamento por frente de colheita">
+        <div class="panel-head">
+          <h2>Frentes de colheita</h2>
+        </div>
+        <div class="front-grid" id="frontCards">
+          <button class="front-card" type="button" data-front="Frente 4001" data-type="Colheita Própria" aria-pressed="false">
+            <strong>Frente 4001</strong>
+            <span>Própria · lançar por frota</span>
+          </button>
+          <button class="front-card" type="button" data-front="Frente 4002" data-type="Colheita Própria" aria-pressed="false">
+            <strong>Frente 4002</strong>
+            <span>Própria · lançar por frota</span>
+          </button>
+          <button class="front-card" type="button" data-front="Frente 4003" data-type="Colheita Própria" aria-pressed="false">
+            <strong>Frente 4003</strong>
+            <span>Própria · lançar por frota</span>
+          </button>
+          <button class="front-card" type="button" data-front="Frente 4007" data-type="Colheita Terceira" aria-pressed="false">
+            <strong>Frente 4007</strong>
+            <span>Terceira · lançar produção</span>
+          </button>
+          <button class="front-card" type="button" data-front="Frente 4009" data-type="Colheita Terceira" aria-pressed="false">
+            <strong>Frente 4009</strong>
+            <span>Terceira · lançar produção</span>
+          </button>
+        </div>
+
+        <div class="front-workspace" id="frontWorkspace" hidden>
+          <div class="workspace-head">
+            <div>
+              <h3 id="activeFrontTitle">Frente selecionada</h3>
+              <p id="activeFrontHint">Informe a produção manualmente ou importe um arquivo.</p>
+            </div>
+            <button class="btn-secondary" id="closeFrontWorkspaceBtn" type="button">Fechar</button>
+          </div>
+          <div class="manual-grid">
+            <div class="field" id="manualFleetField">
+              <label for="manualFleet">Frota da colhedora</label>
+              <input id="manualFleet" list="fleetOptions" type="text" placeholder="Ex.: Colhedora 4001-01">
+            </div>
+            <div class="field">
+              <label for="manualProduction">Produção</label>
+              <input id="manualProduction" class="number-input" inputmode="decimal" type="text" placeholder="0">
+            </div>
+            <div class="field">
+              <label for="manualNote">Observação</label>
+              <input id="manualNote" type="text" placeholder="Opcional">
+            </div>
+            <button class="btn-primary" id="addManualFrontBtn" type="button">Adicionar</button>
+          </div>
+          <div class="workspace-actions">
+            <button class="btn-secondary" id="importFrontFileBtn" type="button">Importar arquivo</button>
+            <input class="file-input" id="frontImportFile" type="file" accept=".csv,.json,.txt,.html,.htm,.pdf,.xls,.xlsx,image/*,application/json,text/csv,text/plain,text/html,application/pdf">
+            <span class="workspace-hint">Para relatório "Colhedora e Dias Trabalhados", o sistema usa Código como frota e Toneladas Colhidas como produção. Aceita foto, PDF, Excel, CSV, TXT, HTML ou JSON.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" aria-label="Tabela de lançamento diário">
+        <div class="panel-head">
+          <h2>Conferência do lançamento</h2>
+          <div class="table-actions">
+            <button class="btn-secondary" id="addOwnHarvesterBtn" type="button">Colhedora própria</button>
+            <button class="btn-secondary" id="addThirdFrontBtn" type="button">Frente terceira</button>
+            <button class="btn-secondary" id="addOwnTransportBtn" type="button">Transporte próprio</button>
+            <button class="btn-secondary" id="addThirdTransportBtn" type="button">Transporte terceiro</button>
+            <button class="btn-secondary" id="resetBtn" type="button">Limpar lançamento</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Frente</th>
+                <th>Frota da colhedora</th>
+                <th>Meta diária</th>
+                <th>Produção diária</th>
+                <th>% Meta</th>
+                <th>Observação</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="entryBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <section class="view" id="targetsView" hidden>
+      <div class="filter-bar">
+        <div class="field">
+          <label for="targetPlantName">Unidade</label>
+          <input id="targetPlantName" type="text" value="Usina Cambuí" readonly>
+        </div>
+        <div class="filter-note">Cadastre metas padrão usadas em todos os lançamentos diários.</div>
+        <div class="actions">
+          <button class="btn-primary" id="saveTargetsBtn" type="button">Salvar metas</button>
+        </div>
+      </div>
+
+      <section class="dashboard-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Metas das frentes próprias</h2>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Frente</th>
+                  <th>Meta diária da frente</th>
+                </tr>
+              </thead>
+              <tbody id="ownHarvesterTargetsBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Metas das frentes terceiras</h2>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Frente</th>
+                  <th>Meta diária</th>
+                </tr>
+              </thead>
+              <tbody id="thirdFrontTargetsBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Metas dos transportes</h2>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Meta diária</th>
+              </tr>
+            </thead>
+            <tbody id="transportTargetsBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <section class="view" id="historyView" hidden>
+      <div class="filter-bar">
+        <div class="field">
+          <label for="historySearch">Buscar</label>
+          <input id="historySearch" type="search" placeholder="Data, tipo, frente, frota ou observação">
+        </div>
+        <div class="filter-note" id="historyCount">0 lançamentos salvos.</div>
+        <div class="history-actions">
+          <button class="btn-secondary" id="exportCsvBtn" type="button">Exportar CSV</button>
+          <button class="btn-secondary" id="exportJsonBtn" type="button">Exportar JSON</button>
+          <button class="btn-secondary" id="importJsonBtn" type="button">Importar JSON</button>
+          <input class="file-input" id="importFile" type="file" accept="application/json,.json">
+        </div>
+      </div>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Histórico Cambuí</h2>
+        </div>
+        <div class="table-wrap" id="historyWrap"></div>
+      </section>
+    </section>
+  </main>
+
+  <datalist id="frontOptions"></datalist>
+  <datalist id="fleetOptions"></datalist>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const STORAGE_KEY = "cambui.daily.production.flow.v5";
+    const TARGETS_KEY = "cambui.daily.production.targets.v1";
+    const PREVIOUS_KEYS = [
+      "cambui.daily.production.v4",
+      "cambui.daily.own.production.v3",
+      "cambui.daily.equipment.operations.v2",
+      "cambui.daily.operations.v1"
+    ];
+    const PLANT = "Usina Cambuí";
+
+    const TYPES = {
+      OWN_HARVEST: "Colheita Própria",
+      THIRD_HARVEST: "Colheita Terceira",
+      OWN_TRANSPORT: "Transporte Próprio",
+      THIRD_TRANSPORT: "Transporte Terceiro"
+    };
+
+    const typeOptions = Object.values(TYPES);
+    const ownHarvestFronts = ["Frente 4001", "Frente 4002", "Frente 4003"];
+    const thirdHarvestFronts = ["Frente 4007", "Frente 4009"];
+    const frontOptions = [...ownHarvestFronts, ...thirdHarvestFronts];
+
+    const fleetOptions = [
+      "Colhedora 4001-01",
+      "Colhedora 4001-02",
+      "Colhedora 4002-01",
+      "Colhedora 4002-02",
+      "Colhedora 4003-01",
+      "Colhedora 4003-02"
+    ];
+
+    const defaultEntries = [];
+    const defaultTargets = {
+      ownFronts: ownHarvestFronts.map((front) => ({ front, target: 0 })),
+      thirdFronts: thirdHarvestFronts.map((front) => ({ front, target: 0 })),
+      transports: [
+        { type: TYPES.OWN_TRANSPORT, target: 0 },
+        { type: TYPES.THIRD_TRANSPORT, target: 0 }
+      ]
+    };
+
+    const els = {
+      dashboardView: document.querySelector("#dashboardView"),
+      entryView: document.querySelector("#entryView"),
+      targetsView: document.querySelector("#targetsView"),
+      historyView: document.querySelector("#historyView"),
+      navTabs: [...document.querySelectorAll(".nav-tab")],
+      dashboardDate: document.querySelector("#dashboardDate"),
+      dashboardSource: document.querySelector("#dashboardSource"),
+      entryDate: document.querySelector("#entryDate"),
+      frontCards: [...document.querySelectorAll(".front-card")],
+      frontWorkspace: document.querySelector("#frontWorkspace"),
+      activeFrontTitle: document.querySelector("#activeFrontTitle"),
+      activeFrontHint: document.querySelector("#activeFrontHint"),
+      manualFleetField: document.querySelector("#manualFleetField"),
+      manualFleet: document.querySelector("#manualFleet"),
+      manualProduction: document.querySelector("#manualProduction"),
+      manualNote: document.querySelector("#manualNote"),
+      frontImportFile: document.querySelector("#frontImportFile"),
+      entryBody: document.querySelector("#entryBody"),
+      historyWrap: document.querySelector("#historyWrap"),
+      historySearch: document.querySelector("#historySearch"),
+      historyCount: document.querySelector("#historyCount"),
+      ownHarvesterTargetsBody: document.querySelector("#ownHarvesterTargetsBody"),
+      thirdFrontTargetsBody: document.querySelector("#thirdFrontTargetsBody"),
+      transportTargetsBody: document.querySelector("#transportTargetsBody"),
+      goalOverviewWrap: document.querySelector("#goalOverviewWrap"),
+      typeChartWrap: document.querySelector("#typeChartWrap"),
+      frontChartWrap: document.querySelector("#frontChartWrap"),
+      harvesterRankingWrap: document.querySelector("#harvesterRankingWrap"),
+      typeSummaryWrap: document.querySelector("#typeSummaryWrap"),
+      frontSummaryWrap: document.querySelector("#frontSummaryWrap"),
+      dashboardRowsWrap: document.querySelector("#dashboardRowsWrap"),
+      frontOptions: document.querySelector("#frontOptions"),
+      fleetOptions: document.querySelector("#fleetOptions"),
+      toast: document.querySelector("#toast"),
+      importFile: document.querySelector("#importFile"),
+      dashTotal: document.querySelector("#dashTotal"),
+      dashOwnHarvest: document.querySelector("#dashOwnHarvest"),
+      dashThirdHarvest: document.querySelector("#dashThirdHarvest"),
+      dashOwnTransport: document.querySelector("#dashOwnTransport"),
+      dashThirdTransport: document.querySelector("#dashThirdTransport"),
+      dashTarget: document.querySelector("#dashTarget"),
+      dashTargetStatus: document.querySelector("#dashTargetStatus"),
+      entryTotal: document.querySelector("#entryTotal"),
+      entryOwnHarvest: document.querySelector("#entryOwnHarvest"),
+      entryThirdHarvest: document.querySelector("#entryThirdHarvest"),
+      entryOwnTransport: document.querySelector("#entryOwnTransport"),
+      entryThirdTransport: document.querySelector("#entryThirdTransport"),
+      entryTarget: document.querySelector("#entryTarget"),
+      entryTargetStatus: document.querySelector("#entryTargetStatus")
+    };
+
+    let records = loadRecords();
+    let targets = loadTargets();
+    let entries = cloneEntries(defaultEntries);
+    let activeFront = null;
+
+    function makeId() {
+      if (window.crypto && typeof window.crypto.randomUUID === "function") {
+        return window.crypto.randomUUID();
+      }
+      return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+
+    function todayInputValue() {
+      const now = new Date();
+      const offset = now.getTimezoneOffset();
+      const local = new Date(now.getTime() - offset * 60000);
+      return local.toISOString().slice(0, 10);
+    }
+
+    function parseNumber(value) {
+      if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+      const normalized = String(value || "")
+        .trim()
+        .replace(/\./g, "")
+        .replace(",", ".");
+      const number = Number(normalized);
+      return Number.isFinite(number) ? number : 0;
+    }
+
+    function formatNumber(value) {
+      return new Intl.NumberFormat("pt-BR", {
+        maximumFractionDigits: value % 1 === 0 ? 0 : 3
+      }).format(value || 0);
+    }
+
+    function formatPercent(value) {
+      return `${new Intl.NumberFormat("pt-BR", {
+        maximumFractionDigits: value >= 100 ? 0 : 1
+      }).format(value || 0)}%`;
+    }
+
+    function progressFor(production, target) {
+      const dailyTarget = Number(target) || 0;
+      if (dailyTarget <= 0) return 0;
+      return ((Number(production) || 0) / dailyTarget) * 100;
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function formatDate(value) {
+      if (!value) return "";
+      const [year, month, day] = value.split("-");
+      return `${day}/${month}/${year}`;
+    }
+
+    function normalizeType(value) {
+      const raw = String(value || "").trim();
+      const map = {
+        "Frente Própria": TYPES.OWN_HARVEST,
+        "Colheita Própria": TYPES.OWN_HARVEST,
+        "Frente Terceira": TYPES.THIRD_HARVEST,
+        "Colheita Terceira": TYPES.THIRD_HARVEST,
+        "Transporte Próprio": TYPES.OWN_TRANSPORT,
+        "Transporte Terceiro": TYPES.THIRD_TRANSPORT
+      };
+      return map[raw] || raw;
+    }
+
+    function isHarvest(type) {
+      return type === TYPES.OWN_HARVEST || type === TYPES.THIRD_HARVEST;
+    }
+
+    function requiresFleet(type) {
+      return type === TYPES.OWN_HARVEST;
+    }
+
+    function needsFront(type) {
+      return type === TYPES.OWN_HARVEST || type === TYPES.THIRD_HARVEST;
+    }
+
+    function allowedFrontsFor(type) {
+      if (type === TYPES.OWN_HARVEST) return ownHarvestFronts;
+      if (type === TYPES.THIRD_HARVEST) return thirdHarvestFronts;
+      return [];
+    }
+
+    function defaultFrontFor(type) {
+      return allowedFrontsFor(type)[0] || "";
+    }
+
+    function normalizeKey(value) {
+      return String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function sameText(a, b) {
+      return normalizeKey(a) === normalizeKey(b);
+    }
+
+    function targetKeyForRow(row) {
+      const type = normalizeType(row.type);
+      if (type === TYPES.OWN_HARVEST) {
+        const front = normalizeKey(row.front);
+        const fleet = normalizeKey(row.fleet);
+        return front && fleet ? `${type}|${front}|${fleet}` : "";
+      }
+      if (type === TYPES.THIRD_HARVEST) {
+        const front = normalizeKey(row.front);
+        return front ? `${type}|${front}` : "";
+      }
+      if (type === TYPES.OWN_TRANSPORT || type === TYPES.THIRD_TRANSPORT) {
+        return type;
+      }
+      return "";
+    }
+
+    function cloneTargets(source = defaultTargets) {
+      const sourceTargets = source && typeof source === "object" ? source : {};
+      const sourceOwnFronts = Array.isArray(sourceTargets.ownFronts) ? sourceTargets.ownFronts : [];
+      const sourceOwnHarvesters = Array.isArray(sourceTargets.ownHarvesters) ? sourceTargets.ownHarvesters : [];
+      const sourceThirdFronts = Array.isArray(sourceTargets.thirdFronts) ? sourceTargets.thirdFronts : [];
+      const sourceTransports = Array.isArray(sourceTargets.transports) ? sourceTargets.transports : [];
+
+      const ownByFront = new Map(sourceOwnFronts.map((sourceRow) => {
+        const row = sourceRow || {};
+        return [normalizeKey(row.front), row];
+      }));
+
+      if (!sourceOwnFronts.length && sourceOwnHarvesters.length) {
+        sourceOwnHarvesters.forEach((sourceRow) => {
+          const row = sourceRow || {};
+          const front = allowedFrontsFor(TYPES.OWN_HARVEST).includes(row.front) ? row.front : defaultFrontFor(TYPES.OWN_HARVEST);
+          const key = normalizeKey(front);
+          const current = ownByFront.get(key) || { front, target: 0 };
+          current.target = parseNumber(current.target) + parseNumber(row.target ?? row.meta ?? row.dailyTarget ?? 0);
+          ownByFront.set(key, current);
+        });
+      }
+
+      const thirdByFront = new Map(sourceThirdFronts.map((sourceRow) => {
+        const row = sourceRow || {};
+        return [normalizeKey(row.front), row];
+      }));
+      const transportByType = new Map(sourceTransports.map((sourceRow) => {
+        const row = sourceRow || {};
+        return [normalizeType(row.type), row];
+      }));
+
+      return {
+        ownFronts: ownHarvestFronts.map((front) => {
+          const row = ownByFront.get(normalizeKey(front)) || {};
+          return {
+            front,
+            target: Math.max(0, parseNumber(row.target ?? row.meta ?? row.dailyTarget ?? 0))
+          };
+        }),
+        thirdFronts: thirdHarvestFronts.map((front) => {
+          const row = thirdByFront.get(normalizeKey(front)) || {};
+          return {
+            front,
+            target: Math.max(0, parseNumber(row.target ?? row.meta ?? row.dailyTarget ?? 0))
+          };
+        }),
+        transports: [TYPES.OWN_TRANSPORT, TYPES.THIRD_TRANSPORT].map((type) => {
+          const row = transportByType.get(type) || {};
+          return {
+            type,
+            target: Math.max(0, parseNumber(row.target ?? row.meta ?? row.dailyTarget ?? 0))
+          };
+        })
+      };
+    }
+
+    function getCleanTargets(source = targets) {
+      const cloned = cloneTargets(source);
+
+      return {
+        ownFronts: cloned.ownFronts,
+        thirdFronts: cloned.thirdFronts,
+        transports: cloned.transports
+      };
+    }
+
+    function loadTargets() {
+      try {
+        const raw = localStorage.getItem(TARGETS_KEY);
+        return cloneTargets(raw ? JSON.parse(raw) : defaultTargets);
+      } catch {
+        return cloneTargets(defaultTargets);
+      }
+    }
+
+    function persistTargets() {
+      localStorage.setItem(TARGETS_KEY, JSON.stringify(getCleanTargets()));
+    }
+
+    function ownHarvesterCountForFront(row, rowsContext = []) {
+      const fleets = new Set((rowsContext || [])
+        .filter((item) => normalizeType(item.type) === TYPES.OWN_HARVEST)
+        .filter((item) => sameText(item.front, row.front))
+        .filter((item) => parseNumber(item.production) > 0 || item.id === row.id)
+        .map((item) => normalizeKey(item.fleet))
+        .filter(Boolean));
+      return Math.max(fleets.size, 1);
+    }
+
+    function targetForRow(row, source = targets, rowsContext = [row]) {
+      const cleanTargets = getCleanTargets(source);
+      const type = normalizeType(row.type);
+
+      if (type === TYPES.OWN_HARVEST) {
+        const found = cleanTargets.ownFronts.find((target) => sameText(target.front, row.front));
+        if (!found) return 0;
+        return found.target / ownHarvesterCountForFront(row, rowsContext);
+      }
+
+      if (type === TYPES.THIRD_HARVEST) {
+        const found = cleanTargets.thirdFronts.find((target) => sameText(target.front, row.front));
+        return found ? found.target : 0;
+      }
+
+      if (type === TYPES.OWN_TRANSPORT || type === TYPES.THIRD_TRANSPORT) {
+        const found = cleanTargets.transports.find((target) => target.type === type);
+        return found ? found.target : 0;
+      }
+
+      return 0;
+    }
+
+    function totalRegisteredTarget(source = targets) {
+      const cleanTargets = getCleanTargets(source);
+      return [
+        ...cleanTargets.ownFronts.map((row) => row.target),
+        ...cleanTargets.thirdFronts.map((row) => row.target),
+        ...cleanTargets.transports.map((row) => row.target)
+      ].reduce((sum, value) => sum + (Number(value) || 0), 0);
+    }
+
+    function ensureTargetForRow(row) {
+      const normalized = normalizeEntry(row);
+      if (normalized.type !== TYPES.OWN_HARVEST || !normalized.front) return;
+
+      const exists = targets.ownFronts.some((target) => sameText(target.front, normalized.front));
+      if (exists) return;
+
+      targets.ownFronts.push({
+        front: normalized.front,
+        target: 0
+      });
+      persistTargets();
+      renderOptions();
+    }
+
+    function normalizeEntry(row) {
+      const type = normalizeType(row.type || row.operation);
+      const rawFront = row.front || "";
+      const rawFleet = row.fleet || row.equipment || "";
+
+      return {
+        id: row.id || makeId(),
+        type,
+        front: needsFront(type) ? rawFront || defaultFrontFor(type) : "",
+        fleet: requiresFleet(type) ? rawFleet : "",
+        production: parseNumber(row.production ?? row.actual ?? row.effective ?? 0),
+        note: row.note || ""
+      };
+    }
+
+    function cloneEntries(source) {
+      return (source || []).map(normalizeEntry);
+    }
+
+    function getCleanEntries(source = entries) {
+      return cloneEntries(source)
+        .map((row) => ({
+          ...row,
+          type: normalizeType(row.type),
+          front: needsFront(row.type) ? String(row.front || "").trim() : "",
+          fleet: requiresFleet(row.type) ? String(row.fleet || "").trim() : "",
+          production: Math.max(0, parseNumber(row.production)),
+          note: String(row.note || "").trim()
+        }))
+        .filter((row) => typeOptions.includes(row.type))
+        .filter((row) => !needsFront(row.type) || row.front)
+        .filter((row) => !requiresFleet(row.type) || row.fleet)
+        .filter((row) => row.production > 0);
+    }
+
+    function loadRecords() {
+      const current = readStoredRecords(STORAGE_KEY);
+      if (current.length) return current;
+
+      for (const key of PREVIOUS_KEYS) {
+        const previous = readStoredRecords(key);
+        if (previous.length) return previous;
+      }
+
+      return [];
+    }
+
+    function readStoredRecords(key) {
+      try {
+        const raw = localStorage.getItem(key);
+        const parsed = raw ? JSON.parse(raw) : [];
+        const list = Array.isArray(parsed) ? parsed : parsed.records;
+        if (!Array.isArray(list)) return [];
+
+        return list
+          .filter((record) => record && record.plant === PLANT && record.date && Array.isArray(record.rows))
+          .map((record) => ({
+            id: record.id || makeId(),
+            plant: PLANT,
+            date: record.date,
+            rows: getCleanEntries(record.rows),
+            updatedAt: record.updatedAt || new Date().toISOString()
+          }))
+          .filter((record) => record.rows.length);
+      } catch {
+        return [];
+      }
+    }
+
+    function persistRecords() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    }
+
+    function summarizeRows(rows) {
+      const summary = {
+        total: 0,
+        ownHarvest: 0,
+        thirdHarvest: 0,
+        ownTransport: 0,
+        thirdTransport: 0,
+        targetTotal: totalRegisteredTarget(),
+        rowTargetTotal: 0,
+        remaining: 0,
+        targetPercent: 0,
+        records: rows.length
+      };
+      const targetKeys = new Set();
+
+      rows.forEach((row) => {
+        const value = Number(row.production) || 0;
+        const target = targetForRow(row, targets, rows);
+        const targetKey = targetKeyForRow(row);
+        summary.total += value;
+        if (row.type === TYPES.OWN_HARVEST) summary.ownHarvest += value;
+        if (row.type === TYPES.THIRD_HARVEST) summary.thirdHarvest += value;
+        if (row.type === TYPES.OWN_TRANSPORT) summary.ownTransport += value;
+        if (row.type === TYPES.THIRD_TRANSPORT) summary.thirdTransport += value;
+        if (targetKey && !targetKeys.has(targetKey)) {
+          summary.rowTargetTotal += target;
+          targetKeys.add(targetKey);
+        }
+      });
+
+      summary.remaining = Math.max(summary.targetTotal - summary.total, 0);
+      summary.targetPercent = progressFor(summary.total, summary.targetTotal);
+      return summary;
+    }
+
+    function aggregateBy(rows, field) {
+      const grouped = new Map();
+      rows.forEach((row) => {
+        const key = row[field] || "Sem frente";
+        if (!grouped.has(key)) {
+          grouped.set(key, { name: key, production: 0, target: 0, records: 0, targetKeys: new Set() });
+        }
+        const item = grouped.get(key);
+        const targetKey = targetKeyForRow(row);
+        item.production += Number(row.production) || 0;
+        if (targetKey && !item.targetKeys.has(targetKey)) {
+          item.target += targetForRow(row, targets, rows);
+          item.targetKeys.add(targetKey);
+        }
+        item.records += 1;
+      });
+
+      return [...grouped.values()]
+        .map(({ targetKeys, ...item }) => item)
+        .sort((a, b) => b.production - a.production || a.name.localeCompare(b.name));
+    }
+
+    function recordForDate(date) {
+      return records.find((record) => record.date === date && record.plant === PLANT);
+    }
+
+    function latestRecord() {
+      return [...records].sort((a, b) => b.date.localeCompare(a.date))[0] || null;
+    }
+
+    function renderOptions() {
+      els.frontOptions.innerHTML = frontOptions.map((item) => `<option value="${escapeHtml(item)}"></option>`).join("");
+      const knownFleets = [
+        ...fleetOptions,
+        ...entries.map((row) => row.fleet),
+        ...records.flatMap((record) => record.rows.map((row) => row.fleet))
+      ]
+        .map((fleet) => String(fleet || "").trim())
+        .filter(Boolean);
+      const uniqueFleets = [...new Set(knownFleets)];
+      els.fleetOptions.innerHTML = uniqueFleets.map((item) => `<option value="${escapeHtml(item)}"></option>`).join("");
+    }
+
+    function switchView(name) {
+      const views = {
+        dashboard: els.dashboardView,
+        entry: els.entryView,
+        targets: els.targetsView,
+        history: els.historyView
+      };
+
+      Object.entries(views).forEach(([viewName, element]) => {
+        element.hidden = viewName !== name;
+      });
+      els.navTabs.forEach((tab) => tab.setAttribute("aria-selected", String(tab.dataset.view === name)));
+
+      if (name === "dashboard") renderDashboard();
+      if (name === "entry") renderEntry();
+      if (name === "targets") renderTargets();
+      if (name === "history") renderHistory();
+    }
+
+    function setStats(prefix, rows) {
+      const summary = summarizeRows(rows);
+      els[`${prefix}Total`].textContent = formatNumber(summary.total);
+      els[`${prefix}OwnHarvest`].textContent = formatNumber(summary.ownHarvest);
+      els[`${prefix}ThirdHarvest`].textContent = formatNumber(summary.thirdHarvest);
+      els[`${prefix}OwnTransport`].textContent = formatNumber(summary.ownTransport);
+      els[`${prefix}ThirdTransport`].textContent = formatNumber(summary.thirdTransport);
+      els[`${prefix}Target`].textContent = formatNumber(summary.targetTotal);
+      els[`${prefix}TargetStatus`].textContent = `${formatPercent(summary.targetPercent)} atingido`;
+    }
+
+    function clampPercent(value) {
+      return Math.max(0, Math.min(100, Number(value) || 0));
+    }
+
+    function statusForProgress(percent) {
+      if (percent >= 100) return { label: "Meta batida", className: "good" };
+      if (percent >= 85) return { label: "Próximo da meta", className: "" };
+      return { label: "Abaixo da meta", className: "alert" };
+    }
+
+    function targetForType(type) {
+      const cleanTargets = getCleanTargets();
+      if (type === TYPES.OWN_HARVEST) {
+        return cleanTargets.ownFronts.reduce((sum, row) => sum + row.target, 0);
+      }
+      if (type === TYPES.THIRD_HARVEST) {
+        return cleanTargets.thirdFronts.reduce((sum, row) => sum + row.target, 0);
+      }
+      const transport = cleanTargets.transports.find((row) => row.type === type);
+      return transport ? transport.target : 0;
+    }
+
+    function targetForFront(front) {
+      const cleanTargets = getCleanTargets();
+      const own = cleanTargets.ownFronts.find((row) => sameText(row.front, front));
+      if (own) return own.target;
+      const third = cleanTargets.thirdFronts.find((row) => sameText(row.front, front));
+      return third ? third.target : 0;
+    }
+
+    function chartRow({ label, production, target, detail }) {
+      const hasTarget = Number(target) > 0;
+      const percent = hasTarget ? progressFor(production, target) : 0;
+      const width = hasTarget ? clampPercent(percent) : production > 0 ? 100 : 0;
+      const status = hasTarget ? statusForProgress(percent) : { label: "Sem meta", className: "" };
+      return `
+        <div class="chart-row">
+          <div class="chart-row-head">
+            <strong>${escapeHtml(label)}</strong>
+            <span>${formatNumber(production)} / ${formatNumber(target)}</span>
+          </div>
+          <div class="chart-track" aria-label="${escapeHtml(label)} ${formatPercent(percent)}">
+            <div class="chart-fill ${percent >= 100 ? "over" : ""}" style="width: ${width}%"></div>
+          </div>
+          <div class="chart-row-head">
+            <span>${escapeHtml(detail || "")}</span>
+            <span class="status-pill ${status.className}">${hasTarget ? formatPercent(percent) : status.label}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function productionByType(rows, type) {
+      return rows
+        .filter((row) => row.type === type)
+        .reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+    }
+
+    function productionByFront(rows, front) {
+      return rows
+        .filter((row) => sameText(row.front, front))
+        .reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+    }
+
+    function renderGoalOverview(rows) {
+      const summary = summarizeRows(rows);
+      const status = statusForProgress(summary.targetPercent);
+      els.goalOverviewWrap.innerHTML = `
+        <div class="goal-overview">
+          <div class="goal-main">
+            <strong>${formatPercent(summary.targetPercent)}</strong>
+            <span>${formatNumber(summary.total)} produzido de ${formatNumber(summary.targetTotal)} de meta</span>
+            <div class="meter-track" aria-label="Meta do dia ${formatPercent(summary.targetPercent)}">
+              <div class="meter-fill ${summary.targetPercent >= 100 ? "over" : ""}" style="width: ${clampPercent(summary.targetPercent)}%"></div>
+            </div>
+            <span class="status-pill ${status.className}">${status.label}</span>
+          </div>
+          <div class="goal-metrics">
+            <div class="goal-metric">
+              <span>Falta</span>
+              <strong>${formatNumber(summary.remaining)}</strong>
+            </div>
+            <div class="goal-metric">
+              <span>Registros</span>
+              <strong>${summary.records}</strong>
+            </div>
+            <div class="goal-metric">
+              <span>Colhedoras</span>
+              <strong>${ownHarvesterRanking(rows).length}</strong>
+            </div>
+            <div class="goal-metric">
+              <span>Frentes ativas</span>
+              <strong>${new Set(rows.filter((row) => row.front).map((row) => normalizeKey(row.front))).size}</strong>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderTypeChart(rows) {
+      const items = typeOptions.map((type) => ({
+        label: type,
+        production: productionByType(rows, type),
+        target: targetForType(type),
+        detail: type === TYPES.OWN_HARVEST ? "Frentes 4001, 4002 e 4003" : type === TYPES.THIRD_HARVEST ? "Frentes 4007 e 4009" : "Produção de transporte"
+      }));
+
+      els.typeChartWrap.innerHTML = `
+        <div class="chart-list">
+          ${items.map(chartRow).join("")}
+        </div>
+      `;
+    }
+
+    function renderFrontChart(rows) {
+      const items = frontOptions.map((front) => ({
+        label: front,
+        production: productionByFront(rows, front),
+        target: targetForFront(front),
+        detail: ownHarvestFronts.includes(front) ? "Colheita própria" : "Colheita terceira"
+      }));
+
+      els.frontChartWrap.innerHTML = `
+        <div class="chart-list">
+          ${items.map(chartRow).join("")}
+        </div>
+      `;
+    }
+
+    function ownHarvesterRanking(rows) {
+      const grouped = new Map();
+      rows
+        .filter((row) => row.type === TYPES.OWN_HARVEST)
+        .filter((row) => row.fleet)
+        .forEach((row) => {
+          const key = `${normalizeKey(row.front)}|${normalizeKey(row.fleet)}`;
+          if (!grouped.has(key)) {
+            grouped.set(key, {
+              front: row.front,
+              fleet: row.fleet,
+              production: 0,
+              target: targetForRow(row, targets, rows),
+              notes: 0
+            });
+          }
+          const item = grouped.get(key);
+          item.production += Number(row.production) || 0;
+          item.notes += 1;
+        });
+
+      return [...grouped.values()]
+        .map((item) => ({
+          ...item,
+          percent: progressFor(item.production, item.target),
+          remaining: Math.max(item.target - item.production, 0)
+        }))
+        .sort((a, b) => b.production - a.production || b.percent - a.percent || a.fleet.localeCompare(b.fleet));
+    }
+
+    function renderHarvesterRanking(rows) {
+      const ranking = ownHarvesterRanking(rows);
+      if (!ranking.length) {
+        els.harvesterRankingWrap.innerHTML = '<div class="empty-state">Sem colhedoras próprias lançadas para a data selecionada.</div>';
+        return;
+      }
+
+      els.harvesterRankingWrap.innerHTML = `
+        <div class="rank-list">
+          ${ranking.map((item, index) => {
+            const hasTarget = Number(item.target) > 0;
+            const status = hasTarget ? statusForProgress(item.percent) : { label: "Sem meta", className: "" };
+            const width = hasTarget ? clampPercent(item.percent) : item.production > 0 ? 100 : 0;
+            return `
+              <div class="rank-item">
+                <div class="rank-position">${index + 1}</div>
+                <div class="rank-main">
+                  <div class="rank-headline">
+                    <strong>${escapeHtml(item.fleet)}</strong>
+                    <span class="status-pill ${status.className}">${hasTarget ? formatPercent(item.percent) : status.label}</span>
+                  </div>
+                  <div class="rank-track" aria-label="${escapeHtml(item.fleet)} ${formatPercent(item.percent)}">
+                    <div class="rank-fill ${item.percent >= 100 ? "over" : ""}" style="width: ${width}%"></div>
+                  </div>
+                  <div class="rank-values">
+                    <span>${escapeHtml(item.front)} · ${formatNumber(item.production)} produzido</span>
+                    <span>${hasTarget ? `Meta ${formatNumber(item.target)} · Falta ${formatNumber(item.remaining)}` : "Meta não cadastrada"}</span>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function renderDashboardCharts(rows) {
+      renderGoalOverview(rows);
+      renderTypeChart(rows);
+      renderFrontChart(rows);
+      renderHarvesterRanking(rows);
+    }
+
+    function renderDashboard() {
+      const date = els.dashboardDate.value;
+      const record = recordForDate(date);
+      const rows = record ? cloneEntries(record.rows) : [];
+
+      els.dashboardSource.textContent = record
+        ? `Lançamento salvo em ${formatDate(record.date)}.`
+        : "Nenhum lançamento salvo para esta data.";
+
+      setStats("dash", rows);
+      renderDashboardCharts(rows);
+      renderTypeSummary(rows);
+      renderFrontSummary(rows);
+      renderDashboardRows(rows);
+    }
+
+    function renderTypeSummary(rows) {
+      const items = aggregateBy(rows, "type");
+      if (!items.length) {
+        els.typeSummaryWrap.innerHTML = '<div class="empty-state">Sem produção salva para a data selecionada.</div>';
+        return;
+      }
+
+      els.typeSummaryWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Tipo</th>
+              <th>Produção</th>
+              <th>Meta</th>
+              <th>% Meta</th>
+              <th>Falta</th>
+              <th>Registros</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map((item) => `
+              <tr>
+                <td>${escapeHtml(item.name)}</td>
+                <td>${formatNumber(item.production)}</td>
+                <td>${formatNumber(item.target)}</td>
+                <td>${formatPercent(progressFor(item.production, item.target))}</td>
+                <td>${formatNumber(Math.max(item.target - item.production, 0))}</td>
+                <td>${item.records}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderFrontSummary(rows) {
+      const items = aggregateBy(rows.filter((row) => isHarvest(row.type)), "front");
+      if (!items.length) {
+        els.frontSummaryWrap.innerHTML = '<div class="empty-state">Sem produção de colheita salva para a data selecionada.</div>';
+        return;
+      }
+
+      els.frontSummaryWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Frente</th>
+              <th>Produção</th>
+              <th>Meta</th>
+              <th>% Meta</th>
+              <th>Falta</th>
+              <th>Registros</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map((item) => `
+              <tr>
+                <td>${escapeHtml(item.name)}</td>
+                <td>${formatNumber(item.production)}</td>
+                <td>${formatNumber(item.target)}</td>
+                <td>${formatPercent(progressFor(item.production, item.target))}</td>
+                <td>${formatNumber(Math.max(item.target - item.production, 0))}</td>
+                <td>${item.records}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderDashboardRows(rows) {
+      if (!rows.length) {
+        els.dashboardRowsWrap.innerHTML = '<div class="empty-state">Nenhum lançamento salvo para a data selecionada.</div>';
+        return;
+      }
+
+      els.dashboardRowsWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Tipo</th>
+              <th>Frente</th>
+              <th>Frota</th>
+              <th>Meta</th>
+              <th>Produção</th>
+              <th>% Meta</th>
+              <th>Falta</th>
+              <th>Observação</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((row) => {
+              const target = targetForRow(row, targets, rows);
+              return `
+                <tr>
+                  <td>${escapeHtml(row.type)}</td>
+                  <td>${escapeHtml(row.front || "-")}</td>
+                  <td>${escapeHtml(row.fleet || "-")}</td>
+                  <td>${formatNumber(target)}</td>
+                  <td>${formatNumber(row.production)}</td>
+                  <td>${formatPercent(progressFor(row.production, target))}</td>
+                  <td>${formatNumber(Math.max(target - row.production, 0))}</td>
+                  <td>${escapeHtml(row.note || "")}</td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderEntry() {
+      renderEntryRows();
+      setStats("entry", getCleanEntries(entries));
+    }
+
+    function openFrontWorkspace(front, type) {
+      activeFront = { front, type: normalizeType(type) };
+      els.frontWorkspace.hidden = false;
+      els.activeFrontTitle.textContent = `${activeFront.front} · ${activeFront.type}`;
+      els.activeFrontHint.textContent = requiresFleet(activeFront.type)
+        ? "Informe a frota da colhedora e a produção, ou importe um arquivo do sistema."
+        : "Informe a produção da frente, ou importe um arquivo do sistema.";
+      els.manualFleetField.hidden = !requiresFleet(activeFront.type);
+      els.manualFleet.value = "";
+      els.manualProduction.value = "";
+      els.manualNote.value = "";
+      els.frontCards.forEach((card) => {
+        const selected = card.dataset.front === front && card.dataset.type === type;
+        card.setAttribute("aria-pressed", String(selected));
+      });
+      setTimeout(() => {
+        const target = requiresFleet(activeFront.type) ? els.manualFleet : els.manualProduction;
+        target.focus();
+      }, 0);
+    }
+
+    function closeFrontWorkspace() {
+      activeFront = null;
+      els.frontWorkspace.hidden = true;
+      els.frontCards.forEach((card) => card.setAttribute("aria-pressed", "false"));
+    }
+
+    function addOrMergeEntry(row) {
+      const normalized = normalizeEntry(row);
+      if (!typeOptions.includes(normalized.type)) return false;
+      if (needsFront(normalized.type) && !normalized.front) return false;
+      if (requiresFleet(normalized.type) && !normalized.fleet) return false;
+      if (!normalized.production) return false;
+
+      const existing = entries.find((item) => {
+        return item.type === normalized.type
+          && item.front === normalized.front
+          && (item.fleet || "") === (normalized.fleet || "");
+      });
+
+      if (existing) {
+        existing.production = parseNumber(existing.production) + normalized.production;
+        if (normalized.note && !existing.note) existing.note = normalized.note;
+      } else {
+        entries.push(normalized);
+      }
+      ensureTargetForRow(normalized);
+      return true;
+    }
+
+    function addManualFrontProduction() {
+      if (!activeFront) {
+        showToast("Selecione uma frente primeiro.");
+        return;
+      }
+
+      const production = parseNumber(els.manualProduction.value);
+      if (!production) {
+        showToast("Informe a produção.");
+        return;
+      }
+
+      const fleet = requiresFleet(activeFront.type) ? els.manualFleet.value.trim() : "";
+      if (requiresFleet(activeFront.type) && !fleet) {
+        showToast("Informe a frota da colhedora.");
+        return;
+      }
+
+      addOrMergeEntry({
+        type: activeFront.type,
+        front: activeFront.front,
+        fleet,
+        production,
+        note: els.manualNote.value
+      });
+
+      els.manualFleet.value = "";
+      els.manualProduction.value = "";
+      els.manualNote.value = "";
+      renderEntry();
+      showToast("Produção adicionada à conferência.");
+    }
+
+    function normalizeHeader(value) {
+      return String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+    }
+
+    function valueFromRow(row, names) {
+      const normalized = {};
+      Object.entries(row || {}).forEach(([key, value]) => {
+        normalized[normalizeHeader(key)] = value;
+      });
+
+      for (const name of names) {
+        const direct = normalized[normalizeHeader(name)];
+        if (direct !== undefined && direct !== "") return direct;
+      }
+
+      const normalizedNames = names.map(normalizeHeader);
+      const foundKey = Object.keys(normalized).find((key) => normalizedNames.some((name) => key.includes(name)));
+      return foundKey ? normalized[foundKey] : "";
+    }
+
+    function splitDelimitedLine(line, separator) {
+      const cells = [];
+      let current = "";
+      let quoted = false;
+
+      for (let i = 0; i < line.length; i += 1) {
+        const char = line[i];
+        const next = line[i + 1];
+        if (char === '"' && quoted && next === '"') {
+          current += '"';
+          i += 1;
+        } else if (char === '"') {
+          quoted = !quoted;
+        } else if (char === separator && !quoted) {
+          cells.push(current.trim());
+          current = "";
+        } else {
+          current += char;
+        }
+      }
+      cells.push(current.trim());
+      return cells;
+    }
+
+    function parseDelimited(text) {
+      const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      if (lines.length < 2) return [];
+      const first = lines[0];
+      const separator = first.includes(";") ? ";" : first.includes("\t") ? "\t" : ",";
+      const headers = splitDelimitedLine(first, separator);
+
+      return lines.slice(1).map((line) => {
+        const values = splitDelimitedLine(line, separator);
+        return headers.reduce((row, header, index) => {
+          row[header] = values[index] || "";
+          return row;
+        }, {});
+      });
+    }
+
+    function stripHtml(text) {
+      return String(text || "")
+        .replace(/<script[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style[\s\S]*?<\/style>/gi, " ")
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/tr>/gi, "\n")
+        .replace(/<\/p>/gi, "\n")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&");
+    }
+
+    function parseHarvesterReport(text) {
+      const cleaned = stripHtml(text);
+      const lines = cleaned
+        .split(/\r?\n/)
+        .map((line) => line.replace(/\s+/g, " ").trim())
+        .filter(Boolean);
+
+      const hasReportHeader = lines.some((line) => /colhedora\s+e\s+dias\s+trabalhados/i.test(line))
+        || lines.some((line) => /toneladas\s+colhidas/i.test(line));
+      if (!hasReportHeader) return [];
+
+      return lines.reduce((rows, line) => {
+        if (/^total\b|^total\s*\/|^c[oó]digo\b/i.test(line)) return rows;
+
+        const match = line.match(/^(\d{3,})\s+(.+?)\s+(\d[\d.]*,\d+|\d+(?:\.\d{3})+|\d+)\s+\d+\s+/);
+        if (!match) return rows;
+
+        rows.push({
+          codigo: normalizeFleetCode(match[1]),
+          frota: normalizeFleetCode(match[1]),
+          modelo: match[2].trim(),
+          toneladas_colhidas: normalizeReportNumber(match[3]),
+          producao: normalizeReportNumber(match[3]),
+          observacao: match[2].trim()
+        });
+        return rows;
+      }, []);
+    }
+
+    function normalizeReportNumber(value) {
+      const text = String(value || "").trim();
+      if (/^\d+\.\d{3}$/.test(text)) return text.replace(".", ",");
+      return text;
+    }
+
+    function normalizeFleetCode(value) {
+      const text = String(value || "").replace(/\D/g, "");
+      if (/^600\d$/.test(text)) return `${text.slice(0, 3)}0${text.slice(3)}`;
+      return text || String(value || "").trim();
+    }
+
+    function textCenter(word) {
+      const box = word.bbox || {};
+      const x0 = Number(box.x0 ?? word.x0 ?? 0);
+      const x1 = Number(box.x1 ?? word.x1 ?? x0);
+      const y0 = Number(box.y0 ?? word.y0 ?? 0);
+      const y1 = Number(box.y1 ?? word.y1 ?? y0);
+      return {
+        x: (x0 + x1) / 2,
+        y: (y0 + y1) / 2,
+        h: Math.max(1, y1 - y0)
+      };
+    }
+
+    function groupOcrWordsIntoLines(words) {
+      const cleanWords = (words || [])
+        .map((word) => ({ ...word, text: String(word.text || "").trim(), center: textCenter(word) }))
+        .filter((word) => word.text);
+      const averageHeight = cleanWords.reduce((sum, word) => sum + word.center.h, 0) / Math.max(cleanWords.length, 1);
+      const threshold = Math.max(10, averageHeight * 0.75);
+      const lines = [];
+
+      cleanWords
+        .sort((a, b) => a.center.y - b.center.y || a.center.x - b.center.x)
+        .forEach((word) => {
+          let line = lines.find((candidate) => Math.abs(candidate.y - word.center.y) <= threshold);
+          if (!line) {
+            line = { y: word.center.y, words: [] };
+            lines.push(line);
+          }
+          line.words.push(word);
+          line.y = line.words.reduce((sum, item) => sum + item.center.y, 0) / line.words.length;
+        });
+
+      return lines.map((line) => ({
+        ...line,
+        words: line.words.sort((a, b) => a.center.x - b.center.x)
+      }));
+    }
+
+    function reportColumnX(words, names) {
+      const matches = (words || []).filter((word) => {
+        const normalized = normalizeHeader(word.text);
+        return names.some((name) => normalized.includes(normalizeHeader(name)));
+      });
+      if (!matches.length) return null;
+      return matches.reduce((sum, word) => sum + word.center.x, 0) / matches.length;
+    }
+
+    function parseHarvesterOcrData(data) {
+      const words = (data.words || [])
+        .map((word) => ({ ...word, text: String(word.text || "").trim(), center: textCenter(word) }))
+        .filter((word) => word.text);
+      if (!words.length) return [];
+
+      const text = data.text || words.map((word) => word.text).join(" ");
+      const looksLikeReport = /colhedora\s+e\s+dias\s+trabalhados/i.test(text)
+        || /toneladas\s+colhidas/i.test(text)
+        || words.some((word) => normalizeHeader(word.text).includes("toneladas"));
+      if (!looksLikeReport) return [];
+
+      const tonX = reportColumnX(words, ["toneladas", "colhidas"]);
+      const lines = groupOcrWordsIntoLines(words);
+
+      return lines.reduce((rows, line) => {
+        const codeWord = line.words.find((word, index) => {
+          return index <= 2 && /^\d{3,6}$/.test(word.text.replace(/\D/g, ""));
+        });
+        if (!codeWord) return rows;
+
+        const code = normalizeFleetCode(codeWord.text);
+        const numericWords = line.words
+          .filter((word) => word.center.x > codeWord.center.x + 10)
+          .map((word) => ({ ...word, normalized: normalizeReportNumber(word.text) }))
+          .filter((word) => /^(\d+|\d+[\.,]\d+|\d+(?:\.\d{3})+)$/.test(word.normalized));
+
+        if (!numericWords.length) return rows;
+
+        let productionWord = numericWords[0];
+        if (tonX !== null) {
+          productionWord = numericWords.reduce((best, word) => {
+            return Math.abs(word.center.x - tonX) < Math.abs(best.center.x - tonX) ? word : best;
+          }, numericWords[0]);
+        }
+
+        const modelWords = line.words
+          .filter((word) => word.center.x > codeWord.center.x && word.center.x < productionWord.center.x - 8)
+          .map((word) => word.text)
+          .join(" ")
+          .replace(/^[-–—]+|[-–—]+$/g, "")
+          .trim();
+
+        rows.push({
+          codigo: code,
+          frota: code,
+          modelo: modelWords,
+          toneladas_colhidas: productionWord.normalized,
+          producao: productionWord.normalized,
+          observacao: modelWords
+        });
+        return rows;
+      }, []);
+    }
+
+    function rowsFromJson(value) {
+      if (Array.isArray(value)) return value;
+      if (Array.isArray(value.rows)) return value.rows;
+      if (Array.isArray(value.records)) {
+        return value.records.flatMap((record) => Array.isArray(record.rows) ? record.rows : []);
+      }
+      return [];
+    }
+
+    function loadExternalScript(url, globalName) {
+      if (window[globalName]) return Promise.resolve(window[globalName]);
+
+      return new Promise((resolve, reject) => {
+        const existing = document.querySelector(`script[data-lib="${globalName}"]`);
+        if (existing) {
+          existing.addEventListener("load", () => resolve(window[globalName]));
+          existing.addEventListener("error", reject);
+          return;
+        }
+
+        const script = document.createElement("script");
+        script.src = url;
+        script.dataset.lib = globalName;
+        script.onload = () => window[globalName] ? resolve(window[globalName]) : reject(new Error(`${globalName} indisponível`));
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    }
+
+    function extractRowsFromText(text, fileName = "") {
+      const looksJson = /\.json$/i.test(fileName) || text.trim().startsWith("{") || text.trim().startsWith("[");
+      if (looksJson) {
+        return rowsFromJson(JSON.parse(text));
+      }
+      const harvesterRows = parseHarvesterReport(text);
+      if (harvesterRows.length) return harvesterRows;
+      return parseDelimited(stripHtml(text));
+    }
+
+    function matrixToObjects(matrix) {
+      const rows = (matrix || []).filter((row) => Array.isArray(row) && row.some((cell) => String(cell ?? "").trim()));
+      const headerIndex = rows.findIndex((row) => {
+        const normalized = row.map(normalizeHeader).join(" ");
+        return normalized.includes("codigo") && normalized.includes("toneladas");
+      });
+      if (headerIndex < 0) return [];
+
+      const headers = rows[headerIndex].map((cell) => String(cell || "").trim() || "coluna");
+      return rows.slice(headerIndex + 1).map((row) => {
+        return headers.reduce((object, header, index) => {
+          object[header] = row[index] ?? "";
+          return object;
+        }, {});
+      });
+    }
+
+    function matrixToReportText(matrix) {
+      return (matrix || [])
+        .map((row) => (Array.isArray(row) ? row : []).map((cell) => String(cell ?? "").trim()).filter(Boolean).join(" "))
+        .filter(Boolean)
+        .join("\n");
+    }
+
+    async function rowsFromExcelFile(file) {
+      const XLSX = await loadExternalScript("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js", "XLSX");
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const rows = [];
+
+      workbook.SheetNames.forEach((sheetName) => {
+        const sheet = workbook.Sheets[sheetName];
+        const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+        const reportRows = parseHarvesterReport(matrixToReportText(matrix));
+        if (reportRows.length) {
+          rows.push(...reportRows);
+          return;
+        }
+
+        const objectRows = matrixToObjects(matrix);
+        if (objectRows.length) {
+          rows.push(...objectRows);
+          return;
+        }
+
+        rows.push(...XLSX.utils.sheet_to_json(sheet, { defval: "" }));
+      });
+
+      return rows;
+    }
+
+    function textContentToLines(content) {
+      const rows = new Map();
+      content.items.forEach((item) => {
+        const y = Math.round(item.transform[5]);
+        if (!rows.has(y)) rows.set(y, []);
+        rows.get(y).push({ x: item.transform[4], text: item.str });
+      });
+
+      return [...rows.entries()]
+        .sort((a, b) => b[0] - a[0])
+        .map(([, items]) => items.sort((a, b) => a.x - b.x).map((item) => item.text).join(" "))
+        .join("\n");
+    }
+
+    async function textFromPdfFile(file) {
+      const pdfjsLib = await loadExternalScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js", "pdfjsLib");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      const buffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+      const pages = [];
+
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+        const page = await pdf.getPage(pageNumber);
+        const content = await page.getTextContent();
+        pages.push(textContentToLines(content));
+      }
+
+      return pages.join("\n");
+    }
+
+    async function imageFileToCanvas(file) {
+      const url = URL.createObjectURL(file);
+      try {
+        const image = new Image();
+        image.src = url;
+        await image.decode();
+        const scale = 2.5;
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(image.naturalWidth * scale);
+        canvas.height = Math.round(image.naturalHeight * scale);
+        const context = canvas.getContext("2d", { willReadFrequently: true });
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.imageSmoothingEnabled = true;
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        for (let index = 0; index < imageData.data.length; index += 4) {
+          const gray = imageData.data[index] * 0.299 + imageData.data[index + 1] * 0.587 + imageData.data[index + 2] * 0.114;
+          const contrasted = gray > 185 ? 255 : gray < 95 ? 0 : gray;
+          imageData.data[index] = contrasted;
+          imageData.data[index + 1] = contrasted;
+          imageData.data[index + 2] = contrasted;
+        }
+        context.putImageData(imageData, 0, 0);
+        return canvas;
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+
+    async function ocrImageData(input) {
+      const Tesseract = await loadExternalScript("https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js", "Tesseract");
+      const imageInput = input instanceof HTMLCanvasElement ? input : await imageFileToCanvas(input);
+      const result = await Tesseract.recognize(imageInput, "por+eng", {
+        preserve_interword_spaces: "1",
+        tessedit_pageseg_mode: "6"
+      });
+      return result.data || {};
+    }
+
+    async function ocrImage(input) {
+      const result = await ocrImageData(input);
+      return result.text || "";
+    }
+
+    async function ocrPdfFile(file) {
+      const pdfjsLib = await loadExternalScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js", "pdfjsLib");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      const buffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+      const texts = [];
+
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+        const page = await pdf.getPage(pageNumber);
+        const viewport = page.getViewport({ scale: 2 });
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        await page.render({ canvasContext: context, viewport }).promise;
+        texts.push(await ocrImage(canvas));
+      }
+
+      return texts.join("\n");
+    }
+
+    async function rowsFromOcrPdfFile(file) {
+      const pdfjsLib = await loadExternalScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js", "pdfjsLib");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      const buffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+      const rows = [];
+      const texts = [];
+
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+        const page = await pdf.getPage(pageNumber);
+        const viewport = page.getViewport({ scale: 2.5 });
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        await page.render({ canvasContext: context, viewport }).promise;
+        const ocrData = await ocrImageData(canvas);
+        rows.push(...parseHarvesterOcrData(ocrData));
+        texts.push(ocrData.text || "");
+      }
+
+      if (rows.length) return rows;
+      return extractRowsFromText(texts.join("\n"), file.name);
+    }
+
+    async function rowsFromOcrImageFile(file) {
+      const ocrData = await ocrImageData(file);
+      const positionedRows = parseHarvesterOcrData(ocrData);
+      if (positionedRows.length) return positionedRows;
+      return extractRowsFromText(ocrData.text || "", file.name);
+    }
+
+    async function importedRowsFromFile(file) {
+      const name = file.name || "";
+      const isExcel = /\.(xlsx|xls)$/i.test(name);
+      const isPdf = /\.pdf$/i.test(name) || file.type === "application/pdf";
+      const isImage = /^image\//i.test(file.type);
+
+      if (isExcel) {
+        return rowsFromExcelFile(file);
+      }
+
+      if (isPdf) {
+        const text = await textFromPdfFile(file);
+        const rows = extractRowsFromText(text, name);
+        if (rows.length) return rows;
+        return rowsFromOcrPdfFile(file);
+      }
+
+      if (isImage) {
+        return rowsFromOcrImageFile(file);
+      }
+
+      return extractRowsFromText(await file.text(), name);
+    }
+
+    async function importFrontProduction(file) {
+      if (!file || !activeFront) return;
+
+      try {
+        showToast("Lendo arquivo...");
+        const importedRows = await importedRowsFromFile(file);
+        let added = 0;
+
+        importedRows.forEach((row) => {
+          const production = parseNumber(valueFromRow(row, [
+            "produção",
+            "producao",
+            "toneladas colhidas",
+            "toneladas_colhidas",
+            "produção diária",
+            "producao diaria",
+            "toneladas",
+            "tonelada",
+            "total",
+            "quantidade",
+            "qtd",
+            "valor",
+            "actual",
+            "efetivo"
+          ]));
+
+          const fleet = valueFromRow(row, [
+            "frota",
+            "codigo",
+            "código",
+            "cod",
+            "cód",
+            "frota colhedora",
+            "frota_colhedora",
+            "colhedora",
+            "equipamento",
+            "maquina",
+            "máquina",
+            "fleet"
+          ]);
+
+          const note = valueFromRow(row, ["modelo", "observação", "observacao", "obs", "note"]);
+          const ok = addOrMergeEntry({
+            type: activeFront.type,
+            front: activeFront.front,
+            fleet: requiresFleet(activeFront.type) ? String(fleet || "").trim() : "",
+            production,
+            note
+          });
+          if (ok) added += 1;
+        });
+
+        renderEntry();
+        showToast(added ? `${added} produção${added === 1 ? "" : "ões"} importada${added === 1 ? "" : "s"}.` : "Nenhuma produção válida encontrada no arquivo.");
+      } catch {
+        showToast("Não foi possível ler o arquivo da frente.");
+      } finally {
+        els.frontImportFile.value = "";
+      }
+    }
+
+    function typeSelect(row) {
+      return `
+        <select class="type-select" data-id="${row.id}" data-field="type" aria-label="Tipo">
+          ${typeOptions.map((type) => `<option value="${escapeHtml(type)}" ${row.type === type ? "selected" : ""}>${escapeHtml(type)}</option>`).join("")}
+        </select>
+      `;
+    }
+
+    function frontInput(row) {
+      if (!needsFront(row.type)) {
+        return '<input value="Não se aplica" disabled aria-label="Frente">';
+      }
+      return `<input class="front-input" list="frontOptions" data-id="${row.id}" data-field="front" value="${escapeHtml(row.front)}" aria-label="Frente">`;
+    }
+
+    function fleetInput(row) {
+      if (!requiresFleet(row.type)) {
+        return '<input value="Não se aplica" disabled aria-label="Frota da colhedora">';
+      }
+      return `<input class="fleet-input" list="fleetOptions" data-id="${row.id}" data-field="fleet" value="${escapeHtml(row.fleet)}" placeholder="Digite a frota" aria-label="Frota da colhedora">`;
+    }
+
+    function productionInput(row) {
+      return `
+        <input
+          class="number-input"
+          inputmode="decimal"
+          data-id="${row.id}"
+          data-field="production"
+          value="${formatNumber(row.production)}"
+          aria-label="Produção diária"
+        >
+      `;
+    }
+
+    function renderEntryRows() {
+      if (!entries.length) {
+        els.entryBody.innerHTML = '<tr><td colspan="8" class="empty-state">Clique em uma frente de colheita ou use os botões de transporte para iniciar o lançamento.</td></tr>';
+        return;
+      }
+
+      els.entryBody.innerHTML = entries.map((row) => {
+        const target = targetForRow(row, targets, entries);
+        return `
+          <tr>
+            <td>${typeSelect(row)}</td>
+            <td>${frontInput(row)}</td>
+            <td>${fleetInput(row)}</td>
+            <td>${formatNumber(target)}</td>
+            <td>${productionInput(row)}</td>
+            <td>${formatPercent(progressFor(row.production, target))}</td>
+            <td><input class="note-input" data-id="${row.id}" data-field="note" value="${escapeHtml(row.note)}" aria-label="Observação"></td>
+            <td>
+              <div class="row-buttons">
+                <button class="icon-button" data-action="duplicate" data-id="${row.id}" type="button" title="Duplicar">+</button>
+                <button class="icon-button delete" data-action="delete" data-id="${row.id}" type="button" title="Excluir">×</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function targetNumberInput(section, key, value, label) {
+      return `
+        <input
+          class="number-input"
+          inputmode="decimal"
+          data-target-section="${section}"
+          data-target-key="${escapeHtml(key)}"
+          data-field="target"
+          value="${formatNumber(value)}"
+          aria-label="${escapeHtml(label)}"
+        >
+      `;
+    }
+
+    function renderTargets() {
+      els.ownHarvesterTargetsBody.innerHTML = targets.ownFronts.map((row) => `
+        <tr>
+          <td>${escapeHtml(row.front)}</td>
+          <td>${targetNumberInput("ownFronts", row.front, row.target, `Meta diária ${row.front}`)}</td>
+        </tr>
+      `).join("");
+
+      els.thirdFrontTargetsBody.innerHTML = targets.thirdFronts.map((row) => `
+        <tr>
+          <td>${escapeHtml(row.front)}</td>
+          <td>${targetNumberInput("thirdFronts", row.front, row.target, `Meta diária ${row.front}`)}</td>
+        </tr>
+      `).join("");
+
+      els.transportTargetsBody.innerHTML = targets.transports.map((row) => `
+        <tr>
+          <td>${escapeHtml(row.type)}</td>
+          <td>${targetNumberInput("transports", row.type, row.target, `Meta diária ${row.type}`)}</td>
+        </tr>
+      `).join("");
+    }
+
+    function updateTarget(section, idOrKey, field, value) {
+      if (section === "ownFronts") {
+        const row = targets.ownFronts.find((item) => sameText(item.front, idOrKey));
+        if (row) row.target = parseNumber(value);
+        return;
+      }
+
+      if (section === "thirdFronts") {
+        const row = targets.thirdFronts.find((item) => sameText(item.front, idOrKey));
+        if (row) row.target = parseNumber(value);
+        return;
+      }
+
+      if (section === "transports") {
+        const row = targets.transports.find((item) => item.type === normalizeType(idOrKey));
+        if (row) row.target = parseNumber(value);
+      }
+    }
+
+    function saveTargets() {
+      targets = getCleanTargets(targets);
+      persistTargets();
+      renderOptions();
+      renderTargets();
+      renderEntry();
+      renderDashboard();
+      renderHistory();
+      showToast("Metas diárias salvas.");
+    }
+
+    function defaultsForType(type) {
+      const count = entries.filter((row) => row.type === type).length + 1;
+      const suffix = String(count).padStart(2, "0");
+      if (type === TYPES.OWN_HARVEST) {
+        return { type, front: ownHarvestFronts[(count - 1) % ownHarvestFronts.length], fleet: "", production: 0, note: "" };
+      }
+      if (type === TYPES.THIRD_HARVEST) {
+        return { type, front: thirdHarvestFronts[(count - 1) % thirdHarvestFronts.length], fleet: "", production: 0, note: "" };
+      }
+      if (type === TYPES.OWN_TRANSPORT) {
+        return { type, front: "", fleet: "", production: 0, note: "" };
+      }
+      return { type, front: "", fleet: "", production: 0, note: "" };
+    }
+
+    function addEntry(type) {
+      entries.push({ id: makeId(), ...defaultsForType(type) });
+      renderEntry();
+    }
+
+    function updateEntry(id, field, value) {
+      const row = entries.find((item) => item.id === id);
+      if (!row) return;
+
+      if (field === "production") {
+        row.production = parseNumber(value);
+      } else if (field === "type") {
+        const next = defaultsForType(normalizeType(value));
+        row.type = next.type;
+        row.front = next.front;
+        row.fleet = next.fleet;
+        row.note = row.note || next.note;
+        renderEntry();
+        return;
+      } else {
+        row[field] = value;
+      }
+
+      if ((field === "front" || field === "fleet" || field === "production") && parseNumber(row.production) > 0) {
+        ensureTargetForRow(row);
+      }
+      setStats("entry", getCleanEntries(entries));
+    }
+
+    function duplicateEntry(id) {
+      const index = entries.findIndex((item) => item.id === id);
+      if (index < 0) return;
+      entries.splice(index + 1, 0, { ...entries[index], id: makeId() });
+      renderEntry();
+    }
+
+    function deleteEntry(id) {
+      if (entries.length === 1) {
+        showToast("Mantenha pelo menos uma linha no lançamento.");
+        return;
+      }
+      entries = entries.filter((item) => item.id !== id);
+      renderEntry();
+    }
+
+    function resetEntries() {
+      entries = cloneEntries(defaultEntries);
+      renderEntry();
+      closeFrontWorkspace();
+      showToast("Lançamento limpo.");
+    }
+
+    function loadEntryDate() {
+      const date = els.entryDate.value;
+      const record = recordForDate(date);
+      if (!record) {
+        entries = cloneEntries(defaultEntries);
+        renderEntry();
+        closeFrontWorkspace();
+        showToast("Data sem lançamento salvo. A conferência foi limpa.");
+        return;
+      }
+
+      entries = cloneEntries(record.rows);
+      renderEntry();
+      closeFrontWorkspace();
+      showToast(`Lançamento de ${formatDate(date)} carregado.`);
+    }
+
+    function saveCurrentDay() {
+      const date = els.entryDate.value;
+      const cleanRows = getCleanEntries();
+
+      if (!date) {
+        showToast("Informe a data do lançamento.");
+        return;
+      }
+
+      if (!cleanRows.length) {
+        showToast("Informe produção em pelo menos uma linha válida.");
+        return;
+      }
+
+      const missingFleet = entries.some((row) => requiresFleet(row.type) && parseNumber(row.production) > 0 && !String(row.fleet || "").trim());
+      if (missingFleet) {
+        showToast("Nas frentes próprias, informe a frota da colhedora.");
+        return;
+      }
+
+      const existingIndex = records.findIndex((record) => record.date === date && record.plant === PLANT);
+      const record = {
+        id: existingIndex >= 0 ? records[existingIndex].id : makeId(),
+        plant: PLANT,
+        date,
+        rows: cleanRows,
+        updatedAt: new Date().toISOString()
+      };
+
+      cleanRows.forEach(ensureTargetForRow);
+
+      if (existingIndex >= 0) {
+        records[existingIndex] = record;
+        showToast("Lançamento diário da Cambuí atualizado.");
+      } else {
+        records.push(record);
+        showToast("Lançamento diário da Cambuí salvo.");
+      }
+
+      entries = cloneEntries(cleanRows.length ? cleanRows : defaultEntries);
+      persistRecords();
+      els.dashboardDate.value = date;
+      renderEntry();
+      renderDashboard();
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const query = (els.historySearch.value || "").trim().toLowerCase();
+      const sorted = [...records].sort((a, b) => b.date.localeCompare(a.date));
+      const filtered = sorted.filter((record) => {
+        if (!query) return true;
+        const haystack = [
+          record.date,
+          formatDate(record.date),
+          record.plant,
+          ...record.rows.flatMap((row) => [row.type, row.front, row.fleet, row.note])
+        ].join(" ").toLowerCase();
+        return haystack.includes(query);
+      });
+
+      els.historyCount.textContent = `${filtered.length} lançamento${filtered.length === 1 ? "" : "s"} salvo${filtered.length === 1 ? "" : "s"}.`;
+
+      if (!filtered.length) {
+        els.historyWrap.innerHTML = '<div class="empty-state">Nenhum lançamento encontrado para a Usina Cambuí.</div>';
+        return;
+      }
+
+      els.historyWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Produção total</th>
+              <th>Meta total</th>
+              <th>% Meta</th>
+              <th>Falta</th>
+              <th>Frentes próprias</th>
+              <th>Frentes terceiras</th>
+              <th>Transp. próprio</th>
+              <th>Transp. terceiro</th>
+              <th>Registros</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filtered.map((record) => {
+              const summary = summarizeRows(record.rows);
+              return `
+                <tr>
+                  <td>${formatDate(record.date)}</td>
+                  <td>${formatNumber(summary.total)}</td>
+                  <td>${formatNumber(summary.targetTotal)}</td>
+                  <td>${formatPercent(summary.targetPercent)}</td>
+                  <td>${formatNumber(summary.remaining)}</td>
+                  <td>${formatNumber(summary.ownHarvest)}</td>
+                  <td>${formatNumber(summary.thirdHarvest)}</td>
+                  <td>${formatNumber(summary.ownTransport)}</td>
+                  <td>${formatNumber(summary.thirdTransport)}</td>
+                  <td>${summary.records}</td>
+                  <td>
+                    <div class="row-buttons">
+                      <button class="btn-link" data-history-action="dashboard" data-id="${record.id}" type="button">Dashboard</button>
+                      <button class="btn-link" data-history-action="open" data-id="${record.id}" type="button">Editar</button>
+                      <button class="btn-link" data-history-action="delete" data-id="${record.id}" type="button">Excluir</button>
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function openHistory(id) {
+      const record = records.find((item) => item.id === id);
+      if (!record) return;
+      els.entryDate.value = record.date;
+      entries = cloneEntries(record.rows);
+      switchView("entry");
+      showToast(`Lançamento de ${formatDate(record.date)} aberto para edição.`);
+    }
+
+    function openHistoryDashboard(id) {
+      const record = records.find((item) => item.id === id);
+      if (!record) return;
+      els.dashboardDate.value = record.date;
+      switchView("dashboard");
+      showToast(`Dashboard de ${formatDate(record.date)} aberto.`);
+    }
+
+    function deleteHistory(id) {
+      records = records.filter((item) => item.id !== id);
+      persistRecords();
+      renderDashboard();
+      renderHistory();
+      showToast("Lançamento removido do histórico.");
+    }
+
+    function exportCsv() {
+      const source = records.length ? records : [{
+        id: "rascunho",
+        plant: PLANT,
+        date: els.entryDate.value,
+        rows: getCleanEntries()
+      }];
+
+      const header = ["data", "usina", "tipo", "frente", "frota_colhedora", "meta", "producao", "percentual_meta", "falta", "observacao"];
+      const lines = source.flatMap((record) => record.rows.map((row) => {
+        const target = targetForRow(row, targets, record.rows);
+        return [
+          record.date,
+          record.plant,
+          row.type,
+          row.front,
+          row.fleet,
+          target,
+          row.production,
+          formatPercent(progressFor(row.production, target)),
+          Math.max(target - row.production, 0),
+          row.note || ""
+        ].map(csvCell).join(";");
+      }));
+
+      downloadFile(`producao-cambui-${todayInputValue()}.csv`, [header.join(";"), ...lines].join("\n"), "text/csv;charset=utf-8");
+      showToast("CSV de produção exportado.");
+    }
+
+    function exportJson() {
+      const payload = {
+        plant: PLANT,
+        version: 6,
+        exportedAt: new Date().toISOString(),
+        targets: getCleanTargets(),
+        records
+      };
+      downloadFile(`producao-cambui-${todayInputValue()}.json`, JSON.stringify(payload, null, 2), "application/json");
+      showToast("JSON da Cambuí exportado.");
+    }
+
+    async function importJson(file) {
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const payload = JSON.parse(text);
+        const importedRecords = Array.isArray(payload) ? payload : payload.records;
+        if (!Array.isArray(importedRecords)) throw new Error("Formato inválido");
+
+        if (!Array.isArray(payload) && payload.targets) {
+          targets = cloneTargets(payload.targets);
+          persistTargets();
+        }
+
+        const normalized = importedRecords
+          .filter((record) => record && record.date && Array.isArray(record.rows))
+          .map((record) => ({
+            id: record.id || makeId(),
+            plant: PLANT,
+            date: record.date,
+            rows: getCleanEntries(record.rows),
+            updatedAt: record.updatedAt || new Date().toISOString()
+          }))
+          .filter((record) => record.rows.length);
+
+        const byDate = new Map(records.map((record) => [`${record.plant}|${record.date}`, record]));
+        normalized.forEach((record) => byDate.set(`${PLANT}|${record.date}`, record));
+        records = [...byDate.values()].filter((record) => record.plant === PLANT);
+        persistRecords();
+        renderOptions();
+        renderTargets();
+        renderEntry();
+        renderDashboard();
+        renderHistory();
+        showToast("JSON importado para produção.");
+      } catch {
+        showToast("Não foi possível importar o JSON.");
+      } finally {
+        els.importFile.value = "";
+      }
+    }
+
+    function csvCell(value) {
+      return `"${String(value ?? "").replace(/"/g, '""')}"`;
+    }
+
+    function downloadFile(filename, content, type) {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function showToast(message) {
+      els.toast.textContent = message;
+      els.toast.classList.add("visible");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => els.toast.classList.remove("visible"), 2800);
+    }
+
+    els.navTabs.forEach((tab) => {
+      tab.addEventListener("click", () => switchView(tab.dataset.view));
+    });
+
+    els.dashboardDate.addEventListener("change", renderDashboard);
+    els.historySearch.addEventListener("input", renderHistory);
+
+    els.frontCards.forEach((card) => {
+      card.addEventListener("click", () => openFrontWorkspace(card.dataset.front, card.dataset.type));
+    });
+
+    document.querySelector("#closeFrontWorkspaceBtn").addEventListener("click", closeFrontWorkspace);
+    document.querySelector("#addManualFrontBtn").addEventListener("click", addManualFrontProduction);
+    document.querySelector("#importFrontFileBtn").addEventListener("click", () => {
+      if (!activeFront) {
+        showToast("Selecione uma frente primeiro.");
+        return;
+      }
+      els.frontImportFile.click();
+    });
+    els.frontImportFile.addEventListener("change", (event) => importFrontProduction(event.target.files[0]));
+
+    document.querySelector("#saveTargetsBtn").addEventListener("click", saveTargets);
+
+    [els.ownHarvesterTargetsBody, els.thirdFrontTargetsBody, els.transportTargetsBody].forEach((body) => {
+      body.addEventListener("input", (event) => {
+        const target = event.target;
+        const section = target.dataset.targetSection;
+        const field = target.dataset.field;
+        if (!section || !field) return;
+        updateTarget(section, target.dataset.id || target.dataset.targetKey, field, target.value);
+      });
+
+      body.addEventListener("change", (event) => {
+        const target = event.target;
+        const section = target.dataset.targetSection;
+        const field = target.dataset.field;
+        if (!section || !field) return;
+        updateTarget(section, target.dataset.id || target.dataset.targetKey, field, target.value);
+        if (field === "target") {
+          target.value = formatNumber(parseNumber(target.value));
+        }
+      });
+
+    });
+
+    els.entryBody.addEventListener("input", (event) => {
+      const target = event.target;
+      const id = target.dataset.id;
+      const field = target.dataset.field;
+      if (!id || !field) return;
+      updateEntry(id, field, target.value);
+    });
+
+    els.entryBody.addEventListener("change", (event) => {
+      const target = event.target;
+      const id = target.dataset.id;
+      const field = target.dataset.field;
+      if (!id || !field) return;
+      if (field === "production") {
+        target.value = formatNumber(parseNumber(target.value));
+      }
+      if (field === "type") {
+        updateEntry(id, field, target.value);
+      }
+      if (field === "front" || field === "fleet") {
+        renderEntry();
+      }
+    });
+
+    els.entryBody.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-action]");
+      if (!button) return;
+      if (button.dataset.action === "duplicate") duplicateEntry(button.dataset.id);
+      if (button.dataset.action === "delete") deleteEntry(button.dataset.id);
+    });
+
+    els.historyWrap.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-history-action]");
+      if (!button) return;
+      if (button.dataset.historyAction === "dashboard") openHistoryDashboard(button.dataset.id);
+      if (button.dataset.historyAction === "open") openHistory(button.dataset.id);
+      if (button.dataset.historyAction === "delete") deleteHistory(button.dataset.id);
+    });
+
+    document.querySelector("#todayDashboardBtn").addEventListener("click", () => {
+      els.dashboardDate.value = todayInputValue();
+      renderDashboard();
+    });
+
+    document.querySelector("#latestDashboardBtn").addEventListener("click", () => {
+      const latest = latestRecord();
+      if (!latest) {
+        showToast("Ainda não há lançamento salvo.");
+        return;
+      }
+      els.dashboardDate.value = latest.date;
+      renderDashboard();
+    });
+
+    document.querySelector("#loadDateBtn").addEventListener("click", loadEntryDate);
+    document.querySelector("#saveBtn").addEventListener("click", saveCurrentDay);
+    document.querySelector("#addOwnHarvesterBtn").addEventListener("click", () => addEntry(TYPES.OWN_HARVEST));
+    document.querySelector("#addThirdFrontBtn").addEventListener("click", () => addEntry(TYPES.THIRD_HARVEST));
+    document.querySelector("#addOwnTransportBtn").addEventListener("click", () => addEntry(TYPES.OWN_TRANSPORT));
+    document.querySelector("#addThirdTransportBtn").addEventListener("click", () => addEntry(TYPES.THIRD_TRANSPORT));
+    document.querySelector("#resetBtn").addEventListener("click", resetEntries);
+    document.querySelector("#exportCsvBtn").addEventListener("click", exportCsv);
+    document.querySelector("#exportJsonBtn").addEventListener("click", exportJson);
+    document.querySelector("#importJsonBtn").addEventListener("click", () => els.importFile.click());
+    document.querySelector("#printBtn").addEventListener("click", () => window.print());
+    els.importFile.addEventListener("change", (event) => importJson(event.target.files[0]));
+
+    renderOptions();
+    const initialDate = todayInputValue();
+    const initialDashboardRecord = recordForDate(initialDate) || latestRecord();
+    els.dashboardDate.value = initialDashboardRecord ? initialDashboardRecord.date : initialDate;
+    els.entryDate.value = initialDate;
+    renderTargets();
+    renderEntry();
+    renderDashboard();
+    renderHistory();
+  </script>
+</body>
+</html>
