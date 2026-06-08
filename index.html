@@ -194,6 +194,10 @@
       box-shadow: var(--shadow);
     }
 
+    .dashboard-filter {
+      grid-template-columns: repeat(2, minmax(160px, 220px)) 1fr auto;
+    }
+
     .filter-note {
       min-height: 40px;
       display: flex;
@@ -240,7 +244,7 @@
 
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 12px;
     }
 
@@ -586,6 +590,53 @@
       padding: 16px;
     }
 
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .section-note {
+      margin: 0 0 14px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .sync-status {
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      color: var(--muted);
+      font-weight: 700;
+      line-height: 1.4;
+    }
+
+    .sync-status.good {
+      background: #edf6ef;
+      border-color: #c9d8ce;
+      color: var(--green-dark);
+    }
+
+    .sync-status.alert {
+      background: #fae5e8;
+      border-color: #efc7cd;
+      color: var(--red);
+    }
+
+    .section-stack {
+      display: grid;
+      gap: 14px;
+    }
+
+    .section-stack .history-actions {
+      justify-content: flex-start;
+    }
+
     .table-wrap {
       overflow-x: auto;
     }
@@ -749,11 +800,23 @@
       .manual-grid {
         grid-template-columns: 1fr;
       }
+
+      .settings-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
     }
 
     @media (max-width: 760px) {
       .header-inner,
       .filter-bar {
+        grid-template-columns: 1fr;
+      }
+
+      .dashboard-filter {
+        grid-template-columns: 1fr;
+      }
+
+      .settings-grid {
         grid-template-columns: 1fr;
       }
 
@@ -836,14 +899,20 @@
 
   <main class="main">
     <section class="view" id="dashboardView">
-      <div class="filter-bar">
+      <div class="filter-bar dashboard-filter">
         <div class="field">
-          <label for="dashboardDate">Data analisada</label>
-          <input id="dashboardDate" type="date">
+          <label for="dashboardStartDate">Início do período</label>
+          <input id="dashboardStartDate" type="date">
         </div>
-        <div class="filter-note" id="dashboardSource">Nenhum lançamento salvo para esta data.</div>
+        <div class="field">
+          <label for="dashboardEndDate">Fim do período</label>
+          <input id="dashboardEndDate" type="date">
+        </div>
+        <div class="filter-note" id="dashboardSource">Nenhum lançamento salvo para este período.</div>
         <div class="actions">
           <button class="btn-secondary" id="todayDashboardBtn" type="button">Hoje</button>
+          <button class="btn-secondary" id="monthDashboardBtn" type="button">Mês atual</button>
+          <button class="btn-secondary" id="allDashboardBtn" type="button">Todo acumulado</button>
           <button class="btn-secondary" id="latestDashboardBtn" type="button">Último salvo</button>
           <button class="btn-secondary" id="printBtn" type="button">Imprimir</button>
         </div>
@@ -851,9 +920,9 @@
 
       <section class="stats-grid" aria-label="Indicadores do dashboard">
         <article class="stat">
-          <span>Produção total</span>
+          <span>Produção período</span>
           <strong id="dashTotal">0</strong>
-          <small>Todos os lançamentos do dia</small>
+          <small>Intervalo selecionado</small>
         </article>
         <article class="stat">
           <span>Frentes próprias</span>
@@ -868,24 +937,34 @@
         <article class="stat">
           <span>Transporte próprio</span>
           <strong id="dashOwnTransport">0</strong>
-          <small>Produção diária</small>
+          <small>No período</small>
         </article>
         <article class="stat">
           <span>Transporte terceiro</span>
           <strong id="dashThirdTransport">0</strong>
-          <small>Produção diária</small>
+          <small>No período</small>
         </article>
         <article class="stat">
-          <span>Meta total</span>
+          <span>Meta período</span>
           <strong id="dashTarget">0</strong>
           <small id="dashTargetStatus">0% atingido</small>
+        </article>
+        <article class="stat">
+          <span>Acumulado mês</span>
+          <strong id="dashMonthAccumulated">0</strong>
+          <small id="dashMonthAccumulatedLabel">Mês selecionado</small>
+        </article>
+        <article class="stat">
+          <span>Acumulado total</span>
+          <strong id="dashAllAccumulated">0</strong>
+          <small>Todos os lançamentos salvos</small>
         </article>
       </section>
 
       <section class="dashboard-chart-grid" aria-label="Gráficos do dashboard">
         <section class="panel">
           <div class="panel-head">
-            <h2>Meta do dia</h2>
+            <h2>Meta do período</h2>
           </div>
           <div class="panel-body" id="goalOverviewWrap"></div>
         </section>
@@ -928,9 +1007,25 @@
         </section>
       </section>
 
+      <section class="dashboard-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Destaques do período</h2>
+          </div>
+          <div class="panel-body" id="dashboardHighlightsWrap"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Resumo diário</h2>
+          </div>
+          <div class="table-wrap" id="dailySummaryWrap"></div>
+        </section>
+      </section>
+
       <section class="panel">
         <div class="panel-head">
-          <h2>Lançamentos do dia</h2>
+          <h2>Lançamentos do período</h2>
         </div>
         <div class="table-wrap" id="dashboardRowsWrap"></div>
       </section>
@@ -1149,11 +1244,73 @@
         <div class="filter-note" id="historyCount">0 lançamentos salvos.</div>
         <div class="history-actions">
           <button class="btn-secondary" id="exportCsvBtn" type="button">Exportar CSV</button>
-          <button class="btn-secondary" id="exportJsonBtn" type="button">Exportar JSON</button>
-          <button class="btn-secondary" id="importJsonBtn" type="button">Importar JSON</button>
+          <button class="btn-secondary" id="exportJsonBtn" type="button">Exportar backup JSON</button>
+          <button class="btn-secondary" id="importJsonBtn" type="button">Importar backup JSON</button>
           <input class="file-input" id="importFile" type="file" accept="application/json,.json">
         </div>
       </div>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Backup local e Firebase</h2>
+          <span class="status-pill" id="firebaseStatusPill">Somente local</span>
+        </div>
+        <div class="panel-body">
+          <p class="section-note">O sistema continua salvando no navegador e, quando o Firebase estiver configurado, grava a mesma base no banco. Assim voce tem backup local em arquivo JSON e uma copia remota dos dados.</p>
+          <div class="sync-status" id="firebaseSyncStatus">Preencha os dados do Firebase para ativar a sincronizacao com o banco.</div>
+          <div class="settings-grid">
+            <div class="field">
+              <label for="firebaseApiKey">API Key</label>
+              <input id="firebaseApiKey" type="text" placeholder="AIza...">
+            </div>
+            <div class="field">
+              <label for="firebaseAuthDomain">Auth Domain</label>
+              <input id="firebaseAuthDomain" type="text" placeholder="seu-projeto.firebaseapp.com">
+            </div>
+            <div class="field">
+              <label for="firebaseProjectId">Project ID</label>
+              <input id="firebaseProjectId" type="text" placeholder="seu-projeto">
+            </div>
+            <div class="field">
+              <label for="firebaseStorageBucket">Storage Bucket</label>
+              <input id="firebaseStorageBucket" type="text" placeholder="seu-projeto.appspot.com">
+            </div>
+            <div class="field">
+              <label for="firebaseMessagingSenderId">Messaging Sender ID</label>
+              <input id="firebaseMessagingSenderId" type="text" placeholder="1234567890">
+            </div>
+            <div class="field">
+              <label for="firebaseAppId">App ID</label>
+              <input id="firebaseAppId" type="text" placeholder="1:1234567890:web:abc123">
+            </div>
+          </div>
+          <div class="history-actions">
+            <button class="btn-secondary" id="saveFirebaseConfigBtn" type="button">Salvar configuracao</button>
+            <button class="btn-secondary" id="testFirebaseBtn" type="button">Testar conexao</button>
+            <button class="btn-secondary" id="pushFirebaseBtn" type="button">Enviar para Firebase</button>
+            <button class="btn-secondary" id="pullFirebaseBtn" type="button">Baixar do Firebase</button>
+            <button class="btn-secondary" id="retryPendingSyncBtn" type="button">Sincronizar pendencias</button>
+            <button class="btn-secondary" id="createBackupBtn" type="button">Gerar backup agora</button>
+          </div>
+          <div class="table-wrap" id="pendingSyncWrap"></div>
+        </div>
+      </section>
+
+      <section class="dashboard-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Backups automáticos</h2>
+          </div>
+          <div class="table-wrap" id="autoBackupWrap"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Auditoria recente</h2>
+          </div>
+          <div class="panel-body" id="auditWrap"></div>
+        </section>
+      </section>
 
       <section class="panel">
         <div class="panel-head">
@@ -1169,9 +1326,19 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
   <script>
     const STORAGE_KEY = "cambui.daily.production.flow.v5";
     const TARGETS_KEY = "cambui.daily.production.targets.v1";
+    const FIREBASE_CONFIG_KEY = "cambui.daily.production.firebase.config.v1";
+    const FIREBASE_APP_NAME = "cambui-production-app";
+    const AUTO_BACKUPS_KEY = "cambui.daily.production.auto.backups.v1";
+    const AUDIT_LOG_KEY = "cambui.daily.production.audit.v1";
+    const PENDING_SYNC_KEY = "cambui.daily.production.pending.sync.v1";
+    const MAX_AUTO_BACKUPS = 12;
+    const MAX_AUDIT_LOG = 80;
+    const MAX_PENDING_SYNCS = 40;
     const PREVIOUS_KEYS = [
       "cambui.daily.production.v4",
       "cambui.daily.own.production.v3",
@@ -1179,6 +1346,7 @@
       "cambui.daily.operations.v1"
     ];
     const PLANT = "Usina Cambuí";
+    const APP_VERSION = 7;
 
     const TYPES = {
       OWN_HARVEST: "Colheita Própria",
@@ -1210,6 +1378,15 @@
         { type: TYPES.THIRD_TRANSPORT, target: 0 }
       ]
     };
+    const defaultFirebaseConfig = {
+      apiKey: "AIzaSyAzbjjyK3eKjR1ssmx22NcXOTUt1p-i4AU",
+      authDomain: "procucaodiaria.firebaseapp.com",
+      projectId: "procucaodiaria",
+      storageBucket: "procucaodiaria.firebasestorage.app",
+      messagingSenderId: "1006880934330",
+      appId: "1:1006880934330:web:d29a62169efc837da5f583",
+      measurementId: "G-DPJQV0SV4W"
+    };
 
     const els = {
       dashboardView: document.querySelector("#dashboardView"),
@@ -1217,7 +1394,8 @@
       targetsView: document.querySelector("#targetsView"),
       historyView: document.querySelector("#historyView"),
       navTabs: [...document.querySelectorAll(".nav-tab")],
-      dashboardDate: document.querySelector("#dashboardDate"),
+      dashboardStartDate: document.querySelector("#dashboardStartDate"),
+      dashboardEndDate: document.querySelector("#dashboardEndDate"),
       dashboardSource: document.querySelector("#dashboardSource"),
       entryDate: document.querySelector("#entryDate"),
       frontCards: [...document.querySelectorAll(".front-card")],
@@ -1242,11 +1420,16 @@
       harvesterRankingWrap: document.querySelector("#harvesterRankingWrap"),
       typeSummaryWrap: document.querySelector("#typeSummaryWrap"),
       frontSummaryWrap: document.querySelector("#frontSummaryWrap"),
+      dashboardHighlightsWrap: document.querySelector("#dashboardHighlightsWrap"),
+      dailySummaryWrap: document.querySelector("#dailySummaryWrap"),
       dashboardRowsWrap: document.querySelector("#dashboardRowsWrap"),
       frontOptions: document.querySelector("#frontOptions"),
       fleetOptions: document.querySelector("#fleetOptions"),
       toast: document.querySelector("#toast"),
       importFile: document.querySelector("#importFile"),
+      pendingSyncWrap: document.querySelector("#pendingSyncWrap"),
+      autoBackupWrap: document.querySelector("#autoBackupWrap"),
+      auditWrap: document.querySelector("#auditWrap"),
       dashTotal: document.querySelector("#dashTotal"),
       dashOwnHarvest: document.querySelector("#dashOwnHarvest"),
       dashThirdHarvest: document.querySelector("#dashThirdHarvest"),
@@ -1254,19 +1437,43 @@
       dashThirdTransport: document.querySelector("#dashThirdTransport"),
       dashTarget: document.querySelector("#dashTarget"),
       dashTargetStatus: document.querySelector("#dashTargetStatus"),
+      dashMonthAccumulated: document.querySelector("#dashMonthAccumulated"),
+      dashMonthAccumulatedLabel: document.querySelector("#dashMonthAccumulatedLabel"),
+      dashAllAccumulated: document.querySelector("#dashAllAccumulated"),
       entryTotal: document.querySelector("#entryTotal"),
       entryOwnHarvest: document.querySelector("#entryOwnHarvest"),
       entryThirdHarvest: document.querySelector("#entryThirdHarvest"),
       entryOwnTransport: document.querySelector("#entryOwnTransport"),
       entryThirdTransport: document.querySelector("#entryThirdTransport"),
       entryTarget: document.querySelector("#entryTarget"),
-      entryTargetStatus: document.querySelector("#entryTargetStatus")
+      entryTargetStatus: document.querySelector("#entryTargetStatus"),
+      firebaseApiKey: document.querySelector("#firebaseApiKey"),
+      firebaseAuthDomain: document.querySelector("#firebaseAuthDomain"),
+      firebaseProjectId: document.querySelector("#firebaseProjectId"),
+      firebaseStorageBucket: document.querySelector("#firebaseStorageBucket"),
+      firebaseMessagingSenderId: document.querySelector("#firebaseMessagingSenderId"),
+      firebaseAppId: document.querySelector("#firebaseAppId"),
+      firebaseStatusPill: document.querySelector("#firebaseStatusPill"),
+      firebaseSyncStatus: document.querySelector("#firebaseSyncStatus")
     };
 
     let records = loadRecords();
     let targets = loadTargets();
+    let firebaseConfig = loadFirebaseConfig();
+    let autoBackups = loadAutoBackups();
+    let auditLog = loadAuditLog();
+    let pendingSyncQueue = loadPendingSyncQueue();
     let entries = cloneEntries(defaultEntries);
     let activeFront = null;
+    const firebaseState = {
+      app: null,
+      db: null,
+      signature: "",
+      syncing: false,
+      lastError: "",
+      lastMessage: "",
+      lastSyncAt: ""
+    };
 
     function makeId() {
       if (window.crypto && typeof window.crypto.randomUUID === "function") {
@@ -1323,6 +1530,31 @@
       if (!value) return "";
       const [year, month, day] = value.split("-");
       return `${day}/${month}/${year}`;
+    }
+
+    function formatMonth(value) {
+      if (!value) return "";
+      const [year, month] = value.split("-");
+      return `${month}/${year}`;
+    }
+
+    function normalizeDateRange(start, end) {
+      let rangeStart = start || end || todayInputValue();
+      let rangeEnd = end || start || rangeStart;
+      if (rangeStart > rangeEnd) {
+        [rangeStart, rangeEnd] = [rangeEnd, rangeStart];
+      }
+      return { start: rangeStart, end: rangeEnd };
+    }
+
+    function monthRangeFor(date) {
+      const value = date || todayInputValue();
+      const [year, month] = value.split("-").map(Number);
+      const lastDay = new Date(year, month, 0).getDate();
+      return {
+        start: `${year}-${String(month).padStart(2, "0")}-01`,
+        end: `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+      };
     }
 
     function normalizeType(value) {
@@ -1457,6 +1689,390 @@
       };
     }
 
+    function cloneFirebaseConfig(source = defaultFirebaseConfig) {
+      const config = source && typeof source === "object" ? source : {};
+      return {
+        apiKey: String(config.apiKey || "").trim(),
+        authDomain: String(config.authDomain || "").trim(),
+        projectId: String(config.projectId || "").trim(),
+        storageBucket: String(config.storageBucket || "").trim(),
+        messagingSenderId: String(config.messagingSenderId || "").trim(),
+        appId: String(config.appId || "").trim(),
+        measurementId: String(config.measurementId || "").trim()
+      };
+    }
+
+    function getCleanFirebaseConfig(source = firebaseConfig) {
+      return cloneFirebaseConfig(source);
+    }
+
+    function loadFirebaseConfig() {
+      try {
+        const raw = localStorage.getItem(FIREBASE_CONFIG_KEY);
+        return cloneFirebaseConfig(raw ? JSON.parse(raw) : defaultFirebaseConfig);
+      } catch {
+        return cloneFirebaseConfig(defaultFirebaseConfig);
+      }
+    }
+
+    function persistFirebaseConfig() {
+      localStorage.setItem(FIREBASE_CONFIG_KEY, JSON.stringify(getCleanFirebaseConfig()));
+    }
+
+    function hasFirebaseConfig(source = firebaseConfig) {
+      const config = getCleanFirebaseConfig(source);
+      return Boolean(config.apiKey && config.authDomain && config.projectId && config.appId);
+    }
+
+    function sameFirebaseConfig(left, right) {
+      return JSON.stringify(getCleanFirebaseConfig(left)) === JSON.stringify(getCleanFirebaseConfig(right));
+    }
+
+    function collectFirebaseConfigFromForm() {
+      return cloneFirebaseConfig({
+        apiKey: els.firebaseApiKey.value,
+        authDomain: els.firebaseAuthDomain.value,
+        projectId: els.firebaseProjectId.value,
+        storageBucket: els.firebaseStorageBucket.value,
+        messagingSenderId: els.firebaseMessagingSenderId.value,
+        appId: els.firebaseAppId.value
+      });
+    }
+
+    function renderFirebaseConfigForm() {
+      els.firebaseApiKey.value = firebaseConfig.apiKey;
+      els.firebaseAuthDomain.value = firebaseConfig.authDomain;
+      els.firebaseProjectId.value = firebaseConfig.projectId;
+      els.firebaseStorageBucket.value = firebaseConfig.storageBucket;
+      els.firebaseMessagingSenderId.value = firebaseConfig.messagingSenderId;
+      els.firebaseAppId.value = firebaseConfig.appId;
+    }
+
+    function formatDateTime(value) {
+      if (!value) return "";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "";
+      return new Intl.DateTimeFormat("pt-BR", {
+        dateStyle: "short",
+        timeStyle: "short"
+      }).format(date);
+    }
+
+    function isOnline() {
+      return typeof navigator === "undefined" ? true : navigator.onLine !== false;
+    }
+
+    function formatFirebaseError(error) {
+      const code = String(error && error.code ? error.code : "").trim();
+      const message = String(error && error.message ? error.message : error || "Erro desconhecido").trim();
+      const detail = code ? `${code}: ${message}` : message;
+      return detail.length > 180 ? `${detail.slice(0, 177)}...` : detail;
+    }
+
+    function renderFirebaseStatus(message) {
+      const pill = els.firebaseStatusPill;
+      const status = els.firebaseSyncStatus;
+      if (!pill || !status) return;
+
+      let label = "Somente local";
+      let detail = message || firebaseState.lastMessage || "Preencha os dados do Firebase para ativar a sincronizacao com o banco.";
+      let tone = "";
+      const pendingCount = pendingSyncQueue.length;
+
+      if (!isOnline()) {
+        label = pendingCount ? `Offline · ${pendingCount} pend.` : "Offline";
+        detail = message || firebaseState.lastMessage || "Sem internet. Os dados continuam salvos localmente e entram na fila de sincronizacao.";
+        tone = "alert";
+      } else if (firebaseState.syncing) {
+        label = "Sincronizando";
+        detail = message || firebaseState.lastMessage || "Sincronizando dados com o Firebase...";
+        tone = "good";
+      } else if (firebaseState.lastError) {
+        label = pendingCount ? `Falha · ${pendingCount} pend.` : "Falha";
+        detail = message || firebaseState.lastMessage || firebaseState.lastError;
+        tone = "alert";
+      } else if (firebaseState.db) {
+        label = pendingCount ? `Pendências · ${pendingCount}` : "Firebase ativo";
+        const syncInfo = firebaseState.lastSyncAt ? ` Ultima sincronizacao: ${formatDateTime(firebaseState.lastSyncAt)}.` : "";
+        const pendingInfo = pendingCount ? ` Existem ${pendingCount} pendencia${pendingCount === 1 ? "" : "s"} aguardando envio.` : "";
+        detail = message || firebaseState.lastMessage || `Configuracao valida. Novos salvamentos vao para o navegador e para o Firebase.${syncInfo}${pendingInfo}`;
+        tone = pendingCount ? "" : "good";
+      } else if (hasFirebaseConfig()) {
+        label = pendingCount ? `Configurado · ${pendingCount} pend.` : "Configurado";
+        detail = message || firebaseState.lastMessage || "Configuracao salva localmente. Use os botoes para testar, enviar ou baixar os dados.";
+      }
+
+      pill.textContent = label;
+      pill.className = `status-pill${tone ? ` ${tone}` : ""}`;
+      status.textContent = detail;
+      status.className = `sync-status${tone ? ` ${tone}` : ""}`;
+    }
+
+    function firebaseRootRef() {
+      return firebaseState.db.collection("productionApps").doc("cambui");
+    }
+
+    async function ensureFirebaseReady(options = {}) {
+      const silent = Boolean(options.silent);
+      const force = Boolean(options.force);
+      const clean = getCleanFirebaseConfig(firebaseConfig);
+      const signature = JSON.stringify(clean);
+
+      if (!hasFirebaseConfig(clean)) {
+        firebaseState.app = null;
+        firebaseState.db = null;
+        firebaseState.signature = "";
+        firebaseState.lastError = "";
+        renderFirebaseStatus();
+        if (!silent) showToast("Preencha os dados do Firebase para ativar o banco.");
+        return false;
+      }
+
+      if (!window.firebase || typeof window.firebase.initializeApp !== "function" || typeof window.firebase.firestore !== "function") {
+        firebaseState.app = null;
+        firebaseState.db = null;
+        firebaseState.lastError = "O SDK do Firebase nao foi carregado neste navegador.";
+        firebaseState.lastMessage = "Nao foi possivel inicializar o Firebase nesta execucao.";
+        renderFirebaseStatus();
+        if (!silent) showToast("Nao foi possivel carregar o Firebase.");
+        return false;
+      }
+
+      if (!force && firebaseState.db && firebaseState.signature === signature) {
+        renderFirebaseStatus();
+        return true;
+      }
+
+      try {
+        let app = window.firebase.apps.find((item) => item.name === FIREBASE_APP_NAME);
+        if (app && (force || firebaseState.signature !== signature)) {
+          await app.delete().catch(() => null);
+          app = null;
+        }
+
+        if (!app) {
+          app = window.firebase.initializeApp(clean, FIREBASE_APP_NAME);
+        }
+
+        firebaseState.app = app;
+        firebaseState.db = app.firestore();
+        firebaseState.signature = signature;
+        firebaseState.lastError = "";
+        firebaseState.lastMessage = "Firebase pronto para receber os dados do sistema.";
+        renderFirebaseStatus();
+        return true;
+      } catch (error) {
+        firebaseState.app = null;
+        firebaseState.db = null;
+        firebaseState.signature = "";
+        firebaseState.lastError = formatFirebaseError(error);
+        firebaseState.lastMessage = `Falha ao conectar no Firebase: ${firebaseState.lastError}`;
+        renderFirebaseStatus();
+        if (!silent) showToast("Nao foi possivel conectar ao Firebase.");
+        return false;
+      }
+    }
+
+    async function runFirebaseTask(task, options = {}) {
+      const ready = await ensureFirebaseReady({ silent: options.silent, force: options.force });
+      if (!ready) return false;
+
+      firebaseState.syncing = true;
+      firebaseState.lastError = "";
+      firebaseState.lastMessage = options.pendingMessage || "Sincronizando dados com o Firebase...";
+      renderFirebaseStatus();
+
+      try {
+        const result = await task(firebaseRootRef());
+        firebaseState.lastSyncAt = new Date().toISOString();
+        firebaseState.lastMessage = options.successStatus || "Dados sincronizados com o Firebase.";
+        renderFirebaseStatus();
+        return result === undefined ? true : result;
+      } catch (error) {
+        firebaseState.lastError = formatFirebaseError(error);
+        firebaseState.lastMessage = options.errorStatus
+          ? `${options.errorStatus} Detalhe: ${firebaseState.lastError}`
+          : `Falha ao sincronizar com o Firebase: ${firebaseState.lastError}`;
+        renderFirebaseStatus();
+        if (!options.silent) showToast(options.errorToast || "Nao foi possivel sincronizar com o Firebase.");
+        return false;
+      } finally {
+        firebaseState.syncing = false;
+        renderFirebaseStatus();
+      }
+    }
+
+    async function saveFirebaseConfig() {
+      const nextConfig = collectFirebaseConfigFromForm();
+      const changed = !sameFirebaseConfig(firebaseConfig, nextConfig);
+      firebaseConfig = nextConfig;
+      persistFirebaseConfig();
+      firebaseState.lastError = "";
+      firebaseState.lastMessage = hasFirebaseConfig()
+        ? "Configuracao salva localmente. Teste a conexao antes de usar a sincronizacao."
+        : "Configuracao limpa. O sistema segue salvando somente no navegador.";
+
+      if (changed) {
+        firebaseState.app = null;
+        firebaseState.db = null;
+        firebaseState.signature = "";
+      }
+
+      renderFirebaseConfigForm();
+      renderFirebaseStatus();
+
+      if (!hasFirebaseConfig()) {
+        showToast("Configuracao do Firebase limpa. Backup local mantido.");
+        return;
+      }
+
+      const connected = await ensureFirebaseReady({ silent: true, force: changed });
+      showToast(connected ? "Configuracao do Firebase salva." : "Configuracao salva, mas a conexao com o Firebase falhou.");
+    }
+
+    async function testFirebaseConnection() {
+      const tested = await runFirebaseTask(async (root) => {
+        await root.set({
+          plant: PLANT,
+          version: APP_VERSION,
+          updatedAt: new Date().toISOString(),
+          targets: getCleanTargets(),
+          recordCount: records.length
+        }, { merge: true });
+      }, {
+        silent: true,
+        pendingMessage: "Testando conexao com o Firebase...",
+        successStatus: "Conexao com o Firebase validada com sucesso.",
+        errorStatus: "Nao foi possivel validar a conexao com o Firebase."
+      });
+
+      showToast(tested ? "Firebase conectado com sucesso." : "Falha ao testar o Firebase.");
+    }
+
+    async function syncTargetsToFirebase(options = {}) {
+      return runFirebaseTask(async (root) => {
+        await root.set({
+          plant: PLANT,
+          version: APP_VERSION,
+          updatedAt: new Date().toISOString(),
+          targets: getCleanTargets(),
+          recordCount: records.length
+        }, { merge: true });
+      }, options);
+    }
+
+    async function syncRecordToFirebase(record, options = {}) {
+      const cleanRecord = {
+        id: record.id || makeId(),
+        plant: PLANT,
+        date: record.date,
+        rows: getCleanEntries(record.rows),
+        updatedAt: record.updatedAt || new Date().toISOString()
+      };
+
+      return runFirebaseTask(async (root) => {
+        await root.set({
+          plant: PLANT,
+          version: APP_VERSION,
+          updatedAt: cleanRecord.updatedAt,
+          targets: getCleanTargets(),
+          recordCount: records.length,
+          lastRecordDate: cleanRecord.date
+        }, { merge: true });
+        await root.collection("records").doc(cleanRecord.date).set(cleanRecord, { merge: true });
+      }, options);
+    }
+
+    async function deleteRecordFromFirebase(date, options = {}) {
+      return runFirebaseTask(async (root) => {
+        await root.collection("records").doc(date).delete();
+        await root.set({
+          plant: PLANT,
+          version: APP_VERSION,
+          updatedAt: new Date().toISOString(),
+          targets: getCleanTargets(),
+          recordCount: records.length
+        }, { merge: true });
+      }, options);
+    }
+
+    async function uploadAllDataToFirebase(options = {}) {
+      return runFirebaseTask(async (root) => {
+        await root.set({
+          plant: PLANT,
+          version: APP_VERSION,
+          updatedAt: new Date().toISOString(),
+          targets: getCleanTargets(),
+          recordCount: records.length,
+          lastRecordDate: latestRecord() ? latestRecord().date : ""
+        }, { merge: true });
+
+        const writes = records.map((record) => root.collection("records").doc(record.date).set({
+          id: record.id || makeId(),
+          plant: PLANT,
+          date: record.date,
+          rows: getCleanEntries(record.rows),
+          updatedAt: record.updatedAt || new Date().toISOString()
+        }, { merge: true }));
+
+        await Promise.all(writes);
+      }, options);
+    }
+
+    async function downloadAllDataFromFirebase(options = {}) {
+      const downloaded = await runFirebaseTask(async (root) => {
+        const [metaSnapshot, recordSnapshots] = await Promise.all([
+          root.get(),
+          root.collection("records").get()
+        ]);
+
+        return {
+          meta: metaSnapshot.exists ? metaSnapshot.data() : {},
+          records: recordSnapshots.docs.map((doc) => doc.data())
+        };
+      }, options);
+
+      if (!downloaded || typeof downloaded !== "object") {
+        return false;
+      }
+
+      const remoteTargets = downloaded.meta && downloaded.meta.targets ? cloneTargets(downloaded.meta.targets) : null;
+      const remoteRecords = (downloaded.records || [])
+        .filter((record) => record && record.date && Array.isArray(record.rows))
+        .map((record) => ({
+          id: record.id || makeId(),
+          plant: PLANT,
+          date: record.date,
+          rows: getCleanEntries(record.rows),
+          updatedAt: record.updatedAt || new Date().toISOString()
+        }))
+        .filter((record) => record.rows.length);
+
+      if (!remoteTargets && !remoteRecords.length) {
+        if (!options.silent) showToast("Nenhum dado encontrado no Firebase.");
+        return false;
+      }
+
+      if (remoteTargets) {
+        targets = cloneTargets(remoteTargets);
+        persistTargets();
+      }
+
+      if (remoteRecords.length) {
+        const byDate = new Map(records.map((record) => [`${record.plant}|${record.date}`, record]));
+        remoteRecords.forEach((record) => byDate.set(`${PLANT}|${record.date}`, record));
+        records = [...byDate.values()].filter((record) => record.plant === PLANT);
+        persistRecords();
+      }
+
+      renderOptions();
+      renderTargets();
+      renderEntry();
+      renderDashboard();
+      renderHistory();
+      return true;
+    }
+
     function loadTargets() {
       try {
         const raw = localStorage.getItem(TARGETS_KEY);
@@ -1468,6 +2084,418 @@
 
     function persistTargets() {
       localStorage.setItem(TARGETS_KEY, JSON.stringify(getCleanTargets()));
+    }
+
+    function getCleanRecords(source = records) {
+      return (source || [])
+        .filter((record) => record && record.date && Array.isArray(record.rows))
+        .map((record) => ({
+          id: record.id || makeId(),
+          plant: PLANT,
+          date: record.date,
+          rows: getCleanEntries(record.rows),
+          updatedAt: record.updatedAt || new Date().toISOString()
+        }))
+        .filter((record) => record.rows.length)
+        .sort((a, b) => a.date.localeCompare(b.date));
+    }
+
+    function currentDataPayload(exportedAt = new Date().toISOString()) {
+      return {
+        plant: PLANT,
+        version: APP_VERSION,
+        exportedAt,
+        targets: getCleanTargets(),
+        records: getCleanRecords(records)
+      };
+    }
+
+    function normalizePayloadRecords(payload) {
+      const importedRecords = Array.isArray(payload) ? payload : payload.records;
+      if (!Array.isArray(importedRecords)) throw new Error("Formato inválido");
+
+      return importedRecords
+        .filter((record) => record && record.date && Array.isArray(record.rows))
+        .map((record) => ({
+          id: record.id || makeId(),
+          plant: PLANT,
+          date: record.date,
+          rows: getCleanEntries(record.rows),
+          updatedAt: record.updatedAt || new Date().toISOString()
+        }))
+        .filter((record) => record.rows.length);
+    }
+
+    function applyDataPayload(payload, options = {}) {
+      const mergeRecords = options.mergeRecords !== false;
+      const normalized = normalizePayloadRecords(payload);
+
+      if (!Array.isArray(payload) && payload.targets) {
+        targets = cloneTargets(payload.targets);
+        persistTargets();
+      }
+
+      if (mergeRecords) {
+        const byDate = new Map(records.map((record) => [`${record.plant}|${record.date}`, record]));
+        normalized.forEach((record) => byDate.set(`${PLANT}|${record.date}`, record));
+        records = [...byDate.values()].filter((record) => record.plant === PLANT);
+      } else {
+        records = normalized.filter((record) => record.plant === PLANT);
+      }
+
+      persistRecords();
+      renderOptions();
+      renderTargets();
+      renderEntry();
+      renderDashboard();
+      renderHistory();
+      return normalized.length;
+    }
+
+    function loadStoredList(key) {
+      try {
+        const raw = localStorage.getItem(key);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function loadAutoBackups() {
+      return loadStoredList(AUTO_BACKUPS_KEY)
+        .filter((item) => item && item.id && item.createdAt && item.payload)
+        .slice(0, MAX_AUTO_BACKUPS);
+    }
+
+    function persistAutoBackups() {
+      localStorage.setItem(AUTO_BACKUPS_KEY, JSON.stringify(autoBackups.slice(0, MAX_AUTO_BACKUPS)));
+    }
+
+    function loadAuditLog() {
+      return loadStoredList(AUDIT_LOG_KEY)
+        .filter((item) => item && item.id && item.message && item.createdAt)
+        .slice(0, MAX_AUDIT_LOG);
+    }
+
+    function persistAuditLog() {
+      localStorage.setItem(AUDIT_LOG_KEY, JSON.stringify(auditLog.slice(0, MAX_AUDIT_LOG)));
+    }
+
+    function loadPendingSyncQueue() {
+      return loadStoredList(PENDING_SYNC_KEY)
+        .filter((item) => item && item.id && item.type && item.createdAt)
+        .slice(0, MAX_PENDING_SYNCS);
+    }
+
+    function persistPendingSyncQueue() {
+      localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(pendingSyncQueue.slice(0, MAX_PENDING_SYNCS)));
+    }
+
+    function addAuditEntry(type, message) {
+      auditLog = [
+        {
+          id: makeId(),
+          type: String(type || "acao"),
+          message: String(message || "").trim() || "Acao registrada.",
+          createdAt: new Date().toISOString()
+        },
+        ...auditLog
+      ].slice(0, MAX_AUDIT_LOG);
+      persistAuditLog();
+      renderAuditLog();
+    }
+
+    function createAutoBackup(reason, options = {}) {
+      const snapshot = {
+        id: makeId(),
+        reason: String(reason || "Rotina automática").trim(),
+        createdAt: new Date().toISOString(),
+        payload: currentDataPayload()
+      };
+
+      autoBackups = [snapshot, ...autoBackups].slice(0, MAX_AUTO_BACKUPS);
+      persistAutoBackups();
+      renderAutoBackups();
+      if (!options.skipAudit) {
+        addAuditEntry("backup", `Backup criado: ${snapshot.reason}.`);
+      }
+      return snapshot;
+    }
+
+    function queueDescription(type, payload = {}) {
+      if (type === "record-upsert") return `Lançamento ${formatDate(payload.date)} aguardando envio`;
+      if (type === "record-delete") return `Exclusão de ${formatDate(payload.date)} aguardando envio`;
+      if (type === "targets-save") return "Metas aguardando envio";
+      if (type === "upload-all") return "Base completa aguardando sincronização";
+      return "Sincronização pendente";
+    }
+
+    function queueSyncKey(type, payload = {}) {
+      if (type === "record-upsert" || type === "record-delete") return `${type}:${payload.date || ""}`;
+      return type;
+    }
+
+    function queueSyncOperation(type, payload = {}) {
+      const key = queueSyncKey(type, payload);
+      const description = queueDescription(type, payload);
+      pendingSyncQueue = [
+        {
+          id: makeId(),
+          key,
+          type,
+          payload,
+          createdAt: new Date().toISOString(),
+          attempts: 0,
+          lastError: "",
+          description
+        },
+        ...pendingSyncQueue.filter((item) => item.key !== key)
+      ].slice(0, MAX_PENDING_SYNCS);
+      persistPendingSyncQueue();
+      renderPendingSyncQueue();
+      renderFirebaseStatus();
+      addAuditEntry("fila", `${description}.`);
+    }
+
+    function updatePendingSyncFailure(id, error) {
+      pendingSyncQueue = pendingSyncQueue.map((item) => {
+        if (item.id !== id) return item;
+        return {
+          ...item,
+          attempts: (item.attempts || 0) + 1,
+          lastError: formatFirebaseError(error || firebaseState.lastError || "Falha desconhecida")
+        };
+      });
+      persistPendingSyncQueue();
+      renderPendingSyncQueue();
+      renderFirebaseStatus();
+    }
+
+    function removePendingSync(id) {
+      pendingSyncQueue = pendingSyncQueue.filter((item) => item.id !== id);
+      persistPendingSyncQueue();
+      renderPendingSyncQueue();
+      renderFirebaseStatus();
+    }
+
+    async function syncOrQueue(type, payload, executor) {
+      if (!hasFirebaseConfig()) return "disabled";
+
+      if (!isOnline()) {
+        queueSyncOperation(type, payload);
+        firebaseState.lastMessage = "Sem internet. Os dados ficaram salvos localmente e entraram na fila de sincronizacao.";
+        renderFirebaseStatus();
+        return "queued-offline";
+      }
+
+      const synced = await executor();
+      if (synced) return "synced";
+
+      queueSyncOperation(type, payload);
+      return "queued-error";
+    }
+
+    async function processQueuedItem(item) {
+      if (item.type === "record-upsert") {
+        const record = records.find((entry) => entry.date === item.payload.date && entry.plant === PLANT);
+        if (!record) return true;
+        return syncRecordToFirebase(record, {
+          silent: true,
+          pendingMessage: "Enviando pendencia de lancamento...",
+          successStatus: "Pendencia de lancamento sincronizada.",
+          errorStatus: "Nao foi possivel sincronizar uma pendencia de lancamento."
+        });
+      }
+
+      if (item.type === "record-delete") {
+        return deleteRecordFromFirebase(item.payload.date, {
+          silent: true,
+          pendingMessage: "Enviando pendencia de exclusao...",
+          successStatus: "Pendencia de exclusao sincronizada.",
+          errorStatus: "Nao foi possivel sincronizar uma exclusao pendente."
+        });
+      }
+
+      if (item.type === "targets-save") {
+        return syncTargetsToFirebase({
+          silent: true,
+          pendingMessage: "Enviando pendencia de metas...",
+          successStatus: "Pendencia de metas sincronizada.",
+          errorStatus: "Nao foi possivel sincronizar as metas pendentes."
+        });
+      }
+
+      return uploadAllDataToFirebase({
+        silent: true,
+        pendingMessage: "Enviando base completa pendente...",
+        successStatus: "Base completa pendente sincronizada.",
+        errorStatus: "Nao foi possivel sincronizar a base pendente."
+      });
+    }
+
+    async function flushPendingSyncQueue(options = {}) {
+      if (!pendingSyncQueue.length) {
+        renderPendingSyncQueue();
+        return true;
+      }
+
+      if (!hasFirebaseConfig()) {
+        renderFirebaseStatus("Configure o Firebase para processar as pendencias.");
+        return false;
+      }
+
+      if (!isOnline()) {
+        renderFirebaseStatus("Sem internet. As pendencias continuam na fila local.");
+        return false;
+      }
+
+      const queue = [...pendingSyncQueue].reverse();
+      let completed = 0;
+
+      for (const item of queue) {
+        const synced = await processQueuedItem(item);
+        if (!synced) {
+          updatePendingSyncFailure(item.id, firebaseState.lastError || "Falha ao sincronizar pendencia");
+          if (!options.silent) showToast("A fila de sincronizacao parou em uma pendencia com erro.");
+          return false;
+        }
+        removePendingSync(item.id);
+        completed += 1;
+      }
+
+      if (completed) {
+        addAuditEntry("fila", `${completed} pendencia${completed === 1 ? "" : "s"} sincronizada${completed === 1 ? "" : "s"} com sucesso.`);
+      }
+      if (!options.silent) {
+        showToast(completed ? "Pendencias sincronizadas com sucesso." : "Nao havia pendencias para sincronizar.");
+      }
+      return true;
+    }
+
+    function renderPendingSyncQueue() {
+      if (!pendingSyncQueue.length) {
+        els.pendingSyncWrap.innerHTML = '<div class="empty-state">Nenhuma pendencia de sincronizacao. Se ficar sem internet, o sistema salva localmente e envia depois.</div>';
+        return;
+      }
+
+      els.pendingSyncWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Pendência</th>
+              <th>Criada em</th>
+              <th>Tentativas</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${pendingSyncQueue.map((item) => `
+              <tr>
+                <td>${escapeHtml(item.description || queueDescription(item.type, item.payload))}</td>
+                <td>${formatDateTime(item.createdAt)}</td>
+                <td>${item.attempts || 0}</td>
+                <td>${escapeHtml(item.lastError || (isOnline() ? "Aguardando envio" : "Aguardando internet"))}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderAutoBackups() {
+      if (!autoBackups.length) {
+        els.autoBackupWrap.innerHTML = '<div class="empty-state">Nenhum backup automático criado ainda.</div>';
+        return;
+      }
+
+      els.autoBackupWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Motivo</th>
+              <th>Lançamentos</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${autoBackups.map((item) => `
+              <tr>
+                <td>${formatDateTime(item.createdAt)}</td>
+                <td>${escapeHtml(item.reason)}</td>
+                <td>${(item.payload && item.payload.records ? item.payload.records.length : 0)}</td>
+                <td>
+                  <div class="row-buttons">
+                    <button class="btn-link" data-backup-action="export" data-id="${item.id}" type="button">Exportar</button>
+                    <button class="btn-link" data-backup-action="restore" data-id="${item.id}" type="button">Restaurar</button>
+                  </div>
+                </td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderAuditLog() {
+      if (!auditLog.length) {
+        els.auditWrap.innerHTML = '<div class="empty-state">Nenhuma ação auditada ainda.</div>';
+        return;
+      }
+
+      els.auditWrap.innerHTML = `
+        <div class="summary-list">
+          ${auditLog.slice(0, 14).map((item) => `
+            <div class="summary-item">
+              <div class="summary-line">
+                <strong>${escapeHtml(item.message)}</strong>
+                <span>${formatDateTime(item.createdAt)}</span>
+              </div>
+              <span class="status-pill">${escapeHtml(item.type)}</span>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function exportBackupItem(id) {
+      const snapshot = autoBackups.find((item) => item.id === id);
+      if (!snapshot) return;
+      downloadFile(
+        `backup-cambui-${snapshot.createdAt.slice(0, 10)}.json`,
+        JSON.stringify(snapshot.payload, null, 2),
+        "application/json"
+      );
+      showToast("Backup automatico exportado.");
+    }
+
+    async function restoreBackupItem(id) {
+      const snapshot = autoBackups.find((item) => item.id === id);
+      if (!snapshot) return;
+
+      createAutoBackup(`Antes de restaurar backup de ${formatDateTime(snapshot.createdAt)}`, { skipAudit: true });
+      applyDataPayload(snapshot.payload, { mergeRecords: false });
+      addAuditEntry("restauracao", `Backup restaurado: ${snapshot.reason}.`);
+
+      const syncState = await syncOrQueue("upload-all", { source: "restore-backup" }, () => uploadAllDataToFirebase({
+        silent: true,
+        pendingMessage: "Enviando restauracao para o Firebase...",
+        successStatus: "Backup restaurado e sincronizado com o Firebase.",
+        errorStatus: "Backup restaurado localmente, mas a sincronizacao com o Firebase falhou."
+      }));
+
+      if (syncState === "synced") {
+        showToast("Backup restaurado localmente e no Firebase.");
+        return;
+      }
+
+      if (syncState === "queued-offline" || syncState === "queued-error") {
+        showToast("Backup restaurado localmente. A sincronizacao ficou na fila.");
+        return;
+      }
+
+      showToast("Backup restaurado localmente.");
     }
 
     function ownHarvesterCountForFront(row, rowsContext = []) {
@@ -1600,14 +2628,15 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
     }
 
-    function summarizeRows(rows) {
+    function summarizeRows(rows, options = {}) {
+      const targetDays = options.targetDays ?? targetDaysForRows(rows);
       const summary = {
         total: 0,
         ownHarvest: 0,
         thirdHarvest: 0,
         ownTransport: 0,
         thirdTransport: 0,
-        targetTotal: totalRegisteredTarget(),
+        targetTotal: totalRegisteredTarget() * targetDays,
         rowTargetTotal: 0,
         remaining: 0,
         targetPercent: 0,
@@ -1617,8 +2646,8 @@
 
       rows.forEach((row) => {
         const value = Number(row.production) || 0;
-        const target = targetForRow(row, targets, rows);
-        const targetKey = targetKeyForRow(row);
+        const target = targetForRow(row, targets, rowsForSameDate(row, rows));
+        const targetKey = `${row.date || "dia"}|${targetKeyForRow(row)}`;
         summary.total += value;
         if (row.type === TYPES.OWN_HARVEST) summary.ownHarvest += value;
         if (row.type === TYPES.THIRD_HARVEST) summary.thirdHarvest += value;
@@ -1643,10 +2672,10 @@
           grouped.set(key, { name: key, production: 0, target: 0, records: 0, targetKeys: new Set() });
         }
         const item = grouped.get(key);
-        const targetKey = targetKeyForRow(row);
+        const targetKey = `${row.date || "dia"}|${targetKeyForRow(row)}`;
         item.production += Number(row.production) || 0;
         if (targetKey && !item.targetKeys.has(targetKey)) {
-          item.target += targetForRow(row, targets, rows);
+          item.target += targetForRow(row, targets, rowsForSameDate(row, rows));
           item.targetKeys.add(targetKey);
         }
         item.records += 1;
@@ -1661,8 +2690,46 @@
       return records.find((record) => record.date === date && record.plant === PLANT);
     }
 
+    function recordsForRange(start, end) {
+      const range = normalizeDateRange(start, end);
+      return records
+        .filter((record) => record.plant === PLANT && record.date >= range.start && record.date <= range.end)
+        .sort((a, b) => a.date.localeCompare(b.date));
+    }
+
+    function rowsFromRecords(sourceRecords) {
+      return (sourceRecords || []).flatMap((record) => (
+        cloneEntries(record.rows).map((row) => ({ ...row, date: record.date }))
+      ));
+    }
+
+    function firstRecord() {
+      return [...records].sort((a, b) => a.date.localeCompare(b.date))[0] || null;
+    }
+
     function latestRecord() {
       return [...records].sort((a, b) => b.date.localeCompare(a.date))[0] || null;
+    }
+
+    function dashboardRange() {
+      return normalizeDateRange(els.dashboardStartDate.value, els.dashboardEndDate.value);
+    }
+
+    function setDashboardRange(start, end) {
+      const range = normalizeDateRange(start, end);
+      els.dashboardStartDate.value = range.start;
+      els.dashboardEndDate.value = range.end;
+    }
+
+    function targetDaysForRows(rows) {
+      const dates = new Set((rows || []).map((row) => row.date).filter(Boolean));
+      return dates.size || 1;
+    }
+
+    function rowsForSameDate(row, rows) {
+      const date = row.date || "";
+      if (!date) return rows;
+      return rows.filter((item) => item.date === date);
     }
 
     function renderOptions() {
@@ -1697,8 +2764,8 @@
       if (name === "history") renderHistory();
     }
 
-    function setStats(prefix, rows) {
-      const summary = summarizeRows(rows);
+    function setStats(prefix, rows, options = {}) {
+      const summary = summarizeRows(rows, options);
       els[`${prefix}Total`].textContent = formatNumber(summary.total);
       els[`${prefix}OwnHarvest`].textContent = formatNumber(summary.ownHarvest);
       els[`${prefix}ThirdHarvest`].textContent = formatNumber(summary.thirdHarvest);
@@ -1772,15 +2839,15 @@
         .reduce((sum, row) => sum + (Number(row.production) || 0), 0);
     }
 
-    function renderGoalOverview(rows) {
-      const summary = summarizeRows(rows);
+    function renderGoalOverview(rows, options = {}) {
+      const summary = summarizeRows(rows, options);
       const status = statusForProgress(summary.targetPercent);
       els.goalOverviewWrap.innerHTML = `
         <div class="goal-overview">
           <div class="goal-main">
             <strong>${formatPercent(summary.targetPercent)}</strong>
             <span>${formatNumber(summary.total)} produzido de ${formatNumber(summary.targetTotal)} de meta</span>
-            <div class="meter-track" aria-label="Meta do dia ${formatPercent(summary.targetPercent)}">
+            <div class="meter-track" aria-label="Meta do período ${formatPercent(summary.targetPercent)}">
               <div class="meter-fill ${summary.targetPercent >= 100 ? "over" : ""}" style="width: ${clampPercent(summary.targetPercent)}%"></div>
             </div>
             <span class="status-pill ${status.className}">${status.label}</span>
@@ -1807,11 +2874,12 @@
       `;
     }
 
-    function renderTypeChart(rows) {
+    function renderTypeChart(rows, options = {}) {
+      const targetDays = options.targetDays ?? targetDaysForRows(rows);
       const items = typeOptions.map((type) => ({
         label: type,
         production: productionByType(rows, type),
-        target: targetForType(type),
+        target: targetForType(type) * targetDays,
         detail: type === TYPES.OWN_HARVEST ? "Frentes 4001, 4002 e 4003" : type === TYPES.THIRD_HARVEST ? "Frentes 4007 e 4009" : "Produção de transporte"
       }));
 
@@ -1822,11 +2890,12 @@
       `;
     }
 
-    function renderFrontChart(rows) {
+    function renderFrontChart(rows, options = {}) {
+      const targetDays = options.targetDays ?? targetDaysForRows(rows);
       const items = frontOptions.map((front) => ({
         label: front,
         production: productionByFront(rows, front),
-        target: targetForFront(front),
+        target: targetForFront(front) * targetDays,
         detail: ownHarvestFronts.includes(front) ? "Colheita própria" : "Colheita terceira"
       }));
 
@@ -1849,12 +2918,13 @@
               front: row.front,
               fleet: row.fleet,
               production: 0,
-              target: targetForRow(row, targets, rows),
+              target: 0,
               notes: 0
             });
           }
           const item = grouped.get(key);
           item.production += Number(row.production) || 0;
+          item.target += targetForRow(row, targets, rowsForSameDate(row, rows));
           item.notes += 1;
         });
 
@@ -1870,7 +2940,7 @@
     function renderHarvesterRanking(rows) {
       const ranking = ownHarvesterRanking(rows);
       if (!ranking.length) {
-        els.harvesterRankingWrap.innerHTML = '<div class="empty-state">Sem colhedoras próprias lançadas para a data selecionada.</div>';
+        els.harvesterRankingWrap.innerHTML = '<div class="empty-state">Sem colhedoras próprias lançadas para o período selecionado.</div>';
         return;
       }
 
@@ -1903,33 +2973,179 @@
       `;
     }
 
-    function renderDashboardCharts(rows) {
-      renderGoalOverview(rows);
-      renderTypeChart(rows);
-      renderFrontChart(rows);
+    function renderDashboardCharts(rows, options = {}) {
+      renderGoalOverview(rows, options);
+      renderTypeChart(rows, options);
+      renderFrontChart(rows, options);
       renderHarvesterRanking(rows);
     }
 
+    function dailySummaries(recordsList) {
+      return (recordsList || [])
+        .map((record) => {
+          const rows = rowsFromRecords([record]);
+          const summary = summarizeRows(rows, { targetDays: 1 });
+          return {
+            date: record.date,
+            updatedAt: record.updatedAt,
+            ...summary
+          };
+        })
+        .sort((a, b) => b.date.localeCompare(a.date));
+    }
+
+    function renderDashboardHighlights(selectedRecords, rows, options = {}) {
+      if (!selectedRecords.length) {
+        els.dashboardHighlightsWrap.innerHTML = '<div class="empty-state">Sem dados suficientes para gerar destaques do período.</div>';
+        return;
+      }
+
+      const summaries = dailySummaries(selectedRecords);
+      const globalSummary = summarizeRows(rows, options);
+      const bestDay = [...summaries].sort((a, b) => b.total - a.total || a.date.localeCompare(b.date))[0];
+      const criticalDay = [...summaries].sort((a, b) => a.targetPercent - b.targetPercent || a.date.localeCompare(b.date))[0];
+      const topFront = aggregateBy(rows.filter((row) => isHarvest(row.type)), "front")[0];
+      const topFleet = ownHarvesterRanking(rows)[0];
+      const averagePerDay = selectedRecords.length ? globalSummary.total / selectedRecords.length : 0;
+
+      els.dashboardHighlightsWrap.innerHTML = `
+        <div class="summary-list">
+          <div class="summary-item">
+            <div class="summary-line">
+              <strong>Melhor dia</strong>
+              <span>${bestDay ? formatDate(bestDay.date) : "-"}</span>
+            </div>
+            <div class="summary-line">
+              <span>${bestDay ? `${formatNumber(bestDay.total)} produzido` : "Sem dado"}</span>
+              <span>${bestDay ? formatPercent(bestDay.targetPercent) : "-"}</span>
+            </div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-line">
+              <strong>Dia mais crítico</strong>
+              <span>${criticalDay ? formatDate(criticalDay.date) : "-"}</span>
+            </div>
+            <div class="summary-line">
+              <span>${criticalDay ? `${formatNumber(criticalDay.remaining)} faltando` : "Sem dado"}</span>
+              <span>${criticalDay ? formatPercent(criticalDay.targetPercent) : "-"}</span>
+            </div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-line">
+              <strong>Média por dia</strong>
+              <span>${formatNumber(averagePerDay)}</span>
+            </div>
+            <div class="summary-line">
+              <span>${selectedRecords.length} dia${selectedRecords.length === 1 ? "" : "s"} com lançamento</span>
+              <span>${formatPercent(globalSummary.targetPercent)}</span>
+            </div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-line">
+              <strong>Frente líder</strong>
+              <span>${topFront ? escapeHtml(topFront.name) : "-"}</span>
+            </div>
+            <div class="summary-line">
+              <span>${topFront ? `${formatNumber(topFront.production)} produzido` : "Sem frente ativa"}</span>
+              <span>${topFront ? formatPercent(progressFor(topFront.production, topFront.target)) : "-"}</span>
+            </div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-line">
+              <strong>Colhedora destaque</strong>
+              <span>${topFleet ? escapeHtml(topFleet.fleet) : "-"}</span>
+            </div>
+            <div class="summary-line">
+              <span>${topFleet ? `${formatNumber(topFleet.production)} produzido` : "Sem frota ativa"}</span>
+              <span>${topFleet ? formatPercent(topFleet.percent) : "-"}</span>
+            </div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-line">
+              <strong>Frentes ativas</strong>
+              <span>${new Set(rows.filter((row) => row.front).map((row) => normalizeKey(row.front))).size}</span>
+            </div>
+            <div class="summary-line">
+              <span>${ownHarvesterRanking(rows).length} colhedora${ownHarvesterRanking(rows).length === 1 ? "" : "s"} no ranking</span>
+              <span>${globalSummary.records} registros</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderDailySummary(selectedRecords) {
+      const items = dailySummaries(selectedRecords);
+      if (!items.length) {
+        els.dailySummaryWrap.innerHTML = '<div class="empty-state">Sem lançamentos para gerar o resumo diário do período.</div>';
+        return;
+      }
+
+      els.dailySummaryWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Produção</th>
+              <th>Meta</th>
+              <th>% Meta</th>
+              <th>Falta</th>
+              <th>Registros</th>
+              <th>Atualizado</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map((item) => `
+              <tr>
+                <td>${formatDate(item.date)}</td>
+                <td>${formatNumber(item.total)}</td>
+                <td>${formatNumber(item.targetTotal)}</td>
+                <td>${formatPercent(item.targetPercent)}</td>
+                <td>${formatNumber(item.remaining)}</td>
+                <td>${item.records}</td>
+                <td>${formatDateTime(item.updatedAt)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
     function renderDashboard() {
-      const date = els.dashboardDate.value;
-      const record = recordForDate(date);
-      const rows = record ? cloneEntries(record.rows) : [];
+      const range = dashboardRange();
+      setDashboardRange(range.start, range.end);
+      const selectedRecords = recordsForRange(range.start, range.end);
+      const rows = rowsFromRecords(selectedRecords);
+      const targetDays = selectedRecords.length;
+      const rangeLabel = range.start === range.end
+        ? formatDate(range.start)
+        : `${formatDate(range.start)} a ${formatDate(range.end)}`;
+      const monthRange = monthRangeFor(range.end);
+      const monthRecords = recordsForRange(monthRange.start, monthRange.end);
+      const monthSummary = summarizeRows(rowsFromRecords(monthRecords), { targetDays: monthRecords.length });
+      const allRecords = records.filter((record) => record.plant === PLANT);
+      const allSummary = summarizeRows(rowsFromRecords(allRecords), { targetDays: allRecords.length });
 
-      els.dashboardSource.textContent = record
-        ? `Lançamento salvo em ${formatDate(record.date)}.`
-        : "Nenhum lançamento salvo para esta data.";
+      els.dashboardSource.textContent = selectedRecords.length
+        ? `${selectedRecords.length} lançamento${selectedRecords.length === 1 ? "" : "s"} no período ${rangeLabel}.`
+        : `Nenhum lançamento salvo no período ${rangeLabel}.`;
+      els.dashMonthAccumulated.textContent = formatNumber(monthSummary.total);
+      els.dashMonthAccumulatedLabel.textContent = `Mês ${formatMonth(range.end)}`;
+      els.dashAllAccumulated.textContent = formatNumber(allSummary.total);
 
-      setStats("dash", rows);
-      renderDashboardCharts(rows);
+      setStats("dash", rows, { targetDays });
+      renderDashboardCharts(rows, { targetDays });
       renderTypeSummary(rows);
       renderFrontSummary(rows);
+      renderDashboardHighlights(selectedRecords, rows, { targetDays });
+      renderDailySummary(selectedRecords);
       renderDashboardRows(rows);
     }
 
     function renderTypeSummary(rows) {
       const items = aggregateBy(rows, "type");
       if (!items.length) {
-        els.typeSummaryWrap.innerHTML = '<div class="empty-state">Sem produção salva para a data selecionada.</div>';
+        els.typeSummaryWrap.innerHTML = '<div class="empty-state">Sem produção salva para o período selecionado.</div>';
         return;
       }
 
@@ -1964,7 +3180,7 @@
     function renderFrontSummary(rows) {
       const items = aggregateBy(rows.filter((row) => isHarvest(row.type)), "front");
       if (!items.length) {
-        els.frontSummaryWrap.innerHTML = '<div class="empty-state">Sem produção de colheita salva para a data selecionada.</div>';
+        els.frontSummaryWrap.innerHTML = '<div class="empty-state">Sem produção de colheita salva para o período selecionado.</div>';
         return;
       }
 
@@ -1998,7 +3214,7 @@
 
     function renderDashboardRows(rows) {
       if (!rows.length) {
-        els.dashboardRowsWrap.innerHTML = '<div class="empty-state">Nenhum lançamento salvo para a data selecionada.</div>';
+        els.dashboardRowsWrap.innerHTML = '<div class="empty-state">Nenhum lançamento salvo para o período selecionado.</div>';
         return;
       }
 
@@ -2006,6 +3222,7 @@
         <table>
           <thead>
             <tr>
+              <th>Data</th>
               <th>Tipo</th>
               <th>Frente</th>
               <th>Frota</th>
@@ -2018,9 +3235,10 @@
           </thead>
           <tbody>
             ${rows.map((row) => {
-              const target = targetForRow(row, targets, rows);
+              const target = targetForRow(row, targets, rowsForSameDate(row, rows));
               return `
                 <tr>
+                  <td>${formatDate(row.date)}</td>
                   <td>${escapeHtml(row.type)}</td>
                   <td>${escapeHtml(row.front || "-")}</td>
                   <td>${escapeHtml(row.fleet || "-")}</td>
@@ -2769,15 +3987,35 @@
       }
     }
 
-    function saveTargets() {
+    async function saveTargets() {
       targets = getCleanTargets(targets);
       persistTargets();
+      createAutoBackup("Metas atualizadas", { skipAudit: true });
+      addAuditEntry("metas", "Metas diárias salvas localmente.");
       renderOptions();
       renderTargets();
       renderEntry();
       renderDashboard();
       renderHistory();
-      showToast("Metas diárias salvas.");
+
+      const syncState = await syncOrQueue("targets-save", {}, () => syncTargetsToFirebase({
+        silent: true,
+        pendingMessage: "Enviando metas para o Firebase...",
+        successStatus: "Metas salvas no navegador e sincronizadas com o Firebase.",
+        errorStatus: "Metas salvas localmente, mas a sincronizacao com o Firebase falhou."
+      }));
+
+      if (syncState === "synced") {
+        showToast("Metas salvas localmente e no Firebase.");
+        return;
+      }
+
+      if (syncState === "queued-offline" || syncState === "queued-error") {
+        showToast("Metas salvas localmente. A sincronizacao ficou pendente.");
+        return;
+      }
+
+      showToast("Metas diarias salvas localmente.");
     }
 
     function defaultsForType(type) {
@@ -2864,7 +4102,7 @@
       showToast(`Lançamento de ${formatDate(date)} carregado.`);
     }
 
-    function saveCurrentDay() {
+    async function saveCurrentDay() {
       const date = els.entryDate.value;
       const cleanRows = getCleanEntries();
 
@@ -2892,23 +4130,43 @@
         rows: cleanRows,
         updatedAt: new Date().toISOString()
       };
+      const updated = existingIndex >= 0;
 
       cleanRows.forEach(ensureTargetForRow);
 
       if (existingIndex >= 0) {
         records[existingIndex] = record;
-        showToast("Lançamento diário da Cambuí atualizado.");
       } else {
         records.push(record);
-        showToast("Lançamento diário da Cambuí salvo.");
       }
 
       entries = cloneEntries(cleanRows.length ? cleanRows : defaultEntries);
       persistRecords();
-      els.dashboardDate.value = date;
+      createAutoBackup(updated ? `Lançamento atualizado em ${formatDate(date)}` : `Lançamento salvo em ${formatDate(date)}`, { skipAudit: true });
+      addAuditEntry("lancamento", updated ? `Lançamento de ${formatDate(date)} atualizado localmente.` : `Lançamento de ${formatDate(date)} salvo localmente.`);
+      setDashboardRange(date, date);
       renderEntry();
       renderDashboard();
       renderHistory();
+
+      const syncState = await syncOrQueue("record-upsert", { date }, () => syncRecordToFirebase(record, {
+        silent: true,
+        pendingMessage: "Enviando lancamento para o Firebase...",
+        successStatus: `Lancamento de ${formatDate(date)} salvo no navegador e no Firebase.`,
+        errorStatus: `Lancamento de ${formatDate(date)} salvo localmente, mas a sincronizacao com o Firebase falhou.`
+      }));
+
+      if (syncState === "synced") {
+        showToast(updated ? "Lançamento atualizado localmente e no Firebase." : "Lançamento salvo localmente e no Firebase.");
+        return;
+      }
+
+      if (syncState === "queued-offline" || syncState === "queued-error") {
+        showToast(updated ? "Lançamento atualizado localmente. A sincronizacao ficou pendente." : "Lançamento salvo localmente. A sincronizacao ficou pendente.");
+        return;
+      }
+
+      showToast(updated ? "Lançamento diário atualizado localmente." : "Lançamento diário salvo localmente.");
     }
 
     function renderHistory() {
@@ -2991,17 +4249,40 @@
     function openHistoryDashboard(id) {
       const record = records.find((item) => item.id === id);
       if (!record) return;
-      els.dashboardDate.value = record.date;
+      setDashboardRange(record.date, record.date);
       switchView("dashboard");
       showToast(`Dashboard de ${formatDate(record.date)} aberto.`);
     }
 
-    function deleteHistory(id) {
+    async function deleteHistory(id) {
+      const record = records.find((item) => item.id === id);
+      if (!record) return;
+
+      createAutoBackup(`Antes de excluir ${formatDate(record.date)}`, { skipAudit: true });
       records = records.filter((item) => item.id !== id);
       persistRecords();
+      addAuditEntry("exclusao", `Lançamento de ${formatDate(record.date)} removido localmente.`);
       renderDashboard();
       renderHistory();
-      showToast("Lançamento removido do histórico.");
+
+      const syncState = await syncOrQueue("record-delete", { date: record.date }, () => deleteRecordFromFirebase(record.date, {
+        silent: true,
+        pendingMessage: "Removendo lancamento do Firebase...",
+        successStatus: `Lancamento de ${formatDate(record.date)} removido do navegador e do Firebase.`,
+        errorStatus: `Lancamento de ${formatDate(record.date)} removido localmente, mas nao foi possivel apagar no Firebase.`
+      }));
+
+      if (syncState === "synced") {
+        showToast("Lançamento removido do histórico local e do Firebase.");
+        return;
+      }
+
+      if (syncState === "queued-offline" || syncState === "queued-error") {
+        showToast("Lançamento removido localmente. A exclusao ficou pendente de sincronizacao.");
+        return;
+      }
+
+      showToast("Lançamento removido do histórico local.");
     }
 
     function exportCsv() {
@@ -3034,54 +4315,39 @@
     }
 
     function exportJson() {
-      const payload = {
-        plant: PLANT,
-        version: 6,
-        exportedAt: new Date().toISOString(),
-        targets: getCleanTargets(),
-        records
-      };
+      const payload = currentDataPayload();
       downloadFile(`producao-cambui-${todayInputValue()}.json`, JSON.stringify(payload, null, 2), "application/json");
-      showToast("JSON da Cambuí exportado.");
+      addAuditEntry("backup", "Backup JSON exportado manualmente.");
+      showToast("Backup JSON exportado.");
     }
 
     async function importJson(file) {
       if (!file) return;
 
       try {
+        createAutoBackup("Antes de importar backup JSON", { skipAudit: true });
         const text = await file.text();
         const payload = JSON.parse(text);
-        const importedRecords = Array.isArray(payload) ? payload : payload.records;
-        if (!Array.isArray(importedRecords)) throw new Error("Formato inválido");
+        applyDataPayload(payload, { mergeRecords: true });
+        createAutoBackup("Backup JSON importado", { skipAudit: true });
+        addAuditEntry("importacao", "Backup JSON importado localmente.");
 
-        if (!Array.isArray(payload) && payload.targets) {
-          targets = cloneTargets(payload.targets);
-          persistTargets();
+        const syncState = await syncOrQueue("upload-all", { source: "import-json" }, () => uploadAllDataToFirebase({
+          silent: true,
+          pendingMessage: "Enviando backup importado para o Firebase...",
+          successStatus: "Backup importado e sincronizado com o Firebase.",
+          errorStatus: "Backup importado localmente, mas a sincronizacao com o Firebase falhou."
+        }));
+
+        if (syncState === "synced") {
+          showToast("Backup JSON importado localmente e no Firebase.");
+        } else if (syncState === "queued-offline" || syncState === "queued-error") {
+          showToast("Backup JSON importado localmente. A sincronizacao ficou pendente.");
+        } else {
+          showToast("Backup JSON importado localmente.");
         }
-
-        const normalized = importedRecords
-          .filter((record) => record && record.date && Array.isArray(record.rows))
-          .map((record) => ({
-            id: record.id || makeId(),
-            plant: PLANT,
-            date: record.date,
-            rows: getCleanEntries(record.rows),
-            updatedAt: record.updatedAt || new Date().toISOString()
-          }))
-          .filter((record) => record.rows.length);
-
-        const byDate = new Map(records.map((record) => [`${record.plant}|${record.date}`, record]));
-        normalized.forEach((record) => byDate.set(`${PLANT}|${record.date}`, record));
-        records = [...byDate.values()].filter((record) => record.plant === PLANT);
-        persistRecords();
-        renderOptions();
-        renderTargets();
-        renderEntry();
-        renderDashboard();
-        renderHistory();
-        showToast("JSON importado para produção.");
       } catch {
-        showToast("Não foi possível importar o JSON.");
+        showToast("Nao foi possivel importar o backup JSON.");
       } finally {
         els.importFile.value = "";
       }
@@ -3114,7 +4380,8 @@
       tab.addEventListener("click", () => switchView(tab.dataset.view));
     });
 
-    els.dashboardDate.addEventListener("change", renderDashboard);
+    els.dashboardStartDate.addEventListener("change", renderDashboard);
+    els.dashboardEndDate.addEventListener("change", renderDashboard);
     els.historySearch.addEventListener("input", renderHistory);
 
     els.frontCards.forEach((card) => {
@@ -3196,7 +4463,28 @@
     });
 
     document.querySelector("#todayDashboardBtn").addEventListener("click", () => {
-      els.dashboardDate.value = todayInputValue();
+      const today = todayInputValue();
+      setDashboardRange(today, today);
+      renderDashboard();
+    });
+
+    document.querySelector("#monthDashboardBtn").addEventListener("click", () => {
+      const range = monthRangeFor(todayInputValue());
+      setDashboardRange(range.start, range.end);
+      renderDashboard();
+    });
+
+    document.querySelector("#allDashboardBtn").addEventListener("click", () => {
+      const first = firstRecord();
+      const latest = latestRecord();
+      if (!first || !latest) {
+        const today = todayInputValue();
+        setDashboardRange(today, today);
+        showToast("Ainda não há lançamento salvo.");
+        renderDashboard();
+        return;
+      }
+      setDashboardRange(first.date, latest.date);
       renderDashboard();
     });
 
@@ -3206,7 +4494,7 @@
         showToast("Ainda não há lançamento salvo.");
         return;
       }
-      els.dashboardDate.value = latest.date;
+      setDashboardRange(latest.date, latest.date);
       renderDashboard();
     });
 
@@ -3220,18 +4508,86 @@
     document.querySelector("#exportCsvBtn").addEventListener("click", exportCsv);
     document.querySelector("#exportJsonBtn").addEventListener("click", exportJson);
     document.querySelector("#importJsonBtn").addEventListener("click", () => els.importFile.click());
+    document.querySelector("#saveFirebaseConfigBtn").addEventListener("click", saveFirebaseConfig);
+    document.querySelector("#testFirebaseBtn").addEventListener("click", testFirebaseConnection);
+    document.querySelector("#pushFirebaseBtn").addEventListener("click", async () => {
+      const syncState = await syncOrQueue("upload-all", { source: "manual-push" }, () => uploadAllDataToFirebase({
+        silent: true,
+        pendingMessage: "Enviando todos os dados para o Firebase...",
+        successStatus: "Todos os dados locais foram enviados para o Firebase.",
+        errorStatus: "Nao foi possivel enviar todos os dados para o Firebase."
+      }));
+      showToast(syncState === "synced" ? "Dados locais enviados para o Firebase." : syncState === "queued-offline" || syncState === "queued-error" ? "Dados mantidos localmente e colocados na fila de sincronizacao." : "Falha ao enviar os dados para o Firebase.");
+    });
+    document.querySelector("#pullFirebaseBtn").addEventListener("click", async () => {
+      const loaded = await downloadAllDataFromFirebase({
+        silent: true,
+        pendingMessage: "Baixando dados do Firebase...",
+        successStatus: "Dados do Firebase carregados no sistema."
+      });
+      if (loaded) {
+        createAutoBackup("Dados baixados do Firebase", { skipAudit: true });
+        addAuditEntry("firebase", "Dados do Firebase importados para o sistema.");
+      }
+      showToast(loaded ? "Dados do Firebase importados para o sistema." : "Nenhum dado foi carregado do Firebase.");
+    });
+    document.querySelector("#retryPendingSyncBtn").addEventListener("click", () => flushPendingSyncQueue());
+    document.querySelector("#createBackupBtn").addEventListener("click", () => {
+      createAutoBackup("Backup manual pelo painel");
+      showToast("Backup automático criado com sucesso.");
+    });
     document.querySelector("#printBtn").addEventListener("click", () => window.print());
     els.importFile.addEventListener("change", (event) => importJson(event.target.files[0]));
+    els.autoBackupWrap.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-backup-action]");
+      if (!button) return;
+      if (button.dataset.backupAction === "export") exportBackupItem(button.dataset.id);
+      if (button.dataset.backupAction === "restore") restoreBackupItem(button.dataset.id);
+    });
 
+    window.addEventListener("online", async () => {
+      firebaseState.lastMessage = "Conexao restaurada. Tentando sincronizar as pendencias.";
+      renderFirebaseStatus();
+      await flushPendingSyncQueue({ silent: true });
+    });
+
+    window.addEventListener("offline", () => {
+      firebaseState.lastMessage = "Modo offline ativo. Os dados continuam salvos localmente.";
+      renderFirebaseStatus();
+      showToast("Modo offline ativo. O sistema vai sincronizar quando a internet voltar.");
+    });
+
+    renderFirebaseConfigForm();
+    renderFirebaseStatus();
     renderOptions();
+    renderPendingSyncQueue();
+    renderAutoBackups();
+    renderAuditLog();
     const initialDate = todayInputValue();
     const initialDashboardRecord = recordForDate(initialDate) || latestRecord();
-    els.dashboardDate.value = initialDashboardRecord ? initialDashboardRecord.date : initialDate;
+    const initialDashboardDate = initialDashboardRecord ? initialDashboardRecord.date : initialDate;
+    setDashboardRange(initialDashboardDate, initialDashboardDate);
     els.entryDate.value = initialDate;
     renderTargets();
     renderEntry();
     renderDashboard();
     renderHistory();
+
+    ensureFirebaseReady({ silent: true }).then((ready) => {
+      if (!ready || records.length) return;
+      return downloadAllDataFromFirebase({
+        silent: true,
+        pendingMessage: "Baixando dados salvos no Firebase...",
+        successStatus: "Dados do Firebase restaurados no sistema."
+      }).then((loaded) => {
+        if (loaded) {
+          showToast("Dados recuperados do Firebase.");
+        }
+      });
+    }).then(() => {
+      if (!pendingSyncQueue.length) return;
+      return flushPendingSyncQueue({ silent: true });
+    });
   </script>
 </body>
 </html>
