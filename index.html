@@ -10,6 +10,7 @@
       --bg: #edf3f0;
       --surface: #ffffff;
       --surface-2: #f7faf8;
+      --surface-3: #ffffff;
       --ink: #16211b;
       --muted: #61736a;
       --line: #d6dfda;
@@ -18,9 +19,72 @@
       --green-dark: #244f2c;
       --blue: #245a84;
       --red: #b21e34;
+      --input-bg: #ffffff;
+      --input-disabled-bg: #edf4ef;
+      --input-disabled-text: #587065;
+      --header-bg: #f9fbfa;
+      --plant-bg: #e9f2ea;
+      --button-secondary-bg: #e7ece9;
+      --button-secondary-hover: #dce5df;
+      --button-secondary-text: #22372c;
+      --danger-bg: #fae5e8;
+      --danger-hover-bg: #f5d1d7;
+      --good-bg: #dff0e3;
+      --alert-bg: #fae5e8;
+      --track-bg: #dfe8e3;
+      --table-head-bg: #e2e8e4;
+      --table-head-text: #1f2b24;
+      --table-even-bg: #f2f7fa;
+      --workspace-bg: #f7faf8;
+      --workspace-head-bg: #edf6ef;
+      --workspace-border: #c9d8ce;
+      --card-hover-bg: #e9f2ea;
+      --card-hover-border: #a9c3af;
+      --toast-bg: #16211b;
+      --toast-text: #ffffff;
       --shadow: 0 18px 55px rgba(25, 44, 34, .12);
       --radius: 8px;
       font-family: Inter, "Segoe UI", Arial, sans-serif;
+    }
+
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #101614;
+      --surface: #18211d;
+      --surface-2: #1f2a25;
+      --surface-3: #22302a;
+      --ink: #eef6f1;
+      --muted: #a8bbb1;
+      --line: #34443d;
+      --line-strong: #52665d;
+      --green: #66b876;
+      --green-dark: #9ed8a7;
+      --blue: #8bbfe8;
+      --red: #ff9aaa;
+      --input-bg: #111a16;
+      --input-disabled-bg: #202b26;
+      --input-disabled-text: #a8bbb1;
+      --header-bg: #151d19;
+      --plant-bg: #203127;
+      --button-secondary-bg: #26342e;
+      --button-secondary-hover: #30443a;
+      --button-secondary-text: #eef6f1;
+      --danger-bg: #42232a;
+      --danger-hover-bg: #552b35;
+      --good-bg: #1f3b2a;
+      --alert-bg: #42232a;
+      --track-bg: #2d3d35;
+      --table-head-bg: #23312b;
+      --table-head-text: #e6f0eb;
+      --table-even-bg: #1c2924;
+      --workspace-bg: #16211c;
+      --workspace-head-bg: #203127;
+      --workspace-border: #3d5548;
+      --card-hover-bg: #203127;
+      --card-hover-border: #558562;
+      --toast-bg: #eef6f1;
+      --toast-text: #101614;
+      --shadow: 0 18px 55px rgba(0, 0, 0, .32);
     }
 
     * {
@@ -68,14 +132,14 @@
       border: 1px solid var(--line);
       border-radius: 7px;
       padding: 8px 10px;
-      background: #fff;
+      background: var(--input-bg);
       color: var(--ink);
     }
 
     input[readonly],
     input:disabled {
-      background: #edf4ef;
-      color: #587065;
+      background: var(--input-disabled-bg);
+      color: var(--input-disabled-text);
       font-weight: 760;
     }
 
@@ -87,7 +151,7 @@
     }
 
     .app-header {
-      background: #f9fbfa;
+      background: var(--header-bg);
       border-bottom: 1px solid var(--line);
     }
 
@@ -122,7 +186,7 @@
       min-height: 58px;
       padding: 9px 14px;
       border-left: 5px solid var(--green);
-      background: #e9f2ea;
+      background: var(--plant-bg);
       border-radius: var(--radius);
     }
 
@@ -155,14 +219,39 @@
 
     .nav-tab {
       background: transparent;
-      color: #274233;
+      color: var(--ink);
       border: 1px solid transparent;
     }
 
     .nav-tab[aria-selected="true"] {
-      background: #e4eee7;
-      border-color: #c9d8ce;
+      background: var(--card-hover-bg);
+      border-color: var(--workspace-border);
       color: var(--green-dark);
+    }
+
+    .theme-toggle {
+      margin-left: auto;
+      display: inline-flex;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-2);
+    }
+
+    .theme-option {
+      min-height: 34px;
+      padding: 0 11px;
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid transparent;
+    }
+
+    .theme-option[aria-pressed="true"] {
+      background: var(--surface);
+      color: var(--ink);
+      border-color: var(--line);
+      box-shadow: 0 6px 14px rgba(0, 0, 0, .08);
     }
 
     .main {
@@ -227,21 +316,21 @@
     }
 
     .btn-secondary {
-      background: #e7ece9;
-      color: #22372c;
+      background: var(--button-secondary-bg);
+      color: var(--button-secondary-text);
     }
 
     .btn-secondary:hover {
-      background: #dce5df;
+      background: var(--button-secondary-hover);
     }
 
     .btn-danger {
-      background: #fae5e8;
+      background: var(--danger-bg);
       color: var(--red);
     }
 
     .btn-danger:hover {
-      background: #f5d1d7;
+      background: var(--danger-hover-bg);
     }
 
     .btn-link {
@@ -329,7 +418,7 @@
       height: 12px;
       overflow: hidden;
       border-radius: 999px;
-      background: #dfe8e3;
+      background: var(--track-bg);
     }
 
     .meter-fill,
@@ -360,7 +449,7 @@
       padding: 10px;
       border: 1px solid var(--line);
       border-radius: var(--radius);
-      background: #fff;
+      background: var(--surface-3);
     }
 
     .goal-metric span {
@@ -425,7 +514,7 @@
       padding: 11px;
       border: 1px solid var(--line);
       border-radius: var(--radius);
-      background: #fff;
+      background: var(--surface-3);
     }
 
     .rank-position {
@@ -434,7 +523,7 @@
       display: grid;
       place-items: center;
       border-radius: 999px;
-      background: #e4eee7;
+      background: var(--card-hover-bg);
       color: var(--green-dark);
       font-weight: 950;
     }
@@ -455,20 +544,20 @@
       min-height: 24px;
       padding: 2px 8px;
       border-radius: 999px;
-      background: #e7ece9;
-      color: #22372c;
+      background: var(--button-secondary-bg);
+      color: var(--button-secondary-text);
       font-size: .75rem;
       font-weight: 850;
       white-space: nowrap;
     }
 
     .status-pill.good {
-      background: #dff0e3;
+      background: var(--good-bg);
       color: var(--green-dark);
     }
 
     .status-pill.alert {
-      background: #fae5e8;
+      background: var(--alert-bg);
       color: var(--red);
     }
 
@@ -478,7 +567,7 @@
 
     .front-grid {
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
       gap: 10px;
       padding: 16px;
     }
@@ -489,7 +578,7 @@
       align-content: center;
       gap: 5px;
       padding: 12px;
-      background: #fff;
+      background: var(--surface-3);
       border: 1px solid var(--line);
       border-radius: var(--radius);
       color: var(--ink);
@@ -499,8 +588,8 @@
 
     .front-card:hover,
     .front-card[aria-pressed="true"] {
-      background: #e9f2ea;
-      border-color: #a9c3af;
+      background: var(--card-hover-bg);
+      border-color: var(--card-hover-border);
     }
 
     .front-card strong {
@@ -516,9 +605,9 @@
 
     .front-workspace {
       margin: 0 16px 16px;
-      border: 1px solid #c9d8ce;
+      border: 1px solid var(--workspace-border);
       border-radius: var(--radius);
-      background: #f7faf8;
+      background: var(--workspace-bg);
       overflow: hidden;
     }
 
@@ -534,7 +623,7 @@
       align-items: center;
       padding: 12px 14px;
       border-bottom: 1px solid var(--line);
-      background: #edf6ef;
+      background: var(--workspace-head-bg);
     }
 
     .workspace-head h3 {
@@ -619,21 +708,21 @@
       margin-bottom: 14px;
       border: 1px solid var(--line);
       border-radius: var(--radius);
-      background: #fff;
+      background: var(--surface-3);
       color: var(--muted);
       font-weight: 700;
       line-height: 1.4;
     }
 
     .sync-status.good {
-      background: #edf6ef;
-      border-color: #c9d8ce;
+      background: var(--workspace-head-bg);
+      border-color: var(--workspace-border);
       color: var(--green-dark);
     }
 
     .sync-status.alert {
-      background: #fae5e8;
-      border-color: #efc7cd;
+      background: var(--alert-bg);
+      border-color: var(--danger-hover-bg);
       color: var(--red);
     }
 
@@ -665,15 +754,15 @@
     }
 
     th {
-      background: #e2e8e4;
-      color: #1f2b24;
+      background: var(--table-head-bg);
+      color: var(--table-head-text);
       font-size: .78rem;
       text-transform: uppercase;
       white-space: nowrap;
     }
 
     tbody tr:nth-child(even) {
-      background: #f2f7fa;
+      background: var(--table-even-bg);
     }
 
     td input,
@@ -716,12 +805,12 @@
       min-height: 34px;
       padding: 0;
       border-radius: 7px;
-      background: #e9efec;
-      color: #1c2c23;
+      background: var(--button-secondary-bg);
+      color: var(--button-secondary-text);
     }
 
     .icon-button.delete {
-      background: #fae5e8;
+      background: var(--danger-bg);
       color: var(--red);
     }
 
@@ -739,7 +828,7 @@
       padding: 10px;
       display: grid;
       gap: 5px;
-      background: #fff;
+      background: var(--surface-3);
     }
 
     .summary-line {
@@ -758,7 +847,7 @@
       padding: 28px 16px;
       text-align: center;
       color: var(--muted);
-      background: #fff;
+      background: var(--surface-3);
       border: 1px dashed var(--line-strong);
       border-radius: var(--radius);
     }
@@ -772,8 +861,8 @@
       right: 18px;
       bottom: 18px;
       max-width: min(420px, calc(100vw - 36px));
-      background: #16211b;
-      color: #fff;
+      background: var(--toast-bg);
+      color: var(--toast-text);
       border-radius: var(--radius);
       padding: 12px 14px;
       box-shadow: var(--shadow);
@@ -888,7 +977,7 @@
     <div class="header-inner">
       <div>
         <h1>Produção Diária da Cambuí</h1>
-        <p class="subtitle">Colheita própria por frota de colhedora, colheita terceira por frente e transporte por tipo.</p>
+        <p class="subtitle">Colheita própria por frota, colheita terceira por frente, transporte próprio por caminhão e terceiro por total.</p>
       </div>
       <div class="plant-lock" aria-label="Usina fixa">
         <span>Usina fixa</span>
@@ -903,6 +992,10 @@
       <button class="nav-tab" type="button" data-view="entry" aria-selected="false">Lançamento Diário</button>
       <button class="nav-tab" type="button" data-view="targets" aria-selected="false">Metas Diárias</button>
       <button class="nav-tab" type="button" data-view="history" aria-selected="false">Histórico</button>
+      <div class="theme-toggle" aria-label="Tema">
+        <button class="theme-option" type="button" data-theme-option="light" aria-pressed="true">Claro</button>
+        <button class="theme-option" type="button" data-theme-option="dark" aria-pressed="false">Escuro</button>
+      </div>
     </div>
   </nav>
 
@@ -1076,12 +1169,12 @@
         <article class="stat">
           <span>Transporte próprio</span>
           <strong id="entryOwnTransport">0</strong>
-          <small>Diário</small>
+          <small>Por caminhão</small>
         </article>
         <article class="stat">
           <span>Transporte terceiro</span>
           <strong id="entryThirdTransport">0</strong>
-          <small>Diário</small>
+          <small>Total diário</small>
         </article>
         <article class="stat">
           <span>Meta total</span>
@@ -1090,9 +1183,9 @@
         </article>
       </section>
 
-      <section class="panel" aria-label="Lançamento por frente de colheita">
+      <section class="panel" aria-label="Lançamento por frente de colheita e transporte">
         <div class="panel-head">
-          <h2>Frentes de colheita</h2>
+          <h2>Frentes e transporte</h2>
         </div>
         <div class="front-grid" id="frontCards">
           <button class="front-card" type="button" data-front="Frente 4001" data-type="Colheita Própria" aria-pressed="false">
@@ -1115,6 +1208,14 @@
             <strong>Frente 4009</strong>
             <span>Terceira · lançar produção</span>
           </button>
+          <button class="front-card" type="button" data-type="Transporte Próprio" aria-pressed="false">
+            <strong>Transporte Próprio</strong>
+            <span>Lançar por caminhão</span>
+          </button>
+          <button class="front-card" type="button" data-type="Transporte Terceiro" aria-pressed="false">
+            <strong>Transporte Terceiro</strong>
+            <span>Lançar total transportado</span>
+          </button>
         </div>
 
         <div class="front-workspace" id="frontWorkspace" hidden>
@@ -1127,7 +1228,7 @@
           </div>
           <div class="manual-grid">
             <div class="field" id="manualFleetField">
-              <label for="manualFleet">Frota da colhedora</label>
+              <label id="manualFleetLabel" for="manualFleet">Frota da colhedora</label>
               <input id="manualFleet" list="fleetOptions" type="text" placeholder="Ex.: Colhedora 4001-01">
             </div>
             <div class="field">
@@ -1143,7 +1244,7 @@
           <div class="workspace-actions">
             <button class="btn-secondary" id="importFrontFileBtn" type="button">Importar arquivo</button>
             <input class="file-input" id="frontImportFile" type="file" accept=".csv,.json,.txt,.html,.htm,.pdf,.xls,.xlsx,image/*,application/json,text/csv,text/plain,text/html,application/pdf">
-            <span class="workspace-hint">Para relatório "Colhedora e Dias Trabalhados", o sistema usa Código como frota e Toneladas Colhidas como produção. Aceita foto, PDF, Excel, CSV, TXT, HTML ou JSON.</span>
+            <span class="workspace-hint">O importador procura frota, caminhão, equipamento, produção, toneladas, quantidade ou total. Aceita foto, PDF, Excel, CSV, TXT, HTML ou JSON.</span>
           </div>
         </div>
       </section>
@@ -1165,7 +1266,7 @@
               <tr>
                 <th>Tipo</th>
                 <th>Frente</th>
-                <th>Frota da colhedora</th>
+                <th>Frota / caminhão</th>
                 <th>Meta diária</th>
                 <th>Produção diária</th>
                 <th>% Meta</th>
@@ -1342,6 +1443,7 @@
     const STORAGE_KEY = "cambui.daily.production.flow.v5";
     const TARGETS_KEY = "cambui.daily.production.targets.v1";
     const FIREBASE_CONFIG_KEY = "cambui.daily.production.firebase.config.v1";
+    const THEME_KEY = "cambui.daily.production.theme.v1";
     const FIREBASE_APP_NAME = "cambui-production-app";
     const AUTO_BACKUPS_KEY = "cambui.daily.production.auto.backups.v1";
     const AUDIT_LOG_KEY = "cambui.daily.production.audit.v1";
@@ -1404,6 +1506,7 @@
       targetsView: document.querySelector("#targetsView"),
       historyView: document.querySelector("#historyView"),
       navTabs: [...document.querySelectorAll(".nav-tab")],
+      themeButtons: [...document.querySelectorAll("[data-theme-option]")],
       dashboardStartDate: document.querySelector("#dashboardStartDate"),
       dashboardEndDate: document.querySelector("#dashboardEndDate"),
       dashboardSource: document.querySelector("#dashboardSource"),
@@ -1413,6 +1516,7 @@
       activeFrontTitle: document.querySelector("#activeFrontTitle"),
       activeFrontHint: document.querySelector("#activeFrontHint"),
       manualFleetField: document.querySelector("#manualFleetField"),
+      manualFleetLabel: document.querySelector("#manualFleetLabel"),
       manualFleet: document.querySelector("#manualFleet"),
       manualProduction: document.querySelector("#manualProduction"),
       manualNote: document.querySelector("#manualNote"),
@@ -1473,6 +1577,7 @@
     let autoBackups = loadAutoBackups();
     let auditLog = loadAuditLog();
     let pendingSyncQueue = loadPendingSyncQueue();
+    let currentTheme = loadTheme();
     let entries = cloneEntries(defaultEntries);
     let activeFront = null;
     const firebaseState = {
@@ -1497,6 +1602,28 @@
       const offset = now.getTimezoneOffset();
       const local = new Date(now.getTime() - offset * 60000);
       return local.toISOString().slice(0, 10);
+    }
+
+    function loadTheme() {
+      try {
+        const stored = localStorage.getItem(THEME_KEY);
+        return stored === "dark" ? "dark" : "light";
+      } catch {
+        return "light";
+      }
+    }
+
+    function applyTheme(theme) {
+      currentTheme = theme === "dark" ? "dark" : "light";
+      document.documentElement.dataset.theme = currentTheme;
+      els.themeButtons.forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.themeOption === currentTheme));
+      });
+      try {
+        localStorage.setItem(THEME_KEY, currentTheme);
+      } catch {
+        // Prefer keeping the UI usable even if local storage is unavailable.
+      }
     }
 
     function parseNumber(value) {
@@ -1585,11 +1712,22 @@
     }
 
     function requiresFleet(type) {
-      return type === TYPES.OWN_HARVEST;
+      return type === TYPES.OWN_HARVEST || type === TYPES.OWN_TRANSPORT;
     }
 
     function needsFront(type) {
       return type === TYPES.OWN_HARVEST || type === TYPES.THIRD_HARVEST;
+    }
+
+    function fleetLabelForType(type) {
+      const normalized = normalizeType(type);
+      if (normalized === TYPES.OWN_TRANSPORT) return "Caminhão próprio";
+      if (normalized === TYPES.OWN_HARVEST) return "Frota da colhedora";
+      return "Frota";
+    }
+
+    function fleetPlaceholderForType(type) {
+      return normalizeType(type) === TYPES.OWN_TRANSPORT ? "Ex.: Caminhão 01" : "Ex.: Colhedora 4001-01";
     }
 
     function allowedFrontsFor(type) {
@@ -1675,7 +1813,7 @@
     function cleanRecord(record) {
       if (!record || !recordBelongsToPlant(record)) return null;
       const date = normalizeRecordDate(record.date || record.id);
-      const rows = getCleanEntries(record.rows);
+      const rows = getCleanEntries(record.rows, { preserveMissingOwnTransportFleet: true });
       if (!date || !rows.length) return null;
       return {
         id: record.id || makeId(),
@@ -1724,7 +1862,11 @@
         const front = normalizeKey(row.front);
         return front ? `${type}|${front}` : "";
       }
-      if (type === TYPES.OWN_TRANSPORT || type === TYPES.THIRD_TRANSPORT) {
+      if (type === TYPES.OWN_TRANSPORT) {
+        const fleet = normalizeKey(row.fleet);
+        return fleet ? `${type}|${fleet}` : "";
+      }
+      if (type === TYPES.THIRD_TRANSPORT) {
         return type;
       }
       return "";
@@ -2618,6 +2760,15 @@
       return Math.max(fleets.size, 1);
     }
 
+    function ownTransportTruckCount(rowsContext = []) {
+      const trucks = new Set((rowsContext || [])
+        .filter((item) => normalizeType(item.type) === TYPES.OWN_TRANSPORT)
+        .filter((item) => parseNumber(item.production) > 0)
+        .map((item) => normalizeKey(item.fleet))
+        .filter(Boolean));
+      return Math.max(trucks.size, 1);
+    }
+
     function targetForRow(row, source = targets, rowsContext = [row]) {
       const cleanTargets = getCleanTargets(source);
       const type = normalizeType(row.type);
@@ -2633,7 +2784,12 @@
         return found ? found.target : 0;
       }
 
-      if (type === TYPES.OWN_TRANSPORT || type === TYPES.THIRD_TRANSPORT) {
+      if (type === TYPES.OWN_TRANSPORT) {
+        const found = cleanTargets.transports.find((target) => target.type === type);
+        return found ? found.target / ownTransportTruckCount(rowsContext) : 0;
+      }
+
+      if (type === TYPES.THIRD_TRANSPORT) {
         const found = cleanTargets.transports.find((target) => target.type === type);
         return found ? found.target : 0;
       }
@@ -2665,27 +2821,31 @@
       renderOptions();
     }
 
-    function normalizeEntry(row) {
+    function normalizeEntry(row, options = {}) {
       const type = normalizeType(row.type || row.operation);
       const rawFront = row.front || "";
-      const rawFleet = row.fleet || row.equipment || "";
+      const rawFleet = row.fleet || row.truck || row.caminhao || row["caminhão"] || row.equipment || "";
+      const production = parseNumber(row.production ?? row.actual ?? row.effective ?? 0);
+      const fleet = options.preserveMissingOwnTransportFleet && type === TYPES.OWN_TRANSPORT && !rawFleet && production > 0
+        ? "Caminhão não informado"
+        : rawFleet;
 
       return {
         id: row.id || makeId(),
         type,
         front: needsFront(type) ? rawFront || defaultFrontFor(type) : "",
-        fleet: requiresFleet(type) ? rawFleet : "",
-        production: parseNumber(row.production ?? row.actual ?? row.effective ?? 0),
+        fleet: requiresFleet(type) ? fleet : "",
+        production,
         note: row.note || ""
       };
     }
 
-    function cloneEntries(source) {
-      return (source || []).map(normalizeEntry);
+    function cloneEntries(source, options = {}) {
+      return (source || []).map((row) => normalizeEntry(row, options));
     }
 
-    function getCleanEntries(source = entries) {
-      return cloneEntries(source)
+    function getCleanEntries(source = entries, options = {}) {
+      return cloneEntries(source, options)
         .map((row) => ({
           ...row,
           type: normalizeType(row.type),
@@ -2988,7 +3148,13 @@
         label: type,
         production: productionByType(rows, type),
         target: targetForType(type) * targetDays,
-        detail: type === TYPES.OWN_HARVEST ? "Frentes 4001, 4002 e 4003" : type === TYPES.THIRD_HARVEST ? "Frentes 4007 e 4009" : "Produção de transporte"
+        detail: type === TYPES.OWN_HARVEST
+          ? "Frentes 4001, 4002 e 4003"
+          : type === TYPES.THIRD_HARVEST
+            ? "Frentes 4007 e 4009"
+            : type === TYPES.OWN_TRANSPORT
+              ? "Por caminhão próprio"
+              : "Total transportado por terceiros"
       }));
 
       els.typeChartWrap.innerHTML = `
@@ -3369,18 +3535,24 @@
     }
 
     function openFrontWorkspace(front, type) {
-      activeFront = { front, type: normalizeType(type) };
+      activeFront = { front: front || "", type: normalizeType(type) };
+      const isTransport = !needsFront(activeFront.type);
+      const fleetLabel = fleetLabelForType(activeFront.type);
       els.frontWorkspace.hidden = false;
-      els.activeFrontTitle.textContent = `${activeFront.front} · ${activeFront.type}`;
+      els.activeFrontTitle.textContent = activeFront.front ? `${activeFront.front} · ${activeFront.type}` : activeFront.type;
       els.activeFrontHint.textContent = requiresFleet(activeFront.type)
-        ? "Informe a frota da colhedora e a produção, ou importe um arquivo do sistema."
-        : "Informe a produção da frente, ou importe um arquivo do sistema.";
+        ? `Informe ${fleetLabel.toLowerCase()} e a produção, ou importe um arquivo do sistema.`
+        : isTransport
+          ? "Informe o total transportado por terceiros, ou importe um arquivo do sistema."
+          : "Informe a produção da frente, ou importe um arquivo do sistema.";
+      els.manualFleetLabel.textContent = fleetLabel;
+      els.manualFleet.placeholder = fleetPlaceholderForType(activeFront.type);
       els.manualFleetField.hidden = !requiresFleet(activeFront.type);
       els.manualFleet.value = "";
       els.manualProduction.value = "";
       els.manualNote.value = "";
       els.frontCards.forEach((card) => {
-        const selected = card.dataset.front === front && card.dataset.type === type;
+        const selected = (card.dataset.front || "") === activeFront.front && normalizeType(card.dataset.type) === activeFront.type;
         card.setAttribute("aria-pressed", String(selected));
       });
       setTimeout(() => {
@@ -3420,7 +3592,7 @@
 
     function addManualFrontProduction() {
       if (!activeFront) {
-        showToast("Selecione uma frente primeiro.");
+        showToast("Selecione uma frente ou transporte primeiro.");
         return;
       }
 
@@ -3432,7 +3604,7 @@
 
       const fleet = requiresFleet(activeFront.type) ? els.manualFleet.value.trim() : "";
       if (requiresFleet(activeFront.type) && !fleet) {
-        showToast("Informe a frota da colhedora.");
+        showToast(`Informe ${fleetLabelForType(activeFront.type).toLowerCase()}.`);
         return;
       }
 
@@ -3448,7 +3620,7 @@
       els.manualProduction.value = "";
       els.manualNote.value = "";
       renderEntry();
-      showToast("Produção adicionada à conferência.");
+      showToast(activeFront.type === TYPES.OWN_TRANSPORT ? "Produção do caminhão adicionada à conferência." : "Produção adicionada à conferência.");
     }
 
     function normalizeHeader(value) {
@@ -3950,6 +4122,10 @@
             "frota colhedora",
             "frota_colhedora",
             "colhedora",
+            "caminhão",
+            "caminhao",
+            "caminhão próprio",
+            "caminhao proprio",
             "equipamento",
             "maquina",
             "máquina",
@@ -3970,7 +4146,7 @@
         renderEntry();
         showToast(added ? `${added} produção${added === 1 ? "" : "ões"} importada${added === 1 ? "" : "s"}.` : "Nenhuma produção válida encontrada no arquivo.");
       } catch {
-        showToast("Não foi possível ler o arquivo da frente.");
+        showToast("Não foi possível ler o arquivo selecionado.");
       } finally {
         els.frontImportFile.value = "";
       }
@@ -3992,10 +4168,11 @@
     }
 
     function fleetInput(row) {
+      const label = fleetLabelForType(row.type);
       if (!requiresFleet(row.type)) {
-        return '<input value="Não se aplica" disabled aria-label="Frota da colhedora">';
+        return `<input value="Não se aplica" disabled aria-label="${escapeHtml(label)}">`;
       }
-      return `<input class="fleet-input" list="fleetOptions" data-id="${row.id}" data-field="fleet" value="${escapeHtml(row.fleet)}" placeholder="Digite a frota" aria-label="Frota da colhedora">`;
+      return `<input class="fleet-input" list="fleetOptions" data-id="${row.id}" data-field="fleet" value="${escapeHtml(row.fleet)}" placeholder="${escapeHtml(fleetPlaceholderForType(row.type))}" aria-label="${escapeHtml(label)}">`;
     }
 
     function productionInput(row) {
@@ -4013,7 +4190,7 @@
 
     function renderEntryRows() {
       if (!entries.length) {
-        els.entryBody.innerHTML = '<tr><td colspan="8" class="empty-state">Clique em uma frente de colheita ou use os botões de transporte para iniciar o lançamento.</td></tr>';
+        els.entryBody.innerHTML = '<tr><td colspan="8" class="empty-state">Clique em uma frente de colheita, transporte próprio ou transporte terceiro para iniciar o lançamento.</td></tr>';
         return;
       }
 
@@ -4239,7 +4416,7 @@
 
       const missingFleet = entries.some((row) => requiresFleet(row.type) && parseNumber(row.production) > 0 && !String(row.fleet || "").trim());
       if (missingFleet) {
-        showToast("Nas frentes próprias, informe a frota da colhedora.");
+        showToast("Informe a colhedora nas frentes próprias e o caminhão no transporte próprio.");
         return;
       }
 
@@ -4527,6 +4704,10 @@
       tab.addEventListener("click", () => switchView(tab.dataset.view));
     });
 
+    els.themeButtons.forEach((button) => {
+      button.addEventListener("click", () => applyTheme(button.dataset.themeOption));
+    });
+
     els.dashboardStartDate.addEventListener("change", renderDashboard);
     els.dashboardEndDate.addEventListener("change", renderDashboard);
     els.historySearch.addEventListener("input", renderHistory);
@@ -4539,7 +4720,7 @@
     document.querySelector("#addManualFrontBtn").addEventListener("click", addManualFrontProduction);
     document.querySelector("#importFrontFileBtn").addEventListener("click", () => {
       if (!activeFront) {
-        showToast("Selecione uma frente primeiro.");
+        showToast("Selecione uma frente ou transporte primeiro.");
         return;
       }
       els.frontImportFile.click();
@@ -4706,6 +4887,7 @@
       showToast("Modo offline ativo. O sistema vai sincronizar quando a internet voltar.");
     });
 
+    applyTheme(currentTheme);
     renderFirebaseConfigForm();
     renderFirebaseStatus();
     renderOptions();
