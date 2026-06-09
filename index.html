@@ -1106,7 +1106,7 @@
     <div class="header-inner">
       <div>
         <h1>Produção Diária da Cambuí</h1>
-        <p class="subtitle">Colheita própria por frota, colheita terceira por frente, transporte próprio por caminhão e terceiro por total.</p>
+        <p class="subtitle">Colheita própria por total da frente, transporte próprio por caminhão e terceiro por total.</p>
       </div>
       <div class="plant-lock" aria-label="Usina fixa">
         <span>Usina fixa</span>
@@ -1159,11 +1159,6 @@
           <span>Frentes próprias</span>
           <strong id="dashOwnHarvest">0</strong>
           <small>4001, 4002 e 4003</small>
-        </article>
-        <article class="stat">
-          <span>Trator transbordo</span>
-          <strong id="dashOwnTransbordo">0</strong>
-          <small>Frentes próprias</small>
         </article>
         <article class="stat">
           <span>Frentes terceiras</span>
@@ -1229,7 +1224,7 @@
 
       <section class="panel">
         <div class="panel-head">
-          <h2>Ranking das colhedoras próprias</h2>
+          <h2>Ranking da colheita própria</h2>
         </div>
         <div class="panel-body" id="harvesterRankingWrap"></div>
       </section>
@@ -1262,20 +1257,11 @@
         </section>
       </section>
 
-      <section class="dashboard-grid">
-        <section class="panel">
-          <div class="panel-head">
-            <h2>Alertas operacionais</h2>
-          </div>
-          <div class="panel-body" id="dashboardAlertsWrap"></div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-head">
-            <h2>Ranking dos tratores transbordo</h2>
-          </div>
-          <div class="panel-body" id="transbordoRankingWrap"></div>
-        </section>
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Alertas operacionais</h2>
+        </div>
+        <div class="panel-body" id="dashboardAlertsWrap"></div>
       </section>
 
       <section class="dashboard-grid">
@@ -1351,12 +1337,7 @@
         <article class="stat">
           <span>Colheita própria</span>
           <strong id="entryOwnHarvest">0</strong>
-          <small>Por frota</small>
-        </article>
-        <article class="stat">
-          <span>Trator transbordo</span>
-          <strong id="entryOwnTransbordo">0</strong>
-          <small>Por trator</small>
+          <small>Total por frente</small>
         </article>
         <article class="stat">
           <span>Colheita terceira</span>
@@ -1387,27 +1368,15 @@
         <div class="front-grid" id="frontCards">
           <button class="front-card" type="button" data-front="Frente 4001" data-type="Colheita Própria" aria-pressed="false">
             <strong>Frente 4001</strong>
-            <span>Própria · lançar por frota</span>
+            <span>Própria · lançar total</span>
           </button>
           <button class="front-card" type="button" data-front="Frente 4002" data-type="Colheita Própria" aria-pressed="false">
             <strong>Frente 4002</strong>
-            <span>Própria · lançar por frota</span>
+            <span>Própria · lançar total</span>
           </button>
           <button class="front-card" type="button" data-front="Frente 4003" data-type="Colheita Própria" aria-pressed="false">
             <strong>Frente 4003</strong>
-            <span>Própria · lançar por frota</span>
-          </button>
-          <button class="front-card" type="button" data-front="Frente 4001" data-type="Trator Transbordo" aria-pressed="false">
-            <strong>Transbordo 4001</strong>
-            <span>Própria · lançar por trator</span>
-          </button>
-          <button class="front-card" type="button" data-front="Frente 4002" data-type="Trator Transbordo" aria-pressed="false">
-            <strong>Transbordo 4002</strong>
-            <span>Própria · lançar por trator</span>
-          </button>
-          <button class="front-card" type="button" data-front="Frente 4003" data-type="Trator Transbordo" aria-pressed="false">
-            <strong>Transbordo 4003</strong>
-            <span>Própria · lançar por trator</span>
+            <span>Própria · lançar total</span>
           </button>
           <button class="front-card" type="button" data-front="Frente 4007" data-type="Colheita Terceira" aria-pressed="false">
             <strong>Frente 4007</strong>
@@ -1453,7 +1422,7 @@
           <div class="workspace-actions">
             <button class="btn-secondary" id="importFrontFileBtn" type="button">Importar arquivo</button>
             <input class="file-input" id="frontImportFile" type="file" accept=".csv,.json,.txt,.html,.htm,.pdf,.xls,.xlsx,image/*,application/json,text/csv,text/plain,text/html,application/pdf">
-            <span class="workspace-hint">O importador procura frota, caminhão, equipamento, produção, toneladas, quantidade ou total. Aceita foto, PDF, Excel, CSV, TXT, HTML ou JSON.</span>
+            <span class="workspace-hint">Nas frentes próprias, o arquivo é lido e somado no total da frente. Para caminhões próprios, o importador reconhece frota, caminhão, equipamento, produção, toneladas, quantidade ou total.</span>
           </div>
         </div>
       </section>
@@ -1462,8 +1431,7 @@
         <div class="panel-head">
           <h2>Conferência do lançamento</h2>
           <div class="table-actions">
-            <button class="btn-secondary" id="addOwnHarvesterBtn" type="button">Colhedora própria</button>
-            <button class="btn-secondary" id="addOwnTransbordoBtn" type="button">Trator transbordo</button>
+            <button class="btn-secondary" id="addOwnHarvesterBtn" type="button">Total frente própria</button>
             <button class="btn-secondary" id="addThirdFrontBtn" type="button">Frente terceira</button>
             <button class="btn-secondary" id="addOwnTransportBtn" type="button">Transporte próprio</button>
             <button class="btn-secondary" id="addThirdTransportBtn" type="button">Transporte terceiro</button>
@@ -1476,7 +1444,7 @@
               <tr>
                 <th>Tipo</th>
                 <th>Frente</th>
-                <th>Frota / trator / caminhão</th>
+                <th>Frota / caminhão</th>
                 <th>Meta diária</th>
                 <th>Produção diária</th>
                 <th>% Meta</th>
@@ -1551,6 +1519,81 @@
               </tr>
             </thead>
             <tbody id="transportTargetsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Planejamento Safra 2026</h2>
+          <span class="status-pill">Cambuí</span>
+        </div>
+        <div class="panel-body">
+          <div class="advanced-metrics">
+            <div class="goal-metric">
+              <span>Moagem tcd</span>
+              <strong>12.000</strong>
+            </div>
+            <div class="goal-metric">
+              <span>Início safra</span>
+              <strong>23/04/26</strong>
+            </div>
+            <div class="goal-metric">
+              <span>Término safra</span>
+              <strong>22/10/26</strong>
+            </div>
+            <div class="goal-metric">
+              <span>Dias de safra</span>
+              <strong>183</strong>
+            </div>
+            <div class="goal-metric">
+              <span>Moagem total</span>
+              <strong>1.946.206</strong>
+            </div>
+          </div>
+        </div>
+        <div class="table-wrap" id="safraRealMonthWrap"></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Parâmetros</th>
+                <th>Unid.</th>
+                <th>Abr 8</th>
+                <th>Mai 31</th>
+                <th>Jun 30</th>
+                <th>Jul 31</th>
+                <th>Ago 31</th>
+                <th>Set 30</th>
+                <th>Out 22</th>
+                <th>Total 183</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Moagem</td><td>t</td><td>68.064</td><td>333.498</td><td>323.640</td><td>353.400</td><td>340.194</td><td>325.368</td><td>202.042</td><td>1.946.206</td></tr>
+              <tr><td>Moagem efetiva/dia</td><td>t</td><td>12.000</td><td>12.000</td><td>12.000</td><td>12.000</td><td>12.000</td><td>12.000</td><td>12.000</td><td>12.000</td></tr>
+              <tr><td>Moagem efetiva/hora</td><td>t</td><td>500</td><td>500</td><td>500</td><td>500</td><td>500</td><td>500</td><td>500</td><td>500</td></tr>
+              <tr><td>Moagem/dia</td><td>t</td><td>8.508</td><td>10.758</td><td>10.788</td><td>11.400</td><td>10.974</td><td>10.846</td><td>9.093</td><td>10.635</td></tr>
+              <tr><td>Horas safra</td><td>h</td><td>192</td><td>744</td><td>720</td><td>744</td><td>744</td><td>720</td><td>528</td><td>4.392</td></tr>
+              <tr><td>Horas efetivas safra ind</td><td>h</td><td>176</td><td>711</td><td>691</td><td>718</td><td>714</td><td>698</td><td>510</td><td>4.218</td></tr>
+              <tr><td>Horas efetivas safra</td><td>h</td><td>136,13</td><td>667,00</td><td>647,28</td><td>706,80</td><td>680,39</td><td>650,74</td><td>404,08</td><td>3.892</td></tr>
+              <tr><td>Horas parada por chuva</td><td>h</td><td>36,7</td><td>32,4</td><td>33,1</td><td>0,0</td><td>19,0</td><td>33,3</td><td>95,1</td><td>249</td></tr>
+              <tr><td>Horas parada agrícola</td><td>h</td><td>2,9</td><td>11,2</td><td>10,8</td><td>11,2</td><td>14,9</td><td>14,4</td><td>10,6</td><td>76</td></tr>
+              <tr><td>Horas parada indústria</td><td>h</td><td>16,3</td><td>33,5</td><td>28,8</td><td>26,0</td><td>29,8</td><td>21,6</td><td>18,3</td><td>174</td></tr>
+              <tr><td>ATR</td><td>kg/t</td><td>97,27</td><td>107,57</td><td>120,39</td><td>134,40</td><td>147,03</td><td>152,84</td><td>146,94</td><td>132,76</td></tr>
+              <tr><td>Aprov. Tempo Industrial</td><td>%</td><td>91,50</td><td>95,50</td><td>96,00</td><td>96,50</td><td>96,00</td><td>97,00</td><td>96,54</td><td>96,03</td></tr>
+              <tr><td>Aprov. Tempo Chuvas</td><td>%</td><td>80,90</td><td>95,65</td><td>95,40</td><td>100,00</td><td>97,45</td><td>95,38</td><td>81,99</td><td>94,32</td></tr>
+              <tr><td>Aprov. Tempo Agrícola</td><td>%</td><td>98,50</td><td>98,50</td><td>98,50</td><td>98,50</td><td>98,00</td><td>98,00</td><td>98,00</td><td>98,27</td></tr>
+              <tr><td>Aprov. Tempo Global</td><td>%</td><td>70,90</td><td>89,65</td><td>89,90</td><td>95,00</td><td>91,45</td><td>90,38</td><td>75,78</td><td>86,80</td></tr>
+              <tr><td>Mix açúcar</td><td>%</td><td>29,78</td><td>28,18</td><td>28,45</td><td>27,82</td><td>29,45</td><td>27,55</td><td>27,09</td><td>28,16</td></tr>
+              <tr><td>Mix álcool</td><td>%</td><td>70,22</td><td>71,82</td><td>71,55</td><td>72,18</td><td>70,55</td><td>72,45</td><td>72,91</td><td>71,84</td></tr>
+              <tr><td>Produção açúcar</td><td>sc</td><td>28.517</td><td>188.270</td><td>206.935</td><td>255.214</td><td>265.910</td><td>263.237</td><td>157.677</td><td>1.365.760</td></tr>
+              <tr><td>Produção Álcool Hidratado</td><td>m3/mês</td><td>2.383</td><td>3.401</td><td>1.844</td><td>7.509</td><td>19.187</td><td>24.526</td><td>15.040</td><td>73.889</td></tr>
+              <tr><td>Produção Álcool anidro</td><td>m3/mês</td><td>0</td><td>13.054</td><td>15.930</td><td>15.312</td><td>3.249</td><td>0</td><td>0</td><td>47.546</td></tr>
+              <tr><td>Produção total álcool</td><td>m3</td><td>2.383</td><td>16.455</td><td>17.775</td><td>22.821</td><td>22.436</td><td>24.526</td><td>15.040</td><td>121.435</td></tr>
+              <tr><td>Produção Energia</td><td>MWH</td><td>0</td><td>2.773</td><td>3.671</td><td>4.213</td><td>4.007</td><td>3.833</td><td>2.888</td><td>21.386</td></tr>
+              <tr><td>Recuperado Total Corrigido (RTC)</td><td>%</td><td>89,90</td><td>91,25</td><td>93,85</td><td>94,20</td><td>93,15</td><td>93,76</td><td>92,50</td><td>93,50</td></tr>
+            </tbody>
           </table>
         </div>
       </section>
@@ -1672,7 +1715,6 @@
 
     const TYPES = {
       OWN_HARVEST: "Colheita Própria",
-      OWN_TRANSBORDO: "Trator Transbordo",
       THIRD_HARVEST: "Colheita Terceira",
       OWN_TRANSPORT: "Transporte Próprio",
       THIRD_TRANSPORT: "Transporte Terceiro"
@@ -1689,10 +1731,17 @@
       "Colhedora 4002-01",
       "Colhedora 4002-02",
       "Colhedora 4003-01",
-      "Colhedora 4003-02",
-      "Trator Transbordo 4001-01",
-      "Trator Transbordo 4002-01",
-      "Trator Transbordo 4003-01"
+      "Colhedora 4003-02"
+    ];
+
+    const safraPlanMonths = [
+      { key: "2026-04", label: "Abr", days: 8, planned: 68064 },
+      { key: "2026-05", label: "Mai", days: 31, planned: 333498 },
+      { key: "2026-06", label: "Jun", days: 30, planned: 323640 },
+      { key: "2026-07", label: "Jul", days: 31, planned: 353400 },
+      { key: "2026-08", label: "Ago", days: 31, planned: 340194 },
+      { key: "2026-09", label: "Set", days: 30, planned: 325368 },
+      { key: "2026-10", label: "Out", days: 22, planned: 202042 }
     ];
 
     const defaultEntries = [];
@@ -1752,13 +1801,13 @@
       dailyTrendWrap: document.querySelector("#dailyTrendWrap"),
       operationMixWrap: document.querySelector("#operationMixWrap"),
       dashboardAlertsWrap: document.querySelector("#dashboardAlertsWrap"),
-      transbordoRankingWrap: document.querySelector("#transbordoRankingWrap"),
       typeSummaryWrap: document.querySelector("#typeSummaryWrap"),
       frontSummaryWrap: document.querySelector("#frontSummaryWrap"),
       dashboardHighlightsWrap: document.querySelector("#dashboardHighlightsWrap"),
       dailySummaryWrap: document.querySelector("#dailySummaryWrap"),
       dailyMatrixWrap: document.querySelector("#dailyMatrixWrap"),
       dashboardRowsWrap: document.querySelector("#dashboardRowsWrap"),
+      safraRealMonthWrap: document.querySelector("#safraRealMonthWrap"),
       frontOptions: document.querySelector("#frontOptions"),
       fleetOptions: document.querySelector("#fleetOptions"),
       toast: document.querySelector("#toast"),
@@ -1768,7 +1817,6 @@
       auditWrap: document.querySelector("#auditWrap"),
       dashTotal: document.querySelector("#dashTotal"),
       dashOwnHarvest: document.querySelector("#dashOwnHarvest"),
-      dashOwnTransbordo: document.querySelector("#dashOwnTransbordo"),
       dashThirdHarvest: document.querySelector("#dashThirdHarvest"),
       dashOwnTransport: document.querySelector("#dashOwnTransport"),
       dashThirdTransport: document.querySelector("#dashThirdTransport"),
@@ -1779,7 +1827,6 @@
       dashAllAccumulated: document.querySelector("#dashAllAccumulated"),
       entryTotal: document.querySelector("#entryTotal"),
       entryOwnHarvest: document.querySelector("#entryOwnHarvest"),
-      entryOwnTransbordo: document.querySelector("#entryOwnTransbordo"),
       entryThirdHarvest: document.querySelector("#entryThirdHarvest"),
       entryOwnTransport: document.querySelector("#entryOwnTransport"),
       entryThirdTransport: document.querySelector("#entryThirdTransport"),
@@ -1948,11 +1995,6 @@
       const map = {
         "Frente Própria": TYPES.OWN_HARVEST,
         "Colheita Própria": TYPES.OWN_HARVEST,
-        "Transbordo": TYPES.OWN_TRANSBORDO,
-        "Transbordo Próprio": TYPES.OWN_TRANSBORDO,
-        "Trator Transbordo": TYPES.OWN_TRANSBORDO,
-        "Trator Transbordo Próprio": TYPES.OWN_TRANSBORDO,
-        "Trator de Transbordo": TYPES.OWN_TRANSBORDO,
         "Frente Terceira": TYPES.THIRD_HARVEST,
         "Colheita Terceira": TYPES.THIRD_HARVEST,
         "Transporte Próprio": TYPES.OWN_TRANSPORT,
@@ -1966,34 +2008,32 @@
     }
 
     function isFrontProduction(type) {
-      return type === TYPES.OWN_HARVEST || type === TYPES.OWN_TRANSBORDO || type === TYPES.THIRD_HARVEST;
+      return type === TYPES.OWN_HARVEST || type === TYPES.THIRD_HARVEST;
     }
 
     function requiresFleet(type) {
-      return type === TYPES.OWN_HARVEST || type === TYPES.OWN_TRANSBORDO || type === TYPES.OWN_TRANSPORT;
+      return type === TYPES.OWN_TRANSPORT;
     }
 
     function needsFront(type) {
-      return type === TYPES.OWN_HARVEST || type === TYPES.OWN_TRANSBORDO || type === TYPES.THIRD_HARVEST;
+      return type === TYPES.OWN_HARVEST || type === TYPES.THIRD_HARVEST;
     }
 
     function fleetLabelForType(type) {
       const normalized = normalizeType(type);
       if (normalized === TYPES.OWN_TRANSPORT) return "Caminhão próprio";
-      if (normalized === TYPES.OWN_TRANSBORDO) return "Trator transbordo";
-      if (normalized === TYPES.OWN_HARVEST) return "Frota da colhedora";
+      if (normalized === TYPES.OWN_HARVEST) return "Total da frente";
       return "Frota";
     }
 
     function fleetPlaceholderForType(type) {
       const normalized = normalizeType(type);
       if (normalized === TYPES.OWN_TRANSPORT) return "Ex.: Caminhão 01";
-      if (normalized === TYPES.OWN_TRANSBORDO) return "Ex.: Trator Transbordo 4001-01";
       return "Ex.: Colhedora 4001-01";
     }
 
     function allowedFrontsFor(type) {
-      if (type === TYPES.OWN_HARVEST || type === TYPES.OWN_TRANSBORDO) return ownHarvestFronts;
+      if (type === TYPES.OWN_HARVEST) return ownHarvestFronts;
       if (type === TYPES.THIRD_HARVEST) return thirdHarvestFronts;
       return [];
     }
@@ -2117,13 +2157,7 @@
       const type = normalizeType(row.type);
       if (type === TYPES.OWN_HARVEST) {
         const front = normalizeKey(row.front);
-        const fleet = normalizeKey(row.fleet);
-        return front && fleet ? `${type}|${front}|${fleet}` : "";
-      }
-      if (type === TYPES.OWN_TRANSBORDO) {
-        const front = normalizeKey(row.front);
-        const fleet = normalizeKey(row.fleet);
-        return front && fleet ? `${type}|${front}|${fleet}` : "";
+        return front ? `${type}|${front}` : "";
       }
       if (type === TYPES.THIRD_HARVEST) {
         const front = normalizeKey(row.front);
@@ -3042,8 +3076,7 @@
 
       if (type === TYPES.OWN_HARVEST) {
         const found = cleanTargets.ownFronts.find((target) => sameText(target.front, row.front));
-        if (!found) return 0;
-        return found.target / ownHarvesterCountForFront(row, rowsContext);
+        return found ? found.target : 0;
       }
 
       if (type === TYPES.THIRD_HARVEST) {
@@ -3111,8 +3144,34 @@
       return (source || []).map((row) => normalizeEntry(row, options));
     }
 
+    function mergeCleanEntries(rows) {
+      const grouped = new Map();
+      (rows || []).forEach((row) => {
+        const key = [
+          normalizeType(row.type),
+          normalizeKey(row.front),
+          normalizeKey(row.fleet)
+        ].join("|");
+
+        if (!grouped.has(key)) {
+          grouped.set(key, { ...row });
+          return;
+        }
+
+        const current = grouped.get(key);
+        current.production = parseNumber(current.production) + parseNumber(row.production);
+        if (row.note && !current.note) {
+          current.note = row.note;
+        } else if (row.note && current.note && !current.note.includes(row.note)) {
+          current.note = `${current.note}; ${row.note}`;
+        }
+      });
+
+      return [...grouped.values()];
+    }
+
     function getCleanEntries(source = entries, options = {}) {
-      return cloneEntries(source, options)
+      const cleaned = cloneEntries(source, options)
         .map((row) => ({
           ...row,
           type: normalizeType(row.type),
@@ -3125,6 +3184,8 @@
         .filter((row) => !needsFront(row.type) || row.front)
         .filter((row) => !requiresFleet(row.type) || row.fleet)
         .filter((row) => row.production > 0);
+
+      return mergeCleanEntries(cleaned);
     }
 
     function loadRecords() {
@@ -3162,7 +3223,6 @@
       const summary = {
         total: 0,
         ownHarvest: 0,
-        ownTransbordo: 0,
         thirdHarvest: 0,
         ownTransport: 0,
         thirdTransport: 0,
@@ -3180,7 +3240,6 @@
         const targetKey = `${row.date || "dia"}|${targetKeyForRow(row)}`;
         summary.total += value;
         if (row.type === TYPES.OWN_HARVEST) summary.ownHarvest += value;
-        if (row.type === TYPES.OWN_TRANSBORDO) summary.ownTransbordo += value;
         if (row.type === TYPES.THIRD_HARVEST) summary.thirdHarvest += value;
         if (row.type === TYPES.OWN_TRANSPORT) summary.ownTransport += value;
         if (row.type === TYPES.THIRD_TRANSPORT) summary.thirdTransport += value;
@@ -3305,7 +3364,6 @@
       const summary = summarizeRows(rows, options);
       els[`${prefix}Total`].textContent = formatNumber(summary.total);
       els[`${prefix}OwnHarvest`].textContent = formatNumber(summary.ownHarvest);
-      els[`${prefix}OwnTransbordo`].textContent = formatNumber(summary.ownTransbordo);
       els[`${prefix}ThirdHarvest`].textContent = formatNumber(summary.thirdHarvest);
       els[`${prefix}OwnTransport`].textContent = formatNumber(summary.ownTransport);
       els[`${prefix}ThirdTransport`].textContent = formatNumber(summary.thirdTransport);
@@ -3377,6 +3435,87 @@
         .reduce((sum, row) => sum + (Number(row.production) || 0), 0);
     }
 
+    function isMoagemRow(row) {
+      return row.type === TYPES.OWN_HARVEST || row.type === TYPES.THIRD_HARVEST;
+    }
+
+    function safraRealForMonth(month) {
+      const monthRecords = getCleanRecords(records)
+        .filter((record) => normalizeRecordDate(record.date).startsWith(month.key));
+      const rows = rowsFromRecords(monthRecords).filter(isMoagemRow);
+      const real = rows.reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+      const launchedDays = new Set(rows.map((row) => row.date).filter(Boolean)).size;
+
+      return {
+        ...month,
+        real,
+        difference: real - month.planned,
+        percent: progressFor(real, month.planned),
+        launchedDays,
+        average: launchedDays ? real / launchedDays : 0
+      };
+    }
+
+    function renderSafraRealMonth() {
+      if (!els.safraRealMonthWrap) return;
+
+      const items = safraPlanMonths.map(safraRealForMonth);
+      const totalPlanned = items.reduce((sum, item) => sum + item.planned, 0);
+      const totalReal = items.reduce((sum, item) => sum + item.real, 0);
+      const totalLaunchedDays = new Set(
+        getCleanRecords(records)
+          .filter((record) => safraPlanMonths.some((month) => normalizeRecordDate(record.date).startsWith(month.key)))
+          .flatMap((record) => rowsFromRecords([record]).filter(isMoagemRow).map((row) => row.date))
+          .filter(Boolean)
+      ).size;
+      const totalDays = safraPlanMonths.reduce((sum, item) => sum + item.days, 0);
+      const totalDifference = totalReal - totalPlanned;
+
+      const diffClass = (value) => value >= 0 ? "good" : "alert";
+      const percentClass = (value) => value >= 100 ? "good" : value > 0 ? "" : "alert";
+
+      els.safraRealMonthWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Mês</th>
+              <th>Dias safra</th>
+              <th>Previsto moagem</th>
+              <th>Real do mês</th>
+              <th>Diferença</th>
+              <th>% Realizado</th>
+              <th>Dias lançados</th>
+              <th>Média real/dia</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map((item) => `
+              <tr>
+                <td>${escapeHtml(item.label)}</td>
+                <td>${item.days}</td>
+                <td>${formatNumber(item.planned)}</td>
+                <td>${formatNumber(item.real)}</td>
+                <td><span class="status-pill ${diffClass(item.difference)}">${formatNumber(item.difference)}</span></td>
+                <td><span class="status-pill ${percentClass(item.percent)}">${formatPercent(item.percent)}</span></td>
+                <td>${item.launchedDays}</td>
+                <td>${formatNumber(item.average)}</td>
+              </tr>
+            `).join("")}
+            <tr>
+              <td><strong>Total safra</strong></td>
+              <td>${totalDays}</td>
+              <td>${formatNumber(totalPlanned)}</td>
+              <td>${formatNumber(totalReal)}</td>
+              <td><span class="status-pill ${diffClass(totalDifference)}">${formatNumber(totalDifference)}</span></td>
+              <td><span class="status-pill ${percentClass(progressFor(totalReal, totalPlanned))}">${formatPercent(progressFor(totalReal, totalPlanned))}</span></td>
+              <td>${totalLaunchedDays}</td>
+              <td>${formatNumber(totalLaunchedDays ? totalReal / totalLaunchedDays : 0)}</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+    }
+
     function renderGoalOverview(rows, options = {}) {
       const summary = summarizeRows(rows, options);
       const status = statusForProgress(summary.targetPercent);
@@ -3400,7 +3539,7 @@
               <strong>${summary.records}</strong>
             </div>
             <div class="goal-metric">
-              <span>Colhedoras</span>
+              <span>Frentes próp.</span>
               <strong>${ownHarvesterRanking(rows).length}</strong>
             </div>
             <div class="goal-metric">
@@ -3420,13 +3559,11 @@
         target: targetForType(type) * targetDays,
         detail: type === TYPES.OWN_HARVEST
           ? "Frentes 4001, 4002 e 4003"
-          : type === TYPES.OWN_TRANSBORDO
-            ? "Tratores das frentes próprias"
-            : type === TYPES.THIRD_HARVEST
-              ? "Frentes 4007 e 4009"
-              : type === TYPES.OWN_TRANSPORT
-                ? "Por caminhão próprio"
-                : "Total transportado por terceiros"
+          : type === TYPES.THIRD_HARVEST
+            ? "Frentes 4007 e 4009"
+            : type === TYPES.OWN_TRANSPORT
+              ? "Por caminhão próprio"
+              : "Total transportado por terceiros"
       }));
 
       els.typeChartWrap.innerHTML = `
@@ -3442,7 +3579,7 @@
         label: front,
         production: productionByFront(rows, front),
         target: targetForFront(front) * targetDays,
-        detail: ownHarvestFronts.includes(front) ? "Colheita e transbordo próprios" : "Colheita terceira"
+        detail: ownHarvestFronts.includes(front) ? "Colheita própria" : "Colheita terceira"
       }));
 
       els.frontChartWrap.innerHTML = `
@@ -3456,37 +3593,42 @@
       const grouped = new Map();
       rows
         .filter((row) => row.type === TYPES.OWN_HARVEST)
-        .filter((row) => row.fleet)
+        .filter((row) => row.front)
         .forEach((row) => {
-          const key = `${normalizeKey(row.front)}|${normalizeKey(row.fleet)}`;
+          const key = normalizeKey(row.front);
           if (!grouped.has(key)) {
             grouped.set(key, {
               front: row.front,
-              fleet: row.fleet,
+              fleet: row.front,
               production: 0,
               target: 0,
-              notes: 0
+              notes: 0,
+              targetKeys: new Set()
             });
           }
           const item = grouped.get(key);
+          const targetKey = `${row.date || "dia"}|${targetKeyForRow(row)}`;
           item.production += Number(row.production) || 0;
-          item.target += targetForRow(row, targets, rowsForSameDate(row, rows));
+          if (targetKey && !item.targetKeys.has(targetKey)) {
+            item.target += targetForRow(row, targets, rowsForSameDate(row, rows));
+            item.targetKeys.add(targetKey);
+          }
           item.notes += 1;
         });
 
       return [...grouped.values()]
-        .map((item) => ({
+        .map(({ targetKeys, ...item }) => ({
           ...item,
           percent: progressFor(item.production, item.target),
           remaining: Math.max(item.target - item.production, 0)
         }))
-        .sort((a, b) => b.production - a.production || b.percent - a.percent || a.fleet.localeCompare(b.fleet));
+        .sort((a, b) => b.production - a.production || b.percent - a.percent || a.front.localeCompare(b.front));
     }
 
     function renderHarvesterRanking(rows) {
       const ranking = ownHarvesterRanking(rows);
       if (!ranking.length) {
-        els.harvesterRankingWrap.innerHTML = '<div class="empty-state">Sem colhedoras próprias lançadas para o período selecionado.</div>';
+        els.harvesterRankingWrap.innerHTML = '<div class="empty-state">Sem colheita própria lançada para o período selecionado.</div>';
         return;
       }
 
@@ -3508,73 +3650,8 @@
                     <div class="rank-fill ${item.percent >= 100 ? "over" : ""}" style="width: ${width}%"></div>
                   </div>
                   <div class="rank-values">
-                    <span>${escapeHtml(item.front)} · ${formatNumber(item.production)} produzido</span>
+                    <span>Total da frente · ${formatNumber(item.production)} produzido</span>
                     <span>${hasTarget ? `Meta ${formatNumber(item.target)} · Falta ${formatNumber(item.remaining)}` : "Meta não cadastrada"}</span>
-                  </div>
-                </div>
-              </div>
-            `;
-          }).join("")}
-        </div>
-      `;
-    }
-
-    function transbordoRanking(rows) {
-      const grouped = new Map();
-      rows
-        .filter((row) => row.type === TYPES.OWN_TRANSBORDO)
-        .filter((row) => row.fleet)
-        .forEach((row) => {
-          const key = `${normalizeKey(row.front)}|${normalizeKey(row.fleet)}`;
-          if (!grouped.has(key)) {
-            grouped.set(key, {
-              front: row.front,
-              fleet: row.fleet,
-              production: 0,
-              records: 0,
-              dates: new Set()
-            });
-          }
-          const item = grouped.get(key);
-          item.production += Number(row.production) || 0;
-          item.records += 1;
-          if (row.date) item.dates.add(row.date);
-        });
-
-      return [...grouped.values()]
-        .map(({ dates, ...item }) => ({
-          ...item,
-          days: dates.size
-        }))
-        .sort((a, b) => b.production - a.production || a.fleet.localeCompare(b.fleet));
-    }
-
-    function renderTransbordoRanking(rows) {
-      const ranking = transbordoRanking(rows);
-      if (!ranking.length) {
-        els.transbordoRankingWrap.innerHTML = '<div class="empty-state">Sem tratores transbordo lançados para o período selecionado.</div>';
-        return;
-      }
-
-      const maxProduction = Math.max(...ranking.map((item) => item.production), 1);
-      els.transbordoRankingWrap.innerHTML = `
-        <div class="rank-list">
-          ${ranking.map((item, index) => {
-            const width = clampPercent((item.production / maxProduction) * 100);
-            return `
-              <div class="rank-item">
-                <div class="rank-position">${index + 1}</div>
-                <div class="rank-main">
-                  <div class="rank-headline">
-                    <strong>${escapeHtml(item.fleet)}</strong>
-                    <span class="status-pill">${formatNumber(item.production)}</span>
-                  </div>
-                  <div class="rank-track" aria-label="${escapeHtml(item.fleet)} ${formatNumber(item.production)}">
-                    <div class="rank-fill" style="width: ${width}%"></div>
-                  </div>
-                  <div class="rank-values">
-                    <span>${escapeHtml(item.front)} · ${item.days} dia${item.days === 1 ? "" : "s"}</span>
-                    <span>${item.records} lançamento${item.records === 1 ? "" : "s"}</span>
                   </div>
                 </div>
               </div>
@@ -4076,11 +4153,11 @@
           </div>
           <div class="summary-item">
             <div class="summary-line">
-              <strong>Colhedora destaque</strong>
+              <strong>Frente própria destaque</strong>
               <span>${topFleet ? escapeHtml(topFleet.fleet) : "-"}</span>
             </div>
             <div class="summary-line">
-              <span>${topFleet ? `${formatNumber(topFleet.production)} produzido` : "Sem frota ativa"}</span>
+              <span>${topFleet ? `${formatNumber(topFleet.production)} produzido` : "Sem frente própria ativa"}</span>
               <span>${topFleet ? formatPercent(topFleet.percent) : "-"}</span>
             </div>
           </div>
@@ -4090,7 +4167,7 @@
               <span>${new Set(rows.filter((row) => row.front).map((row) => normalizeKey(row.front))).size}</span>
             </div>
             <div class="summary-line">
-              <span>${ownHarvesterRanking(rows).length} colhedora${ownHarvesterRanking(rows).length === 1 ? "" : "s"} no ranking</span>
+              <span>${ownHarvesterRanking(rows).length} frente${ownHarvesterRanking(rows).length === 1 ? "" : "s"} própria${ownHarvesterRanking(rows).length === 1 ? "" : "s"} no ranking</span>
               <span>${globalSummary.records} registros</span>
             </div>
           </div>
@@ -4143,7 +4220,6 @@
           return {
             date: record.date,
             ownHarvest: productionByType(rows, TYPES.OWN_HARVEST),
-            ownTransbordo: productionByType(rows, TYPES.OWN_TRANSBORDO),
             thirdHarvest: productionByType(rows, TYPES.THIRD_HARVEST),
             ownTransport: productionByType(rows, TYPES.OWN_TRANSPORT),
             thirdTransport: productionByType(rows, TYPES.THIRD_TRANSPORT),
@@ -4167,7 +4243,6 @@
             <tr>
               <th>Data</th>
               <th>Colheita própria</th>
-              <th>Transbordo</th>
               <th>Colheita terceira</th>
               <th>Transp. próprio</th>
               <th>Transp. terceiro</th>
@@ -4180,7 +4255,6 @@
               <tr>
                 <td>${formatDate(item.date)}</td>
                 <td>${formatNumber(item.ownHarvest)}</td>
-                <td>${formatNumber(item.ownTransbordo)}</td>
                 <td>${formatNumber(item.thirdHarvest)}</td>
                 <td>${formatNumber(item.ownTransport)}</td>
                 <td>${formatNumber(item.thirdTransport)}</td>
@@ -4221,7 +4295,6 @@
       renderDailyTrend(selectedRecords);
       renderOperationMix(rows, { targetDays });
       renderDashboardAlerts(selectedRecords, rows, { targetDays });
-      renderTransbordoRanking(rows);
       renderTypeSummary(rows);
       renderFrontSummary(rows);
       renderDashboardHighlights(selectedRecords, rows, { targetDays });
@@ -4436,9 +4509,7 @@
       renderEntry();
       const toastMessage = activeFront.type === TYPES.OWN_TRANSPORT
         ? "Produção do caminhão adicionada à conferência."
-        : activeFront.type === TYPES.OWN_TRANSBORDO
-          ? "Produção do trator transbordo adicionada à conferência."
-          : "Produção adicionada à conferência.";
+        : "Produção adicionada à conferência.";
       showToast(toastMessage);
     }
 
@@ -4945,9 +5016,6 @@
             "caminhao",
             "caminhão próprio",
             "caminhao proprio",
-            "trator",
-            "trator transbordo",
-            "transbordo",
             "equipamento",
             "maquina",
             "máquina",
@@ -5073,6 +5141,8 @@
           <td>${targetNumberInput("transports", row.type, row.target, `Meta diária ${row.type}`)}</td>
         </tr>
       `).join("");
+
+      renderSafraRealMonth();
     }
 
     function updateTarget(section, idOrKey, field, value) {
@@ -5129,9 +5199,6 @@
       const count = entries.filter((row) => row.type === type).length + 1;
       const suffix = String(count).padStart(2, "0");
       if (type === TYPES.OWN_HARVEST) {
-        return { type, front: ownHarvestFronts[(count - 1) % ownHarvestFronts.length], fleet: "", production: 0, note: "" };
-      }
-      if (type === TYPES.OWN_TRANSBORDO) {
         return { type, front: ownHarvestFronts[(count - 1) % ownHarvestFronts.length], fleet: "", production: 0, note: "" };
       }
       if (type === TYPES.THIRD_HARVEST) {
@@ -5241,7 +5308,7 @@
 
       const missingFleet = entries.some((row) => requiresFleet(row.type) && parseNumber(row.production) > 0 && !String(row.fleet || "").trim());
       if (missingFleet) {
-        showToast("Informe a colhedora, o trator transbordo ou o caminhão próprio antes de salvar.");
+        showToast("Informe o caminhão próprio antes de salvar.");
         return;
       }
 
@@ -5270,6 +5337,7 @@
       setDashboardRange(date, date);
       renderEntry();
       renderDashboard();
+      renderTargets();
       renderHistory();
 
       const syncState = await syncOrQueue("record-upsert", { date }, () => syncRecordToFirebase(record, {
@@ -5323,7 +5391,6 @@
               <th>% Meta</th>
               <th>Falta</th>
               <th>Frentes próprias</th>
-              <th>Transbordo</th>
               <th>Frentes terceiras</th>
               <th>Transp. próprio</th>
               <th>Transp. terceiro</th>
@@ -5342,7 +5409,6 @@
                   <td>${formatPercent(summary.targetPercent)}</td>
                   <td>${formatNumber(summary.remaining)}</td>
                   <td>${formatNumber(summary.ownHarvest)}</td>
-                  <td>${formatNumber(summary.ownTransbordo)}</td>
                   <td>${formatNumber(summary.thirdHarvest)}</td>
                   <td>${formatNumber(summary.ownTransport)}</td>
                   <td>${formatNumber(summary.thirdTransport)}</td>
@@ -5404,6 +5470,7 @@
         closeFrontWorkspace();
       }
       renderDashboard();
+      renderTargets();
       renderHistory();
 
       const syncState = await syncOrQueue("record-delete", { date }, () => deleteRecordFromFirebase(date, {
@@ -5444,7 +5511,7 @@
         rows: getCleanEntries()
       }];
 
-      const header = ["data", "usina", "tipo", "frente", "frota_colhedora", "meta", "producao", "percentual_meta", "falta", "observacao"];
+      const header = ["data", "usina", "tipo", "frente", "frota_equipamento", "meta", "producao", "percentual_meta", "falta", "observacao"];
       const lines = source.flatMap((record) => record.rows.map((row) => {
         const target = targetForRow(row, targets, record.rows);
         return [
@@ -5665,7 +5732,6 @@
     document.querySelector("#saveBtn").addEventListener("click", saveCurrentDay);
     document.querySelector("#deleteDayBtn").addEventListener("click", deleteSelectedDay);
     document.querySelector("#addOwnHarvesterBtn").addEventListener("click", () => addEntry(TYPES.OWN_HARVEST));
-    document.querySelector("#addOwnTransbordoBtn").addEventListener("click", () => addEntry(TYPES.OWN_TRANSBORDO));
     document.querySelector("#addThirdFrontBtn").addEventListener("click", () => addEntry(TYPES.THIRD_HARVEST));
     document.querySelector("#addOwnTransportBtn").addEventListener("click", () => addEntry(TYPES.OWN_TRANSPORT));
     document.querySelector("#addThirdTransportBtn").addEventListener("click", () => addEntry(TYPES.THIRD_TRANSPORT));
