@@ -441,6 +441,12 @@
       gap: 10px;
     }
 
+    .advanced-metrics {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+    }
+
     .goal-metric {
       min-height: 72px;
       display: grid;
@@ -501,9 +507,110 @@
       height: 10px;
     }
 
+    .trend-list {
+      display: grid;
+      gap: 9px;
+    }
+
+    .trend-row {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr) 120px;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .trend-date {
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 850;
+      white-space: nowrap;
+    }
+
+    .trend-value {
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 800;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .mix-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .alert-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .alert-item {
+      display: grid;
+      gap: 5px;
+      padding: 11px;
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--blue);
+      border-radius: var(--radius);
+      background: var(--surface-3);
+    }
+
+    .alert-item.alert {
+      border-left-color: var(--red);
+    }
+
+    .alert-item.good {
+      border-left-color: var(--green);
+    }
+
+    .alert-item strong {
+      line-height: 1.2;
+    }
+
+    .alert-item span {
+      color: var(--muted);
+      font-size: .84rem;
+      font-weight: 730;
+      line-height: 1.35;
+    }
+
     .rank-list {
       display: grid;
       gap: 10px;
+    }
+
+    .transport-ranking-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .transport-summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .transport-summary .goal-metric {
+      min-height: 66px;
+    }
+
+    .rank-filter {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+
+    .rank-filter-btn {
+      min-height: 34px;
+      padding: 0 10px;
+    }
+
+    .rank-filter-btn[aria-pressed="true"] {
+      background: var(--green);
+      color: white;
     }
 
     .rank-item {
@@ -899,6 +1006,24 @@
         grid-template-columns: 1fr;
       }
 
+      .advanced-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .trend-row {
+        grid-template-columns: 76px minmax(0, 1fr);
+      }
+
+      .trend-value {
+        grid-column: 1 / -1;
+        text-align: left;
+      }
+
+      .transport-ranking-grid,
+      .transport-summary {
+        grid-template-columns: 1fr;
+      }
+
       .settings-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
@@ -919,6 +1044,10 @@
       }
 
       .stats-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .advanced-metrics {
         grid-template-columns: 1fr;
       }
 
@@ -1032,6 +1161,11 @@
           <small>4001, 4002 e 4003</small>
         </article>
         <article class="stat">
+          <span>Trator transbordo</span>
+          <strong id="dashOwnTransbordo">0</strong>
+          <small>Frentes próprias</small>
+        </article>
+        <article class="stat">
           <span>Frentes terceiras</span>
           <strong id="dashThirdHarvest">0</strong>
           <small>4007 e 4009</small>
@@ -1061,6 +1195,13 @@
           <strong id="dashAllAccumulated">0</strong>
           <small>Todos os lançamentos salvos</small>
         </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Análise avançada</h2>
+        </div>
+        <div class="panel-body" id="advancedKpiWrap"></div>
       </section>
 
       <section class="dashboard-chart-grid" aria-label="Gráficos do dashboard">
@@ -1093,6 +1234,50 @@
         <div class="panel-body" id="harvesterRankingWrap"></div>
       </section>
 
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Ranking dos transportes</h2>
+          <div class="rank-filter" aria-label="Período do ranking de transporte">
+            <button class="btn-secondary rank-filter-btn" type="button" data-transport-rank-period="week">Semana</button>
+            <button class="btn-secondary rank-filter-btn" type="button" data-transport-rank-period="month">Mês</button>
+            <button class="btn-secondary rank-filter-btn" type="button" data-transport-rank-period="all">Acumulado</button>
+          </div>
+        </div>
+        <div class="panel-body" id="transportRankingWrap"></div>
+      </section>
+
+      <section class="dashboard-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Evolução diária</h2>
+          </div>
+          <div class="panel-body" id="dailyTrendWrap"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Mix operacional</h2>
+          </div>
+          <div class="panel-body" id="operationMixWrap"></div>
+        </section>
+      </section>
+
+      <section class="dashboard-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Alertas operacionais</h2>
+          </div>
+          <div class="panel-body" id="dashboardAlertsWrap"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Ranking dos tratores transbordo</h2>
+          </div>
+          <div class="panel-body" id="transbordoRankingWrap"></div>
+        </section>
+      </section>
+
       <section class="dashboard-grid">
         <section class="panel">
           <div class="panel-head">
@@ -1123,6 +1308,13 @@
           </div>
           <div class="table-wrap" id="dailySummaryWrap"></div>
         </section>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Matriz diária por operação</h2>
+        </div>
+        <div class="table-wrap" id="dailyMatrixWrap"></div>
       </section>
 
       <section class="panel">
@@ -1162,6 +1354,11 @@
           <small>Por frota</small>
         </article>
         <article class="stat">
+          <span>Trator transbordo</span>
+          <strong id="entryOwnTransbordo">0</strong>
+          <small>Por trator</small>
+        </article>
+        <article class="stat">
           <span>Colheita terceira</span>
           <strong id="entryThirdHarvest">0</strong>
           <small>Por frente</small>
@@ -1199,6 +1396,18 @@
           <button class="front-card" type="button" data-front="Frente 4003" data-type="Colheita Própria" aria-pressed="false">
             <strong>Frente 4003</strong>
             <span>Própria · lançar por frota</span>
+          </button>
+          <button class="front-card" type="button" data-front="Frente 4001" data-type="Trator Transbordo" aria-pressed="false">
+            <strong>Transbordo 4001</strong>
+            <span>Própria · lançar por trator</span>
+          </button>
+          <button class="front-card" type="button" data-front="Frente 4002" data-type="Trator Transbordo" aria-pressed="false">
+            <strong>Transbordo 4002</strong>
+            <span>Própria · lançar por trator</span>
+          </button>
+          <button class="front-card" type="button" data-front="Frente 4003" data-type="Trator Transbordo" aria-pressed="false">
+            <strong>Transbordo 4003</strong>
+            <span>Própria · lançar por trator</span>
           </button>
           <button class="front-card" type="button" data-front="Frente 4007" data-type="Colheita Terceira" aria-pressed="false">
             <strong>Frente 4007</strong>
@@ -1254,6 +1463,7 @@
           <h2>Conferência do lançamento</h2>
           <div class="table-actions">
             <button class="btn-secondary" id="addOwnHarvesterBtn" type="button">Colhedora própria</button>
+            <button class="btn-secondary" id="addOwnTransbordoBtn" type="button">Trator transbordo</button>
             <button class="btn-secondary" id="addThirdFrontBtn" type="button">Frente terceira</button>
             <button class="btn-secondary" id="addOwnTransportBtn" type="button">Transporte próprio</button>
             <button class="btn-secondary" id="addThirdTransportBtn" type="button">Transporte terceiro</button>
@@ -1266,7 +1476,7 @@
               <tr>
                 <th>Tipo</th>
                 <th>Frente</th>
-                <th>Frota / caminhão</th>
+                <th>Frota / trator / caminhão</th>
                 <th>Meta diária</th>
                 <th>Produção diária</th>
                 <th>% Meta</th>
@@ -1462,6 +1672,7 @@
 
     const TYPES = {
       OWN_HARVEST: "Colheita Própria",
+      OWN_TRANSBORDO: "Trator Transbordo",
       THIRD_HARVEST: "Colheita Terceira",
       OWN_TRANSPORT: "Transporte Próprio",
       THIRD_TRANSPORT: "Transporte Terceiro"
@@ -1478,7 +1689,10 @@
       "Colhedora 4002-01",
       "Colhedora 4002-02",
       "Colhedora 4003-01",
-      "Colhedora 4003-02"
+      "Colhedora 4003-02",
+      "Trator Transbordo 4001-01",
+      "Trator Transbordo 4002-01",
+      "Trator Transbordo 4003-01"
     ];
 
     const defaultEntries = [];
@@ -1528,14 +1742,22 @@
       ownHarvesterTargetsBody: document.querySelector("#ownHarvesterTargetsBody"),
       thirdFrontTargetsBody: document.querySelector("#thirdFrontTargetsBody"),
       transportTargetsBody: document.querySelector("#transportTargetsBody"),
+      advancedKpiWrap: document.querySelector("#advancedKpiWrap"),
       goalOverviewWrap: document.querySelector("#goalOverviewWrap"),
       typeChartWrap: document.querySelector("#typeChartWrap"),
       frontChartWrap: document.querySelector("#frontChartWrap"),
       harvesterRankingWrap: document.querySelector("#harvesterRankingWrap"),
+      transportRankingWrap: document.querySelector("#transportRankingWrap"),
+      transportRankButtons: [...document.querySelectorAll("[data-transport-rank-period]")],
+      dailyTrendWrap: document.querySelector("#dailyTrendWrap"),
+      operationMixWrap: document.querySelector("#operationMixWrap"),
+      dashboardAlertsWrap: document.querySelector("#dashboardAlertsWrap"),
+      transbordoRankingWrap: document.querySelector("#transbordoRankingWrap"),
       typeSummaryWrap: document.querySelector("#typeSummaryWrap"),
       frontSummaryWrap: document.querySelector("#frontSummaryWrap"),
       dashboardHighlightsWrap: document.querySelector("#dashboardHighlightsWrap"),
       dailySummaryWrap: document.querySelector("#dailySummaryWrap"),
+      dailyMatrixWrap: document.querySelector("#dailyMatrixWrap"),
       dashboardRowsWrap: document.querySelector("#dashboardRowsWrap"),
       frontOptions: document.querySelector("#frontOptions"),
       fleetOptions: document.querySelector("#fleetOptions"),
@@ -1546,6 +1768,7 @@
       auditWrap: document.querySelector("#auditWrap"),
       dashTotal: document.querySelector("#dashTotal"),
       dashOwnHarvest: document.querySelector("#dashOwnHarvest"),
+      dashOwnTransbordo: document.querySelector("#dashOwnTransbordo"),
       dashThirdHarvest: document.querySelector("#dashThirdHarvest"),
       dashOwnTransport: document.querySelector("#dashOwnTransport"),
       dashThirdTransport: document.querySelector("#dashThirdTransport"),
@@ -1556,6 +1779,7 @@
       dashAllAccumulated: document.querySelector("#dashAllAccumulated"),
       entryTotal: document.querySelector("#entryTotal"),
       entryOwnHarvest: document.querySelector("#entryOwnHarvest"),
+      entryOwnTransbordo: document.querySelector("#entryOwnTransbordo"),
       entryThirdHarvest: document.querySelector("#entryThirdHarvest"),
       entryOwnTransport: document.querySelector("#entryOwnTransport"),
       entryThirdTransport: document.querySelector("#entryThirdTransport"),
@@ -1578,6 +1802,7 @@
     let auditLog = loadAuditLog();
     let pendingSyncQueue = loadPendingSyncQueue();
     let currentTheme = loadTheme();
+    let transportRankingPeriod = "week";
     let entries = cloneEntries(defaultEntries);
     let activeFront = null;
     const firebaseState = {
@@ -1684,6 +1909,16 @@
       return { start: rangeStart, end: rangeEnd };
     }
 
+    function daysBetweenInclusive(start, end) {
+      const range = normalizeDateRange(start, end);
+      const [startYear, startMonth, startDay] = range.start.split("-").map(Number);
+      const [endYear, endMonth, endDay] = range.end.split("-").map(Number);
+      const startDate = new Date(startYear, startMonth - 1, startDay);
+      const endDate = new Date(endYear, endMonth - 1, endDay);
+      const diff = Math.round((endDate - startDate) / 86400000) + 1;
+      return Math.max(diff, 1);
+    }
+
     function monthRangeFor(date) {
       const value = date || todayInputValue();
       const [year, month] = value.split("-").map(Number);
@@ -1694,11 +1929,30 @@
       };
     }
 
+    function weekRangeFor(date) {
+      const value = normalizeRecordDate(date) || todayInputValue();
+      const [year, month, day] = value.split("-").map(Number);
+      const current = new Date(year, month - 1, day);
+      const weekDay = current.getDay();
+      const daysFromMonday = weekDay === 0 ? 6 : weekDay - 1;
+      const start = new Date(current);
+      start.setDate(current.getDate() - daysFromMonday);
+      return {
+        start: dateInputFromDate(start),
+        end: value
+      };
+    }
+
     function normalizeType(value) {
       const raw = String(value || "").trim();
       const map = {
         "Frente Própria": TYPES.OWN_HARVEST,
         "Colheita Própria": TYPES.OWN_HARVEST,
+        "Transbordo": TYPES.OWN_TRANSBORDO,
+        "Transbordo Próprio": TYPES.OWN_TRANSBORDO,
+        "Trator Transbordo": TYPES.OWN_TRANSBORDO,
+        "Trator Transbordo Próprio": TYPES.OWN_TRANSBORDO,
+        "Trator de Transbordo": TYPES.OWN_TRANSBORDO,
         "Frente Terceira": TYPES.THIRD_HARVEST,
         "Colheita Terceira": TYPES.THIRD_HARVEST,
         "Transporte Próprio": TYPES.OWN_TRANSPORT,
@@ -1711,27 +1965,35 @@
       return type === TYPES.OWN_HARVEST || type === TYPES.THIRD_HARVEST;
     }
 
+    function isFrontProduction(type) {
+      return type === TYPES.OWN_HARVEST || type === TYPES.OWN_TRANSBORDO || type === TYPES.THIRD_HARVEST;
+    }
+
     function requiresFleet(type) {
-      return type === TYPES.OWN_HARVEST || type === TYPES.OWN_TRANSPORT;
+      return type === TYPES.OWN_HARVEST || type === TYPES.OWN_TRANSBORDO || type === TYPES.OWN_TRANSPORT;
     }
 
     function needsFront(type) {
-      return type === TYPES.OWN_HARVEST || type === TYPES.THIRD_HARVEST;
+      return type === TYPES.OWN_HARVEST || type === TYPES.OWN_TRANSBORDO || type === TYPES.THIRD_HARVEST;
     }
 
     function fleetLabelForType(type) {
       const normalized = normalizeType(type);
       if (normalized === TYPES.OWN_TRANSPORT) return "Caminhão próprio";
+      if (normalized === TYPES.OWN_TRANSBORDO) return "Trator transbordo";
       if (normalized === TYPES.OWN_HARVEST) return "Frota da colhedora";
       return "Frota";
     }
 
     function fleetPlaceholderForType(type) {
-      return normalizeType(type) === TYPES.OWN_TRANSPORT ? "Ex.: Caminhão 01" : "Ex.: Colhedora 4001-01";
+      const normalized = normalizeType(type);
+      if (normalized === TYPES.OWN_TRANSPORT) return "Ex.: Caminhão 01";
+      if (normalized === TYPES.OWN_TRANSBORDO) return "Ex.: Trator Transbordo 4001-01";
+      return "Ex.: Colhedora 4001-01";
     }
 
     function allowedFrontsFor(type) {
-      if (type === TYPES.OWN_HARVEST) return ownHarvestFronts;
+      if (type === TYPES.OWN_HARVEST || type === TYPES.OWN_TRANSBORDO) return ownHarvestFronts;
       if (type === TYPES.THIRD_HARVEST) return thirdHarvestFronts;
       return [];
     }
@@ -1854,6 +2116,11 @@
     function targetKeyForRow(row) {
       const type = normalizeType(row.type);
       if (type === TYPES.OWN_HARVEST) {
+        const front = normalizeKey(row.front);
+        const fleet = normalizeKey(row.fleet);
+        return front && fleet ? `${type}|${front}|${fleet}` : "";
+      }
+      if (type === TYPES.OWN_TRANSBORDO) {
         const front = normalizeKey(row.front);
         const fleet = normalizeKey(row.fleet);
         return front && fleet ? `${type}|${front}|${fleet}` : "";
@@ -2895,6 +3162,7 @@
       const summary = {
         total: 0,
         ownHarvest: 0,
+        ownTransbordo: 0,
         thirdHarvest: 0,
         ownTransport: 0,
         thirdTransport: 0,
@@ -2912,6 +3180,7 @@
         const targetKey = `${row.date || "dia"}|${targetKeyForRow(row)}`;
         summary.total += value;
         if (row.type === TYPES.OWN_HARVEST) summary.ownHarvest += value;
+        if (row.type === TYPES.OWN_TRANSBORDO) summary.ownTransbordo += value;
         if (row.type === TYPES.THIRD_HARVEST) summary.thirdHarvest += value;
         if (row.type === TYPES.OWN_TRANSPORT) summary.ownTransport += value;
         if (row.type === TYPES.THIRD_TRANSPORT) summary.thirdTransport += value;
@@ -3036,6 +3305,7 @@
       const summary = summarizeRows(rows, options);
       els[`${prefix}Total`].textContent = formatNumber(summary.total);
       els[`${prefix}OwnHarvest`].textContent = formatNumber(summary.ownHarvest);
+      els[`${prefix}OwnTransbordo`].textContent = formatNumber(summary.ownTransbordo);
       els[`${prefix}ThirdHarvest`].textContent = formatNumber(summary.thirdHarvest);
       els[`${prefix}OwnTransport`].textContent = formatNumber(summary.ownTransport);
       els[`${prefix}ThirdTransport`].textContent = formatNumber(summary.thirdTransport);
@@ -3150,11 +3420,13 @@
         target: targetForType(type) * targetDays,
         detail: type === TYPES.OWN_HARVEST
           ? "Frentes 4001, 4002 e 4003"
-          : type === TYPES.THIRD_HARVEST
-            ? "Frentes 4007 e 4009"
-            : type === TYPES.OWN_TRANSPORT
-              ? "Por caminhão próprio"
-              : "Total transportado por terceiros"
+          : type === TYPES.OWN_TRANSBORDO
+            ? "Tratores das frentes próprias"
+            : type === TYPES.THIRD_HARVEST
+              ? "Frentes 4007 e 4009"
+              : type === TYPES.OWN_TRANSPORT
+                ? "Por caminhão próprio"
+                : "Total transportado por terceiros"
       }));
 
       els.typeChartWrap.innerHTML = `
@@ -3170,7 +3442,7 @@
         label: front,
         production: productionByFront(rows, front),
         target: targetForFront(front) * targetDays,
-        detail: ownHarvestFronts.includes(front) ? "Colheita própria" : "Colheita terceira"
+        detail: ownHarvestFronts.includes(front) ? "Colheita e transbordo próprios" : "Colheita terceira"
       }));
 
       els.frontChartWrap.innerHTML = `
@@ -3247,11 +3519,489 @@
       `;
     }
 
+    function transbordoRanking(rows) {
+      const grouped = new Map();
+      rows
+        .filter((row) => row.type === TYPES.OWN_TRANSBORDO)
+        .filter((row) => row.fleet)
+        .forEach((row) => {
+          const key = `${normalizeKey(row.front)}|${normalizeKey(row.fleet)}`;
+          if (!grouped.has(key)) {
+            grouped.set(key, {
+              front: row.front,
+              fleet: row.fleet,
+              production: 0,
+              records: 0,
+              dates: new Set()
+            });
+          }
+          const item = grouped.get(key);
+          item.production += Number(row.production) || 0;
+          item.records += 1;
+          if (row.date) item.dates.add(row.date);
+        });
+
+      return [...grouped.values()]
+        .map(({ dates, ...item }) => ({
+          ...item,
+          days: dates.size
+        }))
+        .sort((a, b) => b.production - a.production || a.fleet.localeCompare(b.fleet));
+    }
+
+    function renderTransbordoRanking(rows) {
+      const ranking = transbordoRanking(rows);
+      if (!ranking.length) {
+        els.transbordoRankingWrap.innerHTML = '<div class="empty-state">Sem tratores transbordo lançados para o período selecionado.</div>';
+        return;
+      }
+
+      const maxProduction = Math.max(...ranking.map((item) => item.production), 1);
+      els.transbordoRankingWrap.innerHTML = `
+        <div class="rank-list">
+          ${ranking.map((item, index) => {
+            const width = clampPercent((item.production / maxProduction) * 100);
+            return `
+              <div class="rank-item">
+                <div class="rank-position">${index + 1}</div>
+                <div class="rank-main">
+                  <div class="rank-headline">
+                    <strong>${escapeHtml(item.fleet)}</strong>
+                    <span class="status-pill">${formatNumber(item.production)}</span>
+                  </div>
+                  <div class="rank-track" aria-label="${escapeHtml(item.fleet)} ${formatNumber(item.production)}">
+                    <div class="rank-fill" style="width: ${width}%"></div>
+                  </div>
+                  <div class="rank-values">
+                    <span>${escapeHtml(item.front)} · ${item.days} dia${item.days === 1 ? "" : "s"}</span>
+                    <span>${item.records} lançamento${item.records === 1 ? "" : "s"}</span>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function transportRankingRange(period = transportRankingPeriod) {
+      const today = todayInputValue();
+      if (period === "week") {
+        const range = weekRangeFor(today);
+        return {
+          ...range,
+          label: "Semana",
+          detail: `${formatDate(range.start)} a ${formatDate(range.end)}`
+        };
+      }
+
+      if (period === "month") {
+        const month = monthRangeFor(today);
+        return {
+          start: month.start,
+          end: today,
+          label: "Mês",
+          detail: `${formatDate(month.start)} a ${formatDate(today)}`
+        };
+      }
+
+      const first = firstRecord();
+      const latest = latestRecord();
+      if (!first || !latest) {
+        return {
+          start: today,
+          end: today,
+          label: "Acumulado",
+          detail: "Sem lançamentos salvos"
+        };
+      }
+
+      return {
+        start: first.date,
+        end: latest.date,
+        label: "Acumulado",
+        detail: `${formatDate(first.date)} a ${formatDate(latest.date)}`
+      };
+    }
+
+    function transportRecordsForPeriod(period = transportRankingPeriod) {
+      if (period === "all") return getCleanRecords(records);
+      const range = transportRankingRange(period);
+      return recordsForRange(range.start, range.end);
+    }
+
+    function ownTruckRanking(rows) {
+      const grouped = new Map();
+      rows
+        .filter((row) => row.type === TYPES.OWN_TRANSPORT)
+        .filter((row) => row.fleet)
+        .forEach((row) => {
+          const key = normalizeKey(row.fleet);
+          if (!grouped.has(key)) {
+            grouped.set(key, {
+              fleet: row.fleet,
+              production: 0,
+              target: 0,
+              records: 0,
+              dates: new Set()
+            });
+          }
+          const item = grouped.get(key);
+          item.production += Number(row.production) || 0;
+          item.target += targetForRow(row, targets, rowsForSameDate(row, rows));
+          item.records += 1;
+          if (row.date) item.dates.add(row.date);
+        });
+
+      return [...grouped.values()]
+        .map(({ dates, ...item }) => ({
+          ...item,
+          days: dates.size,
+          percent: progressFor(item.production, item.target),
+          remaining: Math.max(item.target - item.production, 0)
+        }))
+        .sort((a, b) => b.production - a.production || b.percent - a.percent || a.fleet.localeCompare(b.fleet));
+    }
+
+    function thirdTransportDailyRanking(recordsList) {
+      return (recordsList || [])
+        .map((record) => {
+          const rows = rowsFromRecords([record]).filter((row) => row.type === TYPES.THIRD_TRANSPORT);
+          const production = rows.reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+          return {
+            date: record.date,
+            production,
+            records: rows.length,
+            target: production > 0 ? targetForType(TYPES.THIRD_TRANSPORT) : 0
+          };
+        })
+        .filter((item) => item.production > 0)
+        .map((item) => ({
+          ...item,
+          percent: progressFor(item.production, item.target),
+          remaining: Math.max(item.target - item.production, 0)
+        }))
+        .sort((a, b) => b.production - a.production || b.date.localeCompare(a.date));
+    }
+
+    function renderOwnTruckRankingList(ranking) {
+      if (!ranking.length) {
+        return '<div class="empty-state">Sem caminhões próprios lançados neste período.</div>';
+      }
+
+      return `
+        <div class="rank-list">
+          ${ranking.map((item, index) => {
+            const hasTarget = Number(item.target) > 0;
+            const status = hasTarget ? statusForProgress(item.percent) : { label: "Sem meta", className: "" };
+            const width = hasTarget ? clampPercent(item.percent) : item.production > 0 ? 100 : 0;
+            return `
+              <div class="rank-item">
+                <div class="rank-position">${index + 1}</div>
+                <div class="rank-main">
+                  <div class="rank-headline">
+                    <strong>${escapeHtml(item.fleet)}</strong>
+                    <span class="status-pill ${status.className}">${hasTarget ? formatPercent(item.percent) : status.label}</span>
+                  </div>
+                  <div class="rank-track" aria-label="${escapeHtml(item.fleet)} ${formatPercent(item.percent)}">
+                    <div class="rank-fill ${item.percent >= 100 ? "over" : ""}" style="width: ${width}%"></div>
+                  </div>
+                  <div class="rank-values">
+                    <span>${formatNumber(item.production)} transportado · ${item.days} dia${item.days === 1 ? "" : "s"}</span>
+                    <span>${hasTarget ? `Meta ${formatNumber(item.target)} · Falta ${formatNumber(item.remaining)}` : `${item.records} lançamento${item.records === 1 ? "" : "s"}`}</span>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function renderThirdTransportRankingList(ranking) {
+      if (!ranking.length) {
+        return '<div class="empty-state">Sem transporte terceiro lançado neste período.</div>';
+      }
+
+      return `
+        <div class="rank-list">
+          ${ranking.map((item, index) => {
+            const hasTarget = Number(item.target) > 0;
+            const status = hasTarget ? statusForProgress(item.percent) : { label: "Sem meta", className: "" };
+            const width = hasTarget ? clampPercent(item.percent) : item.production > 0 ? 100 : 0;
+            return `
+              <div class="rank-item">
+                <div class="rank-position">${index + 1}</div>
+                <div class="rank-main">
+                  <div class="rank-headline">
+                    <strong>${formatDate(item.date)}</strong>
+                    <span class="status-pill ${status.className}">${hasTarget ? formatPercent(item.percent) : status.label}</span>
+                  </div>
+                  <div class="rank-track" aria-label="Transporte terceiro ${formatDate(item.date)} ${formatPercent(item.percent)}">
+                    <div class="rank-fill ${item.percent >= 100 ? "over" : ""}" style="width: ${width}%"></div>
+                  </div>
+                  <div class="rank-values">
+                    <span>${formatNumber(item.production)} transportado por terceiros</span>
+                    <span>${hasTarget ? `Meta ${formatNumber(item.target)} · Falta ${formatNumber(item.remaining)}` : `${item.records} lançamento${item.records === 1 ? "" : "s"}`}</span>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function renderTransportRanking() {
+      const range = transportRankingRange();
+      const sourceRecords = transportRecordsForPeriod();
+      const rows = rowsFromRecords(sourceRecords);
+      const ownRows = rows.filter((row) => row.type === TYPES.OWN_TRANSPORT);
+      const thirdRows = rows.filter((row) => row.type === TYPES.THIRD_TRANSPORT);
+      const ownRanking = ownTruckRanking(rows);
+      const thirdRanking = thirdTransportDailyRanking(sourceRecords);
+      const ownTotal = ownRows.reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+      const thirdTotal = thirdRows.reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+      const truckCount = ownRanking.length;
+      const transportDays = new Set(rows.filter((row) => row.type === TYPES.OWN_TRANSPORT || row.type === TYPES.THIRD_TRANSPORT).map((row) => row.date).filter(Boolean)).size;
+
+      els.transportRankButtons.forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.transportRankPeriod === transportRankingPeriod));
+      });
+
+      if (!ownRows.length && !thirdRows.length) {
+        els.transportRankingWrap.innerHTML = `<div class="empty-state">Sem transporte lançado no período ${escapeHtml(range.detail)}.</div>`;
+        return;
+      }
+
+      els.transportRankingWrap.innerHTML = `
+        <div class="transport-summary">
+          <div class="goal-metric">
+            <span>Filtro</span>
+            <strong>${escapeHtml(range.label)}</strong>
+          </div>
+          <div class="goal-metric">
+            <span>Transp. próprio</span>
+            <strong>${formatNumber(ownTotal)}</strong>
+          </div>
+          <div class="goal-metric">
+            <span>Transp. terceiro</span>
+            <strong>${formatNumber(thirdTotal)}</strong>
+          </div>
+          <div class="goal-metric">
+            <span>Caminhões / dias</span>
+            <strong>${truckCount} / ${transportDays}</strong>
+          </div>
+        </div>
+        <div class="chart-row-head" style="margin-bottom: 12px;">
+          <span>${escapeHtml(range.detail)}</span>
+          <span>${sourceRecords.length} dia${sourceRecords.length === 1 ? "" : "s"} com lançamento salvo</span>
+        </div>
+        <div class="transport-ranking-grid">
+          <section>
+            <div class="chart-row-head" style="margin-bottom: 10px;">
+              <strong>Caminhões próprios</strong>
+              <span>Ranking por produção</span>
+            </div>
+            ${renderOwnTruckRankingList(ownRanking)}
+          </section>
+          <section>
+            <div class="chart-row-head" style="margin-bottom: 10px;">
+              <strong>Transporte terceiro</strong>
+              <span>Maiores dias</span>
+            </div>
+            ${renderThirdTransportRankingList(thirdRanking)}
+          </section>
+        </div>
+      `;
+    }
+
+    function renderAdvancedKpis(selectedRecords, rows, range, options = {}) {
+      const summary = summarizeRows(rows, options);
+      const activeDays = selectedRecords.length;
+      const calendarDays = daysBetweenInclusive(range.start, range.end);
+      const averageActive = activeDays ? summary.total / activeDays : 0;
+      const averageCalendar = calendarDays ? summary.total / calendarDays : 0;
+      const daily = dailySummaries(selectedRecords);
+      const best = [...daily].sort((a, b) => b.total - a.total || a.date.localeCompare(b.date))[0];
+      const targetDays = daily.filter((item) => item.targetPercent >= 100).length;
+      const belowDays = daily.filter((item) => item.targetPercent < 85).length;
+      const noTargetRows = rows.filter((row) => targetForRow(row, targets, rowsForSameDate(row, rows)) <= 0).length;
+      const monthRange = monthRangeFor(range.end);
+      const monthEnd = range.end > monthRange.end ? monthRange.end : range.end;
+      const monthRecords = recordsForRange(monthRange.start, monthEnd);
+      const monthRows = rowsFromRecords(monthRecords);
+      const monthSummary = summarizeRows(monthRows, { targetDays: monthRecords.length });
+      const monthElapsedDays = daysBetweenInclusive(monthRange.start, monthEnd);
+      const monthTotalDays = daysBetweenInclusive(monthRange.start, monthRange.end);
+      const projectedMonth = monthElapsedDays ? (monthSummary.total / monthElapsedDays) * monthTotalDays : 0;
+
+      els.advancedKpiWrap.innerHTML = `
+        <div class="advanced-metrics">
+          <div class="goal-metric">
+            <span>Dias lançados</span>
+            <strong>${activeDays}/${calendarDays}</strong>
+          </div>
+          <div class="goal-metric">
+            <span>Média ativa</span>
+            <strong>${formatNumber(averageActive)}</strong>
+          </div>
+          <div class="goal-metric">
+            <span>Média corrida</span>
+            <strong>${formatNumber(averageCalendar)}</strong>
+          </div>
+          <div class="goal-metric">
+            <span>Dias meta</span>
+            <strong>${targetDays}</strong>
+          </div>
+          <div class="goal-metric">
+            <span>Abaixo 85%</span>
+            <strong>${belowDays}</strong>
+          </div>
+          <div class="goal-metric">
+            <span>Melhor dia</span>
+            <strong>${best ? formatNumber(best.total) : "0"}</strong>
+          </div>
+          <div class="goal-metric">
+            <span>Falta total</span>
+            <strong>${formatNumber(summary.remaining)}</strong>
+          </div>
+          <div class="goal-metric">
+            <span>Registros sem meta</span>
+            <strong>${noTargetRows}</strong>
+          </div>
+          <div class="goal-metric">
+            <span>Projeção mês</span>
+            <strong>${formatNumber(projectedMonth)}</strong>
+          </div>
+          <div class="goal-metric">
+            <span>Meta média/dia</span>
+            <strong>${formatNumber(options.targetDays ? summary.targetTotal / options.targetDays : 0)}</strong>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderDailyTrend(selectedRecords) {
+      const items = dailySummaries(selectedRecords).sort((a, b) => a.date.localeCompare(b.date));
+      if (!items.length) {
+        els.dailyTrendWrap.innerHTML = '<div class="empty-state">Sem lançamentos para montar a evolução diária.</div>';
+        return;
+      }
+
+      const maxValue = Math.max(...items.map((item) => Math.max(item.total, item.targetTotal)), 1);
+      els.dailyTrendWrap.innerHTML = `
+        <div class="trend-list">
+          ${items.map((item) => {
+            const width = clampPercent((item.total / maxValue) * 100);
+            const status = statusForProgress(item.targetPercent);
+            return `
+              <div class="trend-row">
+                <div class="trend-date">${formatDate(item.date)}</div>
+                <div class="chart-track" aria-label="${formatDate(item.date)} ${formatNumber(item.total)}">
+                  <div class="chart-fill ${item.targetPercent >= 100 ? "over" : ""}" style="width: ${width}%"></div>
+                </div>
+                <div class="trend-value">
+                  ${formatNumber(item.total)} · <span class="status-pill ${status.className}">${formatPercent(item.targetPercent)}</span>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function renderOperationMix(rows, options = {}) {
+      const total = rows.reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+      if (!total) {
+        els.operationMixWrap.innerHTML = '<div class="empty-state">Sem produção para calcular o mix operacional.</div>';
+        return;
+      }
+
+      const targetDays = options.targetDays ?? targetDaysForRows(rows);
+      const items = typeOptions.map((type) => {
+        const production = productionByType(rows, type);
+        return {
+          label: type,
+          production,
+          percent: (production / total) * 100,
+          target: targetForType(type) * targetDays,
+          records: rows.filter((row) => row.type === type).length
+        };
+      }).filter((item) => item.production > 0);
+
+      els.operationMixWrap.innerHTML = `
+        <div class="mix-grid">
+          ${items.map((item) => `
+            <div class="chart-row">
+              <div class="chart-row-head">
+                <strong>${escapeHtml(item.label)}</strong>
+                <span>${formatPercent(item.percent)} do total</span>
+              </div>
+              <div class="chart-track" aria-label="${escapeHtml(item.label)} ${formatPercent(item.percent)}">
+                <div class="chart-fill" style="width: ${clampPercent(item.percent)}%"></div>
+              </div>
+              <div class="chart-row-head">
+                <span>${formatNumber(item.production)} produzido</span>
+                <span>${item.records} registro${item.records === 1 ? "" : "s"} · Meta ${formatNumber(item.target)}</span>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function renderDashboardAlerts(selectedRecords, rows, options = {}) {
+      const daily = dailySummaries(selectedRecords);
+      const summary = summarizeRows(rows, options);
+      const noTargetRows = rows.filter((row) => targetForRow(row, targets, rowsForSameDate(row, rows)) <= 0);
+      const belowTarget = daily.filter((item) => item.targetPercent < 85);
+      const missingTypes = typeOptions.filter((type) => !rows.some((row) => row.type === type));
+      const alerts = [];
+
+      if (!selectedRecords.length) {
+        alerts.push({ tone: "alert", title: "Sem dados no período", text: "Não há lançamentos salvos para o intervalo selecionado." });
+      } else if (summary.targetPercent >= 100) {
+        alerts.push({ tone: "good", title: "Meta do período batida", text: `${formatPercent(summary.targetPercent)} atingido no período selecionado.` });
+      } else {
+        alerts.push({ tone: summary.targetPercent < 85 ? "alert" : "", title: "Meta ainda aberta", text: `${formatNumber(summary.remaining)} faltando para bater a meta do período.` });
+      }
+
+      if (belowTarget.length) {
+        const worst = [...belowTarget].sort((a, b) => a.targetPercent - b.targetPercent)[0];
+        alerts.push({ tone: "alert", title: `${belowTarget.length} dia${belowTarget.length === 1 ? "" : "s"} abaixo de 85%`, text: `Pior dia: ${formatDate(worst.date)} com ${formatPercent(worst.targetPercent)}.` });
+      }
+
+      if (noTargetRows.length) {
+        alerts.push({ tone: "alert", title: "Registros sem meta", text: `${noTargetRows.length} lançamento${noTargetRows.length === 1 ? "" : "s"} não encontrou meta cadastrada.` });
+      }
+
+      if (missingTypes.length && selectedRecords.length) {
+        alerts.push({ tone: "", title: "Operações sem lançamento", text: missingTypes.join(", ") });
+      }
+
+      if (!alerts.length) {
+        alerts.push({ tone: "good", title: "Sem alertas críticos", text: "Os lançamentos do período estão consistentes com as metas cadastradas." });
+      }
+
+      els.dashboardAlertsWrap.innerHTML = `
+        <div class="alert-grid">
+          ${alerts.map((item) => `
+            <div class="alert-item ${item.tone}">
+              <strong>${escapeHtml(item.title)}</strong>
+              <span>${escapeHtml(item.text)}</span>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
     function renderDashboardCharts(rows, options = {}) {
       renderGoalOverview(rows, options);
       renderTypeChart(rows, options);
       renderFrontChart(rows, options);
       renderHarvesterRanking(rows);
+      renderTransportRanking();
     }
 
     function dailySummaries(recordsList) {
@@ -3278,7 +4028,7 @@
       const globalSummary = summarizeRows(rows, options);
       const bestDay = [...summaries].sort((a, b) => b.total - a.total || a.date.localeCompare(b.date))[0];
       const criticalDay = [...summaries].sort((a, b) => a.targetPercent - b.targetPercent || a.date.localeCompare(b.date))[0];
-      const topFront = aggregateBy(rows.filter((row) => isHarvest(row.type)), "front")[0];
+      const topFront = aggregateBy(rows.filter((row) => isFrontProduction(row.type)), "front")[0];
       const topFleet = ownHarvesterRanking(rows)[0];
       const averagePerDay = selectedRecords.length ? globalSummary.total / selectedRecords.length : 0;
 
@@ -3385,6 +4135,64 @@
       `;
     }
 
+    function dailyOperationMatrix(recordsList) {
+      return (recordsList || [])
+        .map((record) => {
+          const rows = rowsFromRecords([record]);
+          const summary = summarizeRows(rows, { targetDays: 1 });
+          return {
+            date: record.date,
+            ownHarvest: productionByType(rows, TYPES.OWN_HARVEST),
+            ownTransbordo: productionByType(rows, TYPES.OWN_TRANSBORDO),
+            thirdHarvest: productionByType(rows, TYPES.THIRD_HARVEST),
+            ownTransport: productionByType(rows, TYPES.OWN_TRANSPORT),
+            thirdTransport: productionByType(rows, TYPES.THIRD_TRANSPORT),
+            total: summary.total,
+            percent: summary.targetPercent
+          };
+        })
+        .sort((a, b) => b.date.localeCompare(a.date));
+    }
+
+    function renderDailyMatrix(selectedRecords) {
+      const items = dailyOperationMatrix(selectedRecords);
+      if (!items.length) {
+        els.dailyMatrixWrap.innerHTML = '<div class="empty-state">Sem lançamentos para montar a matriz diária.</div>';
+        return;
+      }
+
+      els.dailyMatrixWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Colheita própria</th>
+              <th>Transbordo</th>
+              <th>Colheita terceira</th>
+              <th>Transp. próprio</th>
+              <th>Transp. terceiro</th>
+              <th>Total</th>
+              <th>% Meta</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map((item) => `
+              <tr>
+                <td>${formatDate(item.date)}</td>
+                <td>${formatNumber(item.ownHarvest)}</td>
+                <td>${formatNumber(item.ownTransbordo)}</td>
+                <td>${formatNumber(item.thirdHarvest)}</td>
+                <td>${formatNumber(item.ownTransport)}</td>
+                <td>${formatNumber(item.thirdTransport)}</td>
+                <td>${formatNumber(item.total)}</td>
+                <td>${formatPercent(item.percent)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
     function renderDashboard() {
       const range = dashboardRange();
       setDashboardRange(range.start, range.end);
@@ -3408,11 +4216,17 @@
       els.dashAllAccumulated.textContent = formatNumber(allSummary.total);
 
       setStats("dash", rows, { targetDays });
+      renderAdvancedKpis(selectedRecords, rows, range, { targetDays });
       renderDashboardCharts(rows, { targetDays });
+      renderDailyTrend(selectedRecords);
+      renderOperationMix(rows, { targetDays });
+      renderDashboardAlerts(selectedRecords, rows, { targetDays });
+      renderTransbordoRanking(rows);
       renderTypeSummary(rows);
       renderFrontSummary(rows);
       renderDashboardHighlights(selectedRecords, rows, { targetDays });
       renderDailySummary(selectedRecords);
+      renderDailyMatrix(selectedRecords);
       renderDashboardRows(rows);
     }
 
@@ -3452,9 +4266,9 @@
     }
 
     function renderFrontSummary(rows) {
-      const items = aggregateBy(rows.filter((row) => isHarvest(row.type)), "front");
+      const items = aggregateBy(rows.filter((row) => isFrontProduction(row.type)), "front");
       if (!items.length) {
-        els.frontSummaryWrap.innerHTML = '<div class="empty-state">Sem produção de colheita salva para o período selecionado.</div>';
+        els.frontSummaryWrap.innerHTML = '<div class="empty-state">Sem produção por frente salva para o período selecionado.</div>';
         return;
       }
 
@@ -3620,7 +4434,12 @@
       els.manualProduction.value = "";
       els.manualNote.value = "";
       renderEntry();
-      showToast(activeFront.type === TYPES.OWN_TRANSPORT ? "Produção do caminhão adicionada à conferência." : "Produção adicionada à conferência.");
+      const toastMessage = activeFront.type === TYPES.OWN_TRANSPORT
+        ? "Produção do caminhão adicionada à conferência."
+        : activeFront.type === TYPES.OWN_TRANSBORDO
+          ? "Produção do trator transbordo adicionada à conferência."
+          : "Produção adicionada à conferência.";
+      showToast(toastMessage);
     }
 
     function normalizeHeader(value) {
@@ -4126,6 +4945,9 @@
             "caminhao",
             "caminhão próprio",
             "caminhao proprio",
+            "trator",
+            "trator transbordo",
+            "transbordo",
             "equipamento",
             "maquina",
             "máquina",
@@ -4309,6 +5131,9 @@
       if (type === TYPES.OWN_HARVEST) {
         return { type, front: ownHarvestFronts[(count - 1) % ownHarvestFronts.length], fleet: "", production: 0, note: "" };
       }
+      if (type === TYPES.OWN_TRANSBORDO) {
+        return { type, front: ownHarvestFronts[(count - 1) % ownHarvestFronts.length], fleet: "", production: 0, note: "" };
+      }
       if (type === TYPES.THIRD_HARVEST) {
         return { type, front: thirdHarvestFronts[(count - 1) % thirdHarvestFronts.length], fleet: "", production: 0, note: "" };
       }
@@ -4416,7 +5241,7 @@
 
       const missingFleet = entries.some((row) => requiresFleet(row.type) && parseNumber(row.production) > 0 && !String(row.fleet || "").trim());
       if (missingFleet) {
-        showToast("Informe a colhedora nas frentes próprias e o caminhão no transporte próprio.");
+        showToast("Informe a colhedora, o trator transbordo ou o caminhão próprio antes de salvar.");
         return;
       }
 
@@ -4498,6 +5323,7 @@
               <th>% Meta</th>
               <th>Falta</th>
               <th>Frentes próprias</th>
+              <th>Transbordo</th>
               <th>Frentes terceiras</th>
               <th>Transp. próprio</th>
               <th>Transp. terceiro</th>
@@ -4516,6 +5342,7 @@
                   <td>${formatPercent(summary.targetPercent)}</td>
                   <td>${formatNumber(summary.remaining)}</td>
                   <td>${formatNumber(summary.ownHarvest)}</td>
+                  <td>${formatNumber(summary.ownTransbordo)}</td>
                   <td>${formatNumber(summary.thirdHarvest)}</td>
                   <td>${formatNumber(summary.ownTransport)}</td>
                   <td>${formatNumber(summary.thirdTransport)}</td>
@@ -4708,6 +5535,13 @@
       button.addEventListener("click", () => applyTheme(button.dataset.themeOption));
     });
 
+    els.transportRankButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        transportRankingPeriod = button.dataset.transportRankPeriod || "week";
+        renderTransportRanking();
+      });
+    });
+
     els.dashboardStartDate.addEventListener("change", renderDashboard);
     els.dashboardEndDate.addEventListener("change", renderDashboard);
     els.historySearch.addEventListener("input", renderHistory);
@@ -4831,6 +5665,7 @@
     document.querySelector("#saveBtn").addEventListener("click", saveCurrentDay);
     document.querySelector("#deleteDayBtn").addEventListener("click", deleteSelectedDay);
     document.querySelector("#addOwnHarvesterBtn").addEventListener("click", () => addEntry(TYPES.OWN_HARVEST));
+    document.querySelector("#addOwnTransbordoBtn").addEventListener("click", () => addEntry(TYPES.OWN_TRANSBORDO));
     document.querySelector("#addThirdFrontBtn").addEventListener("click", () => addEntry(TYPES.THIRD_HARVEST));
     document.querySelector("#addOwnTransportBtn").addEventListener("click", () => addEntry(TYPES.OWN_TRANSPORT));
     document.querySelector("#addThirdTransportBtn").addEventListener("click", () => addEntry(TYPES.THIRD_TRANSPORT));
