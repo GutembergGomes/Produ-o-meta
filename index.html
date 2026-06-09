@@ -235,6 +235,15 @@
       background: #dce5df;
     }
 
+    .btn-danger {
+      background: #fae5e8;
+      color: var(--red);
+    }
+
+    .btn-danger:hover {
+      background: #f5d1d7;
+    }
+
     .btn-link {
       min-height: 34px;
       padding: 0 10px;
@@ -1044,6 +1053,7 @@
         <div class="actions">
           <button class="btn-secondary" id="loadDateBtn" type="button">Carregar data</button>
           <button class="btn-primary" id="saveBtn" type="button">Salvar dia</button>
+          <button class="btn-secondary btn-danger" id="deleteDayBtn" type="button">Excluir dia</button>
         </div>
       </div>
 
@@ -1605,6 +1615,104 @@
       return normalizeKey(a) === normalizeKey(b);
     }
 
+    function dateInputFromDate(value) {
+      if (!(value instanceof Date) || Number.isNaN(value.getTime())) return "";
+      const offset = value.getTimezoneOffset();
+      const local = new Date(value.getTime() - offset * 60000);
+      return local.toISOString().slice(0, 10);
+    }
+
+    function validInputDate(year, month, day) {
+      const parsedYear = Number(year);
+      const parsedMonth = Number(month);
+      const parsedDay = Number(day);
+      if (!parsedYear || !parsedMonth || !parsedDay) return "";
+      const date = new Date(parsedYear, parsedMonth - 1, parsedDay);
+      if (
+        date.getFullYear() !== parsedYear ||
+        date.getMonth() + 1 !== parsedMonth ||
+        date.getDate() !== parsedDay
+      ) {
+        return "";
+      }
+      return [
+        String(parsedYear).padStart(4, "0"),
+        String(parsedMonth).padStart(2, "0"),
+        String(parsedDay).padStart(2, "0")
+      ].join("-");
+    }
+
+    function normalizeRecordDate(value) {
+      if (!value) return "";
+
+      if (value instanceof Date) {
+        return dateInputFromDate(value);
+      }
+
+      if (value && typeof value.toDate === "function") {
+        return dateInputFromDate(value.toDate());
+      }
+
+      if (value && typeof value.seconds === "number") {
+        return dateInputFromDate(new Date(value.seconds * 1000));
+      }
+
+      const text = String(value).trim();
+      const isoMatch = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+      if (isoMatch) return validInputDate(isoMatch[1], isoMatch[2], isoMatch[3]);
+
+      const brMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (brMatch) return validInputDate(brMatch[3], brMatch[2], brMatch[1]);
+
+      const parsed = new Date(text);
+      return dateInputFromDate(parsed);
+    }
+
+    function recordBelongsToPlant(record) {
+      return !record || !record.plant || sameText(record.plant, PLANT);
+    }
+
+    function cleanRecord(record) {
+      if (!record || !recordBelongsToPlant(record)) return null;
+      const date = normalizeRecordDate(record.date || record.id);
+      const rows = getCleanEntries(record.rows);
+      if (!date || !rows.length) return null;
+      return {
+        id: record.id || makeId(),
+        plant: PLANT,
+        date,
+        rows,
+        updatedAt: record.updatedAt || new Date().toISOString()
+      };
+    }
+
+    function recordTimestamp(record) {
+      const time = Date.parse(record && record.updatedAt ? record.updatedAt : "");
+      return Number.isNaN(time) ? 0 : time;
+    }
+
+    function shouldReplaceRecord(nextRecord, currentRecord) {
+      const nextTime = recordTimestamp(nextRecord);
+      const currentTime = recordTimestamp(currentRecord);
+      if (nextTime !== currentTime) return nextTime > currentTime;
+      return true;
+    }
+
+    function consolidateRecords(source = []) {
+      const byDate = new Map();
+      (source || []).forEach((record) => {
+        const clean = cleanRecord(record);
+        if (!clean) return;
+        const key = `${clean.plant}|${clean.date}`;
+        const current = byDate.get(key);
+        if (!current || shouldReplaceRecord(clean, current)) {
+          byDate.set(key, clean);
+        }
+      });
+
+      return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+    }
+
     function targetKeyForRow(row) {
       const type = normalizeType(row.type);
       if (type === TYPES.OWN_HARVEST) {
@@ -1962,10 +2070,13 @@
     }
 
     async function syncRecordToFirebase(record, options = {}) {
+      const date = normalizeRecordDate(record && record.date);
+      if (!date) return false;
+
       const cleanRecord = {
         id: record.id || makeId(),
         plant: PLANT,
-        date: record.date,
+        date,
         rows: getCleanEntries(record.rows),
         updatedAt: record.updatedAt || new Date().toISOString()
       };
@@ -1984,8 +2095,24 @@
     }
 
     async function deleteRecordFromFirebase(date, options = {}) {
+      const cleanDate = normalizeRecordDate(date);
+      if (!cleanDate) return false;
+
       return runFirebaseTask(async (root) => {
-        await root.collection("records").doc(date).delete();
+        const recordsRef = root.collection("records");
+        const snapshot = await recordsRef.get();
+        const deleteRefs = snapshot.docs
+          .filter((doc) => {
+            const data = doc.data() || {};
+            return doc.id === cleanDate || normalizeRecordDate(data.date || doc.id) === cleanDate;
+          })
+          .map((doc) => doc.ref);
+
+        if (!deleteRefs.some((ref) => ref.id === cleanDate)) {
+          deleteRefs.push(recordsRef.doc(cleanDate));
+        }
+
+        await Promise.all(deleteRefs.map((ref) => ref.delete()));
         await root.set({
           plant: PLANT,
           version: APP_VERSION,
@@ -1997,17 +2124,31 @@
     }
 
     async function uploadAllDataToFirebase(options = {}) {
+      const cleanRecords = getCleanRecords(records);
+      const localDates = new Set(cleanRecords.map((record) => record.date));
+      const lastRecord = cleanRecords[cleanRecords.length - 1] || null;
+
       return runFirebaseTask(async (root) => {
         await root.set({
           plant: PLANT,
           version: APP_VERSION,
           updatedAt: new Date().toISOString(),
           targets: getCleanTargets(),
-          recordCount: records.length,
-          lastRecordDate: latestRecord() ? latestRecord().date : ""
+          recordCount: cleanRecords.length,
+          lastRecordDate: lastRecord ? lastRecord.date : ""
         }, { merge: true });
 
-        const writes = records.map((record) => root.collection("records").doc(record.date).set({
+        const recordsRef = root.collection("records");
+        const remoteSnapshot = await recordsRef.get();
+        const deletes = remoteSnapshot.docs
+          .filter((doc) => {
+            const data = doc.data() || {};
+            const docDate = normalizeRecordDate(data.date || doc.id);
+            return !localDates.has(docDate) || doc.id !== docDate;
+          })
+          .map((doc) => doc.ref.delete());
+
+        const writes = cleanRecords.map((record) => recordsRef.doc(record.date).set({
           id: record.id || makeId(),
           plant: PLANT,
           date: record.date,
@@ -2015,7 +2156,7 @@
           updatedAt: record.updatedAt || new Date().toISOString()
         }, { merge: true }));
 
-        await Promise.all(writes);
+        await Promise.all([...deletes, ...writes]);
       }, options);
     }
 
@@ -2028,7 +2169,7 @@
 
         return {
           meta: metaSnapshot.exists ? metaSnapshot.data() : {},
-          records: recordSnapshots.docs.map((doc) => doc.data())
+          records: recordSnapshots.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
         };
       }, options);
 
@@ -2037,16 +2178,7 @@
       }
 
       const remoteTargets = downloaded.meta && downloaded.meta.targets ? cloneTargets(downloaded.meta.targets) : null;
-      const remoteRecords = (downloaded.records || [])
-        .filter((record) => record && record.date && Array.isArray(record.rows))
-        .map((record) => ({
-          id: record.id || makeId(),
-          plant: PLANT,
-          date: record.date,
-          rows: getCleanEntries(record.rows),
-          updatedAt: record.updatedAt || new Date().toISOString()
-        }))
-        .filter((record) => record.rows.length);
+      const remoteRecords = consolidateRecords(downloaded.records || []);
 
       if (!remoteTargets && !remoteRecords.length) {
         if (!options.silent) showToast("Nenhum dado encontrado no Firebase.");
@@ -2059,15 +2191,13 @@
       }
 
       if (remoteRecords.length) {
-        const byDate = new Map(records.map((record) => [`${record.plant}|${record.date}`, record]));
-        remoteRecords.forEach((record) => byDate.set(`${PLANT}|${record.date}`, record));
-        records = [...byDate.values()].filter((record) => record.plant === PLANT);
+        records = consolidateRecords([...records, ...remoteRecords]);
         persistRecords();
       }
 
       renderOptions();
       renderTargets();
-      renderEntry();
+      refreshEntryFromSelectedDate({ silent: true });
       renderDashboard();
       renderHistory();
       return true;
@@ -2087,17 +2217,7 @@
     }
 
     function getCleanRecords(source = records) {
-      return (source || [])
-        .filter((record) => record && record.date && Array.isArray(record.rows))
-        .map((record) => ({
-          id: record.id || makeId(),
-          plant: PLANT,
-          date: record.date,
-          rows: getCleanEntries(record.rows),
-          updatedAt: record.updatedAt || new Date().toISOString()
-        }))
-        .filter((record) => record.rows.length)
-        .sort((a, b) => a.date.localeCompare(b.date));
+      return consolidateRecords(source);
     }
 
     function currentDataPayload(exportedAt = new Date().toISOString()) {
@@ -2114,16 +2234,7 @@
       const importedRecords = Array.isArray(payload) ? payload : payload.records;
       if (!Array.isArray(importedRecords)) throw new Error("Formato inválido");
 
-      return importedRecords
-        .filter((record) => record && record.date && Array.isArray(record.rows))
-        .map((record) => ({
-          id: record.id || makeId(),
-          plant: PLANT,
-          date: record.date,
-          rows: getCleanEntries(record.rows),
-          updatedAt: record.updatedAt || new Date().toISOString()
-        }))
-        .filter((record) => record.rows.length);
+      return consolidateRecords(importedRecords);
     }
 
     function applyDataPayload(payload, options = {}) {
@@ -2136,17 +2247,15 @@
       }
 
       if (mergeRecords) {
-        const byDate = new Map(records.map((record) => [`${record.plant}|${record.date}`, record]));
-        normalized.forEach((record) => byDate.set(`${PLANT}|${record.date}`, record));
-        records = [...byDate.values()].filter((record) => record.plant === PLANT);
+        records = consolidateRecords([...records, ...normalized]);
       } else {
-        records = normalized.filter((record) => record.plant === PLANT);
+        records = consolidateRecords(normalized);
       }
 
       persistRecords();
       renderOptions();
       renderTargets();
-      renderEntry();
+      refreshEntryFromSelectedDate({ silent: true });
       renderDashboard();
       renderHistory();
       return normalized.length;
@@ -2298,7 +2407,8 @@
 
     async function processQueuedItem(item) {
       if (item.type === "record-upsert") {
-        const record = records.find((entry) => entry.date === item.payload.date && entry.plant === PLANT);
+        const date = normalizeRecordDate(item.payload.date);
+        const record = records.find((entry) => normalizeRecordDate(entry.date) === date && recordBelongsToPlant(entry));
         if (!record) return true;
         return syncRecordToFirebase(record, {
           silent: true,
@@ -2609,22 +2719,14 @@
         const list = Array.isArray(parsed) ? parsed : parsed.records;
         if (!Array.isArray(list)) return [];
 
-        return list
-          .filter((record) => record && record.plant === PLANT && record.date && Array.isArray(record.rows))
-          .map((record) => ({
-            id: record.id || makeId(),
-            plant: PLANT,
-            date: record.date,
-            rows: getCleanEntries(record.rows),
-            updatedAt: record.updatedAt || new Date().toISOString()
-          }))
-          .filter((record) => record.rows.length);
+        return consolidateRecords(list);
       } catch {
         return [];
       }
     }
 
     function persistRecords() {
+      records = getCleanRecords(records);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
     }
 
@@ -2687,28 +2789,34 @@
     }
 
     function recordForDate(date) {
-      return records.find((record) => record.date === date && record.plant === PLANT);
+      const cleanDate = normalizeRecordDate(date);
+      if (!cleanDate) return null;
+      return records.find((record) => normalizeRecordDate(record.date) === cleanDate && recordBelongsToPlant(record)) || null;
     }
 
     function recordsForRange(start, end) {
       const range = normalizeDateRange(start, end);
       return records
-        .filter((record) => record.plant === PLANT && record.date >= range.start && record.date <= range.end)
-        .sort((a, b) => a.date.localeCompare(b.date));
+        .filter((record) => {
+          const date = normalizeRecordDate(record.date);
+          return recordBelongsToPlant(record) && date >= range.start && date <= range.end;
+        })
+        .sort((a, b) => normalizeRecordDate(a.date).localeCompare(normalizeRecordDate(b.date)));
     }
 
     function rowsFromRecords(sourceRecords) {
       return (sourceRecords || []).flatMap((record) => (
-        cloneEntries(record.rows).map((row) => ({ ...row, date: record.date }))
+        cloneEntries(record.rows).map((row) => ({ ...row, date: normalizeRecordDate(record.date) }))
       ));
     }
 
     function firstRecord() {
-      return [...records].sort((a, b) => a.date.localeCompare(b.date))[0] || null;
+      return getCleanRecords(records)[0] || null;
     }
 
     function latestRecord() {
-      return [...records].sort((a, b) => b.date.localeCompare(a.date))[0] || null;
+      const cleanRecords = getCleanRecords(records);
+      return cleanRecords[cleanRecords.length - 1] || null;
     }
 
     function dashboardRange() {
@@ -3123,7 +3231,7 @@
       const monthRange = monthRangeFor(range.end);
       const monthRecords = recordsForRange(monthRange.start, monthRange.end);
       const monthSummary = summarizeRows(rowsFromRecords(monthRecords), { targetDays: monthRecords.length });
-      const allRecords = records.filter((record) => record.plant === PLANT);
+      const allRecords = getCleanRecords(records);
       const allSummary = summarizeRows(rowsFromRecords(allRecords), { targetDays: allRecords.length });
 
       els.dashboardSource.textContent = selectedRecords.length
@@ -4085,31 +4193,44 @@
       showToast("Lançamento limpo.");
     }
 
-    function loadEntryDate() {
-      const date = els.entryDate.value;
+    function refreshEntryFromSelectedDate(options = {}) {
+      const date = normalizeRecordDate(els.entryDate.value);
+      if (date && els.entryDate.value !== date) {
+        els.entryDate.value = date;
+      }
+
       const record = recordForDate(date);
       if (!record) {
-        entries = cloneEntries(defaultEntries);
-        renderEntry();
-        closeFrontWorkspace();
-        showToast("Data sem lançamento salvo. A conferência foi limpa.");
-        return;
+        if (options.clearWhenMissing) {
+          entries = cloneEntries(defaultEntries);
+          renderEntry();
+          closeFrontWorkspace();
+        }
+        if (!options.silent) showToast("Data sem lançamento salvo. A conferência foi limpa.");
+        return false;
       }
 
       entries = cloneEntries(record.rows);
       renderEntry();
       closeFrontWorkspace();
-      showToast(`Lançamento de ${formatDate(date)} carregado.`);
+      if (!options.silent) showToast(`Lançamento de ${formatDate(date)} carregado.`);
+      return true;
+    }
+
+    function loadEntryDate() {
+      refreshEntryFromSelectedDate({ clearWhenMissing: true });
     }
 
     async function saveCurrentDay() {
-      const date = els.entryDate.value;
+      const date = normalizeRecordDate(els.entryDate.value);
       const cleanRows = getCleanEntries();
 
       if (!date) {
         showToast("Informe a data do lançamento.");
         return;
       }
+
+      els.entryDate.value = date;
 
       if (!cleanRows.length) {
         showToast("Informe produção em pelo menos uma linha válida.");
@@ -4122,7 +4243,7 @@
         return;
       }
 
-      const existingIndex = records.findIndex((record) => record.date === date && record.plant === PLANT);
+      const existingIndex = records.findIndex((record) => normalizeRecordDate(record.date) === date && recordBelongsToPlant(record));
       const record = {
         id: existingIndex >= 0 ? records[existingIndex].id : makeId(),
         plant: PLANT,
@@ -4240,36 +4361,52 @@
     function openHistory(id) {
       const record = records.find((item) => item.id === id);
       if (!record) return;
-      els.entryDate.value = record.date;
+      const date = normalizeRecordDate(record.date);
+      els.entryDate.value = date;
       entries = cloneEntries(record.rows);
       switchView("entry");
-      showToast(`Lançamento de ${formatDate(record.date)} aberto para edição.`);
+      showToast(`Lançamento de ${formatDate(date)} aberto para edição.`);
     }
 
     function openHistoryDashboard(id) {
       const record = records.find((item) => item.id === id);
       if (!record) return;
-      setDashboardRange(record.date, record.date);
+      const date = normalizeRecordDate(record.date);
+      setDashboardRange(date, date);
       switchView("dashboard");
-      showToast(`Dashboard de ${formatDate(record.date)} aberto.`);
+      showToast(`Dashboard de ${formatDate(date)} aberto.`);
     }
 
-    async function deleteHistory(id) {
-      const record = records.find((item) => item.id === id);
-      if (!record) return;
+    async function deleteDayByDate(dateValue) {
+      const date = normalizeRecordDate(dateValue);
+      if (!date) {
+        showToast("Informe a data do lançamento.");
+        return;
+      }
 
-      createAutoBackup(`Antes de excluir ${formatDate(record.date)}`, { skipAudit: true });
-      records = records.filter((item) => item.id !== id);
+      const record = recordForDate(date);
+      if (!record) {
+        showToast("Data sem lançamento salvo para excluir.");
+        return;
+      }
+
+      createAutoBackup(`Antes de excluir ${formatDate(date)}`, { skipAudit: true });
+      records = records.filter((item) => !(recordBelongsToPlant(item) && normalizeRecordDate(item.date) === date));
       persistRecords();
-      addAuditEntry("exclusao", `Lançamento de ${formatDate(record.date)} removido localmente.`);
+      addAuditEntry("exclusao", `Lançamento de ${formatDate(date)} removido localmente.`);
+      if (normalizeRecordDate(els.entryDate.value) === date) {
+        entries = cloneEntries(defaultEntries);
+        renderEntry();
+        closeFrontWorkspace();
+      }
       renderDashboard();
       renderHistory();
 
-      const syncState = await syncOrQueue("record-delete", { date: record.date }, () => deleteRecordFromFirebase(record.date, {
+      const syncState = await syncOrQueue("record-delete", { date }, () => deleteRecordFromFirebase(date, {
         silent: true,
         pendingMessage: "Removendo lancamento do Firebase...",
-        successStatus: `Lancamento de ${formatDate(record.date)} removido do navegador e do Firebase.`,
-        errorStatus: `Lancamento de ${formatDate(record.date)} removido localmente, mas nao foi possivel apagar no Firebase.`
+        successStatus: `Lancamento de ${formatDate(date)} removido do navegador e do Firebase.`,
+        errorStatus: `Lancamento de ${formatDate(date)} removido localmente, mas nao foi possivel apagar no Firebase.`
       }));
 
       if (syncState === "synced") {
@@ -4283,6 +4420,16 @@
       }
 
       showToast("Lançamento removido do histórico local.");
+    }
+
+    async function deleteSelectedDay() {
+      await deleteDayByDate(els.entryDate.value);
+    }
+
+    async function deleteHistory(id) {
+      const record = records.find((item) => item.id === id);
+      if (!record) return;
+      await deleteDayByDate(record.date);
     }
 
     function exportCsv() {
@@ -4498,8 +4645,10 @@
       renderDashboard();
     });
 
+    els.entryDate.addEventListener("change", loadEntryDate);
     document.querySelector("#loadDateBtn").addEventListener("click", loadEntryDate);
     document.querySelector("#saveBtn").addEventListener("click", saveCurrentDay);
+    document.querySelector("#deleteDayBtn").addEventListener("click", deleteSelectedDay);
     document.querySelector("#addOwnHarvesterBtn").addEventListener("click", () => addEntry(TYPES.OWN_HARVEST));
     document.querySelector("#addThirdFrontBtn").addEventListener("click", () => addEntry(TYPES.THIRD_HARVEST));
     document.querySelector("#addOwnTransportBtn").addEventListener("click", () => addEntry(TYPES.OWN_TRANSPORT));
@@ -4569,7 +4718,7 @@
     setDashboardRange(initialDashboardDate, initialDashboardDate);
     els.entryDate.value = initialDate;
     renderTargets();
-    renderEntry();
+    refreshEntryFromSelectedDate({ clearWhenMissing: true, silent: true });
     renderDashboard();
     renderHistory();
 
