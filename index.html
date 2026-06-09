@@ -1151,9 +1151,9 @@
 
       <section class="stats-grid" aria-label="Indicadores do dashboard">
         <article class="stat">
-          <span>Produção período</span>
+          <span>Moagem período</span>
           <strong id="dashTotal">0</strong>
-          <small>Intervalo selecionado</small>
+          <small>Sem somar transporte</small>
         </article>
         <article class="stat">
           <span>Frentes próprias</span>
@@ -1178,12 +1178,12 @@
         <article class="stat">
           <span>Transporte próprio</span>
           <strong id="dashOwnTransport">0</strong>
-          <small>No período</small>
+          <small id="dashOwnTransportPercent">0% da moagem</small>
         </article>
         <article class="stat">
           <span>Transporte terceiro</span>
           <strong id="dashThirdTransport">0</strong>
-          <small>No período</small>
+          <small id="dashThirdTransportPercent">0% da moagem</small>
         </article>
         <article class="stat">
           <span>Transp. / moagem</span>
@@ -1198,12 +1198,12 @@
         <article class="stat">
           <span>Acumulado mês</span>
           <strong id="dashMonthAccumulated">0</strong>
-          <small id="dashMonthAccumulatedLabel">Mês selecionado</small>
+          <small id="dashMonthAccumulatedLabel">Moagem do mês</small>
         </article>
         <article class="stat">
           <span>Acumulado total</span>
           <strong id="dashAllAccumulated">0</strong>
-          <small>Todos os lançamentos salvos</small>
+          <small>Moagem salva</small>
         </article>
       </section>
 
@@ -1224,7 +1224,7 @@
 
         <section class="panel">
           <div class="panel-head">
-            <h2>Produção por tipo</h2>
+            <h2>Produção e transporte por tipo</h2>
           </div>
           <div class="panel-body" id="typeChartWrap"></div>
         </section>
@@ -1345,9 +1345,9 @@
 
       <section class="stats-grid" aria-label="Prévia do lançamento">
         <article class="stat">
-          <span>Produção total</span>
+          <span>Moagem do dia</span>
           <strong id="entryTotal">0</strong>
-          <small>Prévia do dia</small>
+          <small>Sem somar transporte</small>
         </article>
         <article class="stat">
           <span>Colheita própria</span>
@@ -1372,12 +1372,12 @@
         <article class="stat">
           <span>Transporte próprio</span>
           <strong id="entryOwnTransport">0</strong>
-          <small>Total diário</small>
+          <small id="entryOwnTransportPercent">0% da moagem</small>
         </article>
         <article class="stat">
           <span>Transporte terceiro</span>
           <strong id="entryThirdTransport">0</strong>
-          <small>Total diário</small>
+          <small id="entryThirdTransportPercent">0% da moagem</small>
         </article>
         <article class="stat">
           <span>Transp. / moagem</span>
@@ -1863,7 +1863,9 @@
       dashFlorestaCane: document.querySelector("#dashFlorestaCane"),
       dashValeCane: document.querySelector("#dashValeCane"),
       dashOwnTransport: document.querySelector("#dashOwnTransport"),
+      dashOwnTransportPercent: document.querySelector("#dashOwnTransportPercent"),
       dashThirdTransport: document.querySelector("#dashThirdTransport"),
+      dashThirdTransportPercent: document.querySelector("#dashThirdTransportPercent"),
       dashTransportTotal: document.querySelector("#dashTransportTotal"),
       dashTransportPercent: document.querySelector("#dashTransportPercent"),
       dashTarget: document.querySelector("#dashTarget"),
@@ -1877,7 +1879,9 @@
       entryFlorestaCane: document.querySelector("#entryFlorestaCane"),
       entryValeCane: document.querySelector("#entryValeCane"),
       entryOwnTransport: document.querySelector("#entryOwnTransport"),
+      entryOwnTransportPercent: document.querySelector("#entryOwnTransportPercent"),
       entryThirdTransport: document.querySelector("#entryThirdTransport"),
+      entryThirdTransportPercent: document.querySelector("#entryThirdTransportPercent"),
       entryTransportTotal: document.querySelector("#entryTransportTotal"),
       entryTransportPercent: document.querySelector("#entryTransportPercent"),
       entryTarget: document.querySelector("#entryTarget"),
@@ -3181,8 +3185,7 @@
       const cleanTargets = getCleanTargets(source);
       return [
         ...cleanTargets.ownFronts.map((row) => row.target),
-        ...cleanTargets.thirdFronts.map((row) => row.target),
-        ...cleanTargets.transports.map((row) => row.target)
+        ...cleanTargets.thirdFronts.map((row) => row.target)
       ].reduce((sum, value) => sum + (Number(value) || 0), 0);
     }
 
@@ -3305,6 +3308,10 @@
         valeCane: 0,
         ownTransport: 0,
         thirdTransport: 0,
+        ownTransportPercent: 0,
+        thirdTransportPercent: 0,
+        transportTotal: 0,
+        transportPercent: 0,
         targetTotal: totalRegisteredTarget() * targetDays,
         rowTargetTotal: 0,
         remaining: 0,
@@ -3317,19 +3324,23 @@
         const value = Number(row.production) || 0;
         const target = targetForRow(row, targets, rowsForSameDate(row, rows));
         const targetKey = `${row.date || "dia"}|${targetKeyForRow(row)}`;
-        summary.total += value;
+        if (!isTransport(row.type)) summary.total += value;
         if (row.type === TYPES.OWN_HARVEST) summary.ownHarvest += value;
         if (row.type === TYPES.THIRD_HARVEST) summary.thirdHarvest += value;
         if (row.type === TYPES.FLORESTA_CANE) summary.florestaCane += value;
         if (row.type === TYPES.VALE_CANE) summary.valeCane += value;
         if (row.type === TYPES.OWN_TRANSPORT) summary.ownTransport += value;
         if (row.type === TYPES.THIRD_TRANSPORT) summary.thirdTransport += value;
-        if (targetKey && !targetKeys.has(targetKey)) {
+        if (targetKey && !isTransport(row.type) && !targetKeys.has(targetKey)) {
           summary.rowTargetTotal += target;
           targetKeys.add(targetKey);
         }
       });
 
+      summary.transportTotal = summary.ownTransport + summary.thirdTransport;
+      summary.ownTransportPercent = progressFor(summary.ownTransport, summary.total);
+      summary.thirdTransportPercent = progressFor(summary.thirdTransport, summary.total);
+      summary.transportPercent = progressFor(summary.transportTotal, summary.total);
       summary.remaining = Math.max(summary.targetTotal - summary.total, 0);
       summary.targetPercent = progressFor(summary.total, summary.targetTotal);
       return summary;
@@ -3450,7 +3461,11 @@
       els[`${prefix}FlorestaCane`].textContent = formatNumber(summary.florestaCane);
       els[`${prefix}ValeCane`].textContent = formatNumber(summary.valeCane);
       els[`${prefix}OwnTransport`].textContent = formatNumber(summary.ownTransport);
+      els[`${prefix}OwnTransportPercent`].textContent = `${formatPercent(summary.ownTransportPercent)} da moagem`;
       els[`${prefix}ThirdTransport`].textContent = formatNumber(summary.thirdTransport);
+      els[`${prefix}ThirdTransportPercent`].textContent = `${formatPercent(summary.thirdTransportPercent)} da moagem`;
+      els[`${prefix}TransportTotal`].textContent = formatNumber(summary.transportTotal);
+      els[`${prefix}TransportPercent`].textContent = `${formatPercent(summary.transportPercent)} sobre moagem`;
       els[`${prefix}Target`].textContent = formatNumber(summary.targetTotal);
       els[`${prefix}TargetStatus`].textContent = `${formatPercent(summary.targetPercent)} atingido em ${targetDays} dia${targetDays === 1 ? "" : "s"} de meta`;
     }
@@ -3607,7 +3622,7 @@
         <div class="goal-overview">
           <div class="goal-main">
             <strong>${formatPercent(summary.targetPercent)}</strong>
-            <span>${formatNumber(summary.total)} produzido de ${formatNumber(summary.targetTotal)} de meta</span>
+            <span>${formatNumber(summary.total)} de moagem de ${formatNumber(summary.targetTotal)} de meta</span>
             <div class="meter-track" aria-label="Meta do período ${formatPercent(summary.targetPercent)}">
               <div class="meter-fill ${summary.targetPercent >= 100 ? "over" : ""}" style="width: ${clampPercent(summary.targetPercent)}%"></div>
             </div>
@@ -3926,6 +3941,11 @@
       const thirdRanking = thirdTransportDailyRanking(sourceRecords);
       const ownTotal = ownRows.reduce((sum, row) => sum + (Number(row.production) || 0), 0);
       const thirdTotal = thirdRows.reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+      const transportTotal = ownTotal + thirdTotal;
+      const moagemTotal = rows.filter((row) => !isTransport(row.type)).reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+      const ownPercent = progressFor(ownTotal, moagemTotal);
+      const thirdPercent = progressFor(thirdTotal, moagemTotal);
+      const transportPercent = progressFor(transportTotal, moagemTotal);
       const truckCount = ownRanking.length;
       const transportDays = new Set(rows.filter((row) => row.type === TYPES.OWN_TRANSPORT || row.type === TYPES.THIRD_TRANSPORT).map((row) => row.date).filter(Boolean)).size;
 
@@ -3947,10 +3967,20 @@
           <div class="goal-metric">
             <span>Transp. próprio</span>
             <strong>${formatNumber(ownTotal)}</strong>
+            <small>${formatPercent(ownPercent)} da moagem</small>
           </div>
           <div class="goal-metric">
             <span>Transp. terceiro</span>
             <strong>${formatNumber(thirdTotal)}</strong>
+            <small>${formatPercent(thirdPercent)} da moagem</small>
+          </div>
+          <div class="goal-metric">
+            <span>Total transp.</span>
+            <strong>${formatNumber(transportTotal)}</strong>
+          </div>
+          <div class="goal-metric">
+            <span>% sobre moagem</span>
+            <strong>${formatPercent(transportPercent)}</strong>
           </div>
           <div class="goal-metric">
             <span>Dias transp.</span>
@@ -3992,7 +4022,7 @@
       const best = [...daily].sort((a, b) => b.total - a.total || a.date.localeCompare(b.date))[0];
       const achievedTargetDays = daily.filter((item) => item.targetPercent >= 100).length;
       const belowDays = daily.filter((item) => item.targetPercent < 85).length;
-      const noTargetRows = rows.filter((row) => !isExternalCane(row.type) && targetForRow(row, targets, rowsForSameDate(row, rows)) <= 0).length;
+      const noTargetRows = rows.filter((row) => !isExternalCane(row.type) && !isTransport(row.type) && targetForRow(row, targets, rowsForSameDate(row, rows)) <= 0).length;
       const monthRange = monthRangeFor(range.end);
       const today = todayInputValue();
       let monthEnd = [range.end, monthRange.end, today].sort()[0];
@@ -4089,8 +4119,9 @@
     }
 
     function renderOperationMix(rows, options = {}) {
-      const total = rows.reduce((sum, row) => sum + (Number(row.production) || 0), 0);
-      if (!total) {
+      const summary = summarizeRows(rows, options);
+      const total = summary.total;
+      if (!total && !summary.transportTotal) {
         els.operationMixWrap.innerHTML = '<div class="empty-state">Sem produção para calcular o mix operacional.</div>';
         return;
       }
@@ -4101,7 +4132,9 @@
         return {
           label: type,
           production,
-          percent: (production / total) * 100,
+          percent: total ? (production / total) * 100 : 0,
+          basis: isTransport(type) ? "sobre moagem" : "da moagem",
+          action: isTransport(type) ? "transportado" : "produzido",
           target: targetForType(type) * targetDays,
           records: rows.filter((row) => row.type === type).length
         };
@@ -4113,13 +4146,13 @@
             <div class="chart-row">
               <div class="chart-row-head">
                 <strong>${escapeHtml(item.label)}</strong>
-                <span>${formatPercent(item.percent)} do total</span>
+                <span>${formatPercent(item.percent)} ${item.basis}</span>
               </div>
               <div class="chart-track" aria-label="${escapeHtml(item.label)} ${formatPercent(item.percent)}">
                 <div class="chart-fill" style="width: ${clampPercent(item.percent)}%"></div>
               </div>
               <div class="chart-row-head">
-                <span>${formatNumber(item.production)} produzido</span>
+                <span>${formatNumber(item.production)} ${item.action}</span>
                 <span>${item.records} registro${item.records === 1 ? "" : "s"} · Meta ${formatNumber(item.target)}</span>
               </div>
             </div>
@@ -4131,9 +4164,9 @@
     function renderDashboardAlerts(selectedRecords, rows, options = {}) {
       const daily = dailySummaries(selectedRecords);
       const summary = summarizeRows(rows, options);
-      const noTargetRows = rows.filter((row) => !isExternalCane(row.type) && targetForRow(row, targets, rowsForSameDate(row, rows)) <= 0);
+      const noTargetRows = rows.filter((row) => !isExternalCane(row.type) && !isTransport(row.type) && targetForRow(row, targets, rowsForSameDate(row, rows)) <= 0);
       const belowTarget = daily.filter((item) => item.targetPercent < 85);
-      const missingTypes = typeOptions.filter((type) => !isExternalCane(type) && !rows.some((row) => row.type === type));
+      const missingTypes = typeOptions.filter((type) => !isExternalCane(type) && !isTransport(type) && !rows.some((row) => row.type === type));
       const alerts = [];
 
       if (!selectedRecords.length) {
@@ -4288,6 +4321,10 @@
             <tr>
               <th>Data</th>
               <th>Produção</th>
+              <th>Transporte</th>
+              <th>% Próprio</th>
+              <th>% Terceiro</th>
+              <th>% Transp./moagem</th>
               <th>Meta</th>
               <th>% Meta</th>
               <th>Falta</th>
@@ -4300,6 +4337,10 @@
               <tr>
                 <td>${formatDate(item.date)}</td>
                 <td>${formatNumber(item.total)}</td>
+                <td>${formatNumber(item.transportTotal)}</td>
+                <td>${formatPercent(item.ownTransportPercent)}</td>
+                <td>${formatPercent(item.thirdTransportPercent)}</td>
+                <td>${formatPercent(item.transportPercent)}</td>
                 <td>${formatNumber(item.targetTotal)}</td>
                 <td>${formatPercent(item.targetPercent)}</td>
                 <td>${formatNumber(item.remaining)}</td>
@@ -4326,6 +4367,10 @@
             ownTransport: productionByType(rows, TYPES.OWN_TRANSPORT),
             thirdTransport: productionByType(rows, TYPES.THIRD_TRANSPORT),
             total: summary.total,
+            transportTotal: summary.transportTotal,
+            ownTransportPercent: summary.ownTransportPercent,
+            thirdTransportPercent: summary.thirdTransportPercent,
+            transportPercent: summary.transportPercent,
             percent: summary.targetPercent
           };
         })
@@ -4349,7 +4394,11 @@
               <th>Cana Floresta</th>
               <th>Cana Vale</th>
               <th>Transp. próprio</th>
+              <th>% próprio</th>
               <th>Transp. terceiro</th>
+              <th>% terceiro</th>
+              <th>Total transp.</th>
+              <th>% transp./moagem</th>
               <th>Total</th>
               <th>% Meta</th>
             </tr>
@@ -4363,7 +4412,11 @@
                 <td>${formatNumber(item.florestaCane)}</td>
                 <td>${formatNumber(item.valeCane)}</td>
                 <td>${formatNumber(item.ownTransport)}</td>
+                <td>${formatPercent(item.ownTransportPercent)}</td>
                 <td>${formatNumber(item.thirdTransport)}</td>
+                <td>${formatPercent(item.thirdTransportPercent)}</td>
+                <td>${formatNumber(item.transportTotal)}</td>
+                <td>${formatPercent(item.transportPercent)}</td>
                 <td>${formatNumber(item.total)}</td>
                 <td>${formatPercent(item.percent)}</td>
               </tr>
@@ -5514,7 +5567,11 @@
               <th>Cana Floresta</th>
               <th>Cana Vale</th>
               <th>Transp. próprio</th>
+              <th>% próprio</th>
               <th>Transp. terceiro</th>
+              <th>% terceiro</th>
+              <th>Total transp.</th>
+              <th>% transp./moagem</th>
               <th>Registros</th>
               <th>Ações</th>
             </tr>
@@ -5534,7 +5591,11 @@
                   <td>${formatNumber(summary.florestaCane)}</td>
                   <td>${formatNumber(summary.valeCane)}</td>
                   <td>${formatNumber(summary.ownTransport)}</td>
+                  <td>${formatPercent(summary.ownTransportPercent)}</td>
                   <td>${formatNumber(summary.thirdTransport)}</td>
+                  <td>${formatPercent(summary.thirdTransportPercent)}</td>
+                  <td>${formatNumber(summary.transportTotal)}</td>
+                  <td>${formatPercent(summary.transportPercent)}</td>
                   <td>${summary.records}</td>
                   <td>
                     <div class="row-buttons">
