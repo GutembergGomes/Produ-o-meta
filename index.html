@@ -1106,7 +1106,7 @@
     <div class="header-inner">
       <div>
         <h1>Produção Diária da Cambuí</h1>
-        <p class="subtitle">Colheita própria por total da frente, transporte próprio por caminhão e terceiro por total.</p>
+        <p class="subtitle">Colheita própria por total da frente, cana recebida de outras unidades, transporte próprio por caminhão e terceiro por total.</p>
       </div>
       <div class="plant-lock" aria-label="Usina fixa">
         <span>Usina fixa</span>
@@ -1166,6 +1166,16 @@
           <small>4007 e 4009</small>
         </article>
         <article class="stat">
+          <span>Cana Floresta</span>
+          <strong id="dashFlorestaCane">0</strong>
+          <small>Recebida em Cambuí</small>
+        </article>
+        <article class="stat">
+          <span>Cana Vale</span>
+          <strong id="dashValeCane">0</strong>
+          <small>Recebida em Cambuí</small>
+        </article>
+        <article class="stat">
           <span>Transporte próprio</span>
           <strong id="dashOwnTransport">0</strong>
           <small>No período</small>
@@ -1174,6 +1184,11 @@
           <span>Transporte terceiro</span>
           <strong id="dashThirdTransport">0</strong>
           <small>No período</small>
+        </article>
+        <article class="stat">
+          <span>Transp. / moagem</span>
+          <strong id="dashTransportTotal">0</strong>
+          <small id="dashTransportPercent">0% sobre moagem</small>
         </article>
         <article class="stat">
           <span>Meta período</span>
@@ -1345,14 +1360,29 @@
           <small>Por frente</small>
         </article>
         <article class="stat">
+          <span>Cana Floresta</span>
+          <strong id="entryFlorestaCane">0</strong>
+          <small>Total recebido</small>
+        </article>
+        <article class="stat">
+          <span>Cana Vale</span>
+          <strong id="entryValeCane">0</strong>
+          <small>Total recebido</small>
+        </article>
+        <article class="stat">
           <span>Transporte próprio</span>
           <strong id="entryOwnTransport">0</strong>
-          <small>Por caminhão</small>
+          <small>Total diário</small>
         </article>
         <article class="stat">
           <span>Transporte terceiro</span>
           <strong id="entryThirdTransport">0</strong>
           <small>Total diário</small>
+        </article>
+        <article class="stat">
+          <span>Transp. / moagem</span>
+          <strong id="entryTransportTotal">0</strong>
+          <small id="entryTransportPercent">0% sobre moagem</small>
         </article>
         <article class="stat">
           <span>Meta total</span>
@@ -1361,9 +1391,9 @@
         </article>
       </section>
 
-      <section class="panel" aria-label="Lançamento por frente de colheita e transporte">
+      <section class="panel" aria-label="Lançamento por frente, outras unidades e transporte">
         <div class="panel-head">
-          <h2>Frentes e transporte</h2>
+          <h2>Frentes, outras unidades e transporte</h2>
         </div>
         <div class="front-grid" id="frontCards">
           <button class="front-card" type="button" data-front="Frente 4001" data-type="Colheita Própria" aria-pressed="false">
@@ -1386,9 +1416,17 @@
             <strong>Frente 4009</strong>
             <span>Terceira · lançar produção</span>
           </button>
+          <button class="front-card" type="button" data-type="Cana Floresta" aria-pressed="false">
+            <strong>Cana Floresta</strong>
+            <span>Outra unidade · lançar total</span>
+          </button>
+          <button class="front-card" type="button" data-type="Cana Vale" aria-pressed="false">
+            <strong>Cana Vale</strong>
+            <span>Outra unidade · lançar total</span>
+          </button>
           <button class="front-card" type="button" data-type="Transporte Próprio" aria-pressed="false">
             <strong>Transporte Próprio</strong>
-            <span>Lançar por caminhão</span>
+            <span>Lançar total transportado</span>
           </button>
           <button class="front-card" type="button" data-type="Transporte Terceiro" aria-pressed="false">
             <strong>Transporte Terceiro</strong>
@@ -1422,7 +1460,7 @@
           <div class="workspace-actions">
             <button class="btn-secondary" id="importFrontFileBtn" type="button">Importar arquivo</button>
             <input class="file-input" id="frontImportFile" type="file" accept=".csv,.json,.txt,.html,.htm,.pdf,.xls,.xlsx,image/*,application/json,text/csv,text/plain,text/html,application/pdf">
-            <span class="workspace-hint">Nas frentes próprias, o arquivo é lido e somado no total da frente. Para caminhões próprios, o importador reconhece frota, caminhão, equipamento, produção, toneladas, quantidade ou total.</span>
+            <span class="workspace-hint">Nas frentes próprias, nas canas de outras unidades e no transporte próprio, o arquivo é lido e somado no total. O importador reconhece produção, toneladas, quantidade, valor ou total.</span>
           </div>
         </div>
       </section>
@@ -1433,6 +1471,8 @@
           <div class="table-actions">
             <button class="btn-secondary" id="addOwnHarvesterBtn" type="button">Total frente própria</button>
             <button class="btn-secondary" id="addThirdFrontBtn" type="button">Frente terceira</button>
+            <button class="btn-secondary" id="addFlorestaCaneBtn" type="button">Cana Floresta</button>
+            <button class="btn-secondary" id="addValeCaneBtn" type="button">Cana Vale</button>
             <button class="btn-secondary" id="addOwnTransportBtn" type="button">Transporte próprio</button>
             <button class="btn-secondary" id="addThirdTransportBtn" type="button">Transporte terceiro</button>
             <button class="btn-secondary" id="resetBtn" type="button">Limpar lançamento</button>
@@ -1444,7 +1484,7 @@
               <tr>
                 <th>Tipo</th>
                 <th>Frente</th>
-                <th>Frota / caminhão</th>
+                <th>Identificação</th>
                 <th>Meta diária</th>
                 <th>Produção diária</th>
                 <th>% Meta</th>
@@ -1716,6 +1756,8 @@
     const TYPES = {
       OWN_HARVEST: "Colheita Própria",
       THIRD_HARVEST: "Colheita Terceira",
+      FLORESTA_CANE: "Cana Floresta",
+      VALE_CANE: "Cana Vale",
       OWN_TRANSPORT: "Transporte Próprio",
       THIRD_TRANSPORT: "Transporte Terceiro"
     };
@@ -1818,8 +1860,12 @@
       dashTotal: document.querySelector("#dashTotal"),
       dashOwnHarvest: document.querySelector("#dashOwnHarvest"),
       dashThirdHarvest: document.querySelector("#dashThirdHarvest"),
+      dashFlorestaCane: document.querySelector("#dashFlorestaCane"),
+      dashValeCane: document.querySelector("#dashValeCane"),
       dashOwnTransport: document.querySelector("#dashOwnTransport"),
       dashThirdTransport: document.querySelector("#dashThirdTransport"),
+      dashTransportTotal: document.querySelector("#dashTransportTotal"),
+      dashTransportPercent: document.querySelector("#dashTransportPercent"),
       dashTarget: document.querySelector("#dashTarget"),
       dashTargetStatus: document.querySelector("#dashTargetStatus"),
       dashMonthAccumulated: document.querySelector("#dashMonthAccumulated"),
@@ -1828,8 +1874,12 @@
       entryTotal: document.querySelector("#entryTotal"),
       entryOwnHarvest: document.querySelector("#entryOwnHarvest"),
       entryThirdHarvest: document.querySelector("#entryThirdHarvest"),
+      entryFlorestaCane: document.querySelector("#entryFlorestaCane"),
+      entryValeCane: document.querySelector("#entryValeCane"),
       entryOwnTransport: document.querySelector("#entryOwnTransport"),
       entryThirdTransport: document.querySelector("#entryThirdTransport"),
+      entryTransportTotal: document.querySelector("#entryTransportTotal"),
+      entryTransportPercent: document.querySelector("#entryTransportPercent"),
       entryTarget: document.querySelector("#entryTarget"),
       entryTargetStatus: document.querySelector("#entryTargetStatus"),
       firebaseApiKey: document.querySelector("#firebaseApiKey"),
@@ -1966,6 +2016,33 @@
       return Math.max(diff, 1);
     }
 
+    function targetInfoForRange(start, end) {
+      const range = normalizeDateRange(start, end);
+      const today = todayInputValue();
+      const selectedDays = daysBetweenInclusive(range.start, range.end);
+
+      if (range.start > today) {
+        return {
+          ...range,
+          selectedDays,
+          targetStart: range.start,
+          targetEnd: range.start,
+          targetDays: 0,
+          cappedAtToday: true
+        };
+      }
+
+      const targetEnd = range.end > today ? today : range.end;
+      return {
+        ...range,
+        selectedDays,
+        targetStart: range.start,
+        targetEnd,
+        targetDays: daysBetweenInclusive(range.start, targetEnd),
+        cappedAtToday: range.end > today
+      };
+    }
+
     function monthRangeFor(date) {
       const value = date || todayInputValue();
       const [year, month] = value.split("-").map(Number);
@@ -1997,10 +2074,26 @@
         "Colheita Própria": TYPES.OWN_HARVEST,
         "Frente Terceira": TYPES.THIRD_HARVEST,
         "Colheita Terceira": TYPES.THIRD_HARVEST,
+        "Cana Floresta": TYPES.FLORESTA_CANE,
+        "Cana da Floresta": TYPES.FLORESTA_CANE,
+        "Floresta": TYPES.FLORESTA_CANE,
+        "Cana Vale": TYPES.VALE_CANE,
+        "Cana do Vale": TYPES.VALE_CANE,
+        "Vale": TYPES.VALE_CANE,
         "Transporte Próprio": TYPES.OWN_TRANSPORT,
         "Transporte Terceiro": TYPES.THIRD_TRANSPORT
       };
       return map[raw] || raw;
+    }
+
+    function isExternalCane(type) {
+      const normalized = normalizeType(type);
+      return normalized === TYPES.FLORESTA_CANE || normalized === TYPES.VALE_CANE;
+    }
+
+    function isTransport(type) {
+      const normalized = normalizeType(type);
+      return normalized === TYPES.OWN_TRANSPORT || normalized === TYPES.THIRD_TRANSPORT;
     }
 
     function isHarvest(type) {
@@ -2012,7 +2105,7 @@
     }
 
     function requiresFleet(type) {
-      return type === TYPES.OWN_TRANSPORT;
+      return false;
     }
 
     function needsFront(type) {
@@ -2021,14 +2114,11 @@
 
     function fleetLabelForType(type) {
       const normalized = normalizeType(type);
-      if (normalized === TYPES.OWN_TRANSPORT) return "Caminhão próprio";
       if (normalized === TYPES.OWN_HARVEST) return "Total da frente";
-      return "Frota";
+      return "Identificação";
     }
 
     function fleetPlaceholderForType(type) {
-      const normalized = normalizeType(type);
-      if (normalized === TYPES.OWN_TRANSPORT) return "Ex.: Caminhão 01";
       return "Ex.: Colhedora 4001-01";
     }
 
@@ -2164,8 +2254,7 @@
         return front ? `${type}|${front}` : "";
       }
       if (type === TYPES.OWN_TRANSPORT) {
-        const fleet = normalizeKey(row.fleet);
-        return fleet ? `${type}|${fleet}` : "";
+        return type;
       }
       if (type === TYPES.THIRD_TRANSPORT) {
         return type;
@@ -3061,15 +3150,6 @@
       return Math.max(fleets.size, 1);
     }
 
-    function ownTransportTruckCount(rowsContext = []) {
-      const trucks = new Set((rowsContext || [])
-        .filter((item) => normalizeType(item.type) === TYPES.OWN_TRANSPORT)
-        .filter((item) => parseNumber(item.production) > 0)
-        .map((item) => normalizeKey(item.fleet))
-        .filter(Boolean));
-      return Math.max(trucks.size, 1);
-    }
-
     function targetForRow(row, source = targets, rowsContext = [row]) {
       const cleanTargets = getCleanTargets(source);
       const type = normalizeType(row.type);
@@ -3086,7 +3166,7 @@
 
       if (type === TYPES.OWN_TRANSPORT) {
         const found = cleanTargets.transports.find((target) => target.type === type);
-        return found ? found.target / ownTransportTruckCount(rowsContext) : 0;
+        return found ? found.target : 0;
       }
 
       if (type === TYPES.THIRD_TRANSPORT) {
@@ -3126,15 +3206,12 @@
       const rawFront = row.front || "";
       const rawFleet = row.fleet || row.truck || row.caminhao || row["caminhão"] || row.equipment || "";
       const production = parseNumber(row.production ?? row.actual ?? row.effective ?? 0);
-      const fleet = options.preserveMissingOwnTransportFleet && type === TYPES.OWN_TRANSPORT && !rawFleet && production > 0
-        ? "Caminhão não informado"
-        : rawFleet;
 
       return {
         id: row.id || makeId(),
         type,
         front: needsFront(type) ? rawFront || defaultFrontFor(type) : "",
-        fleet: requiresFleet(type) ? fleet : "",
+        fleet: requiresFleet(type) ? rawFleet : "",
         production,
         note: row.note || ""
       };
@@ -3224,6 +3301,8 @@
         total: 0,
         ownHarvest: 0,
         thirdHarvest: 0,
+        florestaCane: 0,
+        valeCane: 0,
         ownTransport: 0,
         thirdTransport: 0,
         targetTotal: totalRegisteredTarget() * targetDays,
@@ -3241,6 +3320,8 @@
         summary.total += value;
         if (row.type === TYPES.OWN_HARVEST) summary.ownHarvest += value;
         if (row.type === TYPES.THIRD_HARVEST) summary.thirdHarvest += value;
+        if (row.type === TYPES.FLORESTA_CANE) summary.florestaCane += value;
+        if (row.type === TYPES.VALE_CANE) summary.valeCane += value;
         if (row.type === TYPES.OWN_TRANSPORT) summary.ownTransport += value;
         if (row.type === TYPES.THIRD_TRANSPORT) summary.thirdTransport += value;
         if (targetKey && !targetKeys.has(targetKey)) {
@@ -3362,13 +3443,16 @@
 
     function setStats(prefix, rows, options = {}) {
       const summary = summarizeRows(rows, options);
+      const targetDays = options.targetDays ?? targetDaysForRows(rows);
       els[`${prefix}Total`].textContent = formatNumber(summary.total);
       els[`${prefix}OwnHarvest`].textContent = formatNumber(summary.ownHarvest);
       els[`${prefix}ThirdHarvest`].textContent = formatNumber(summary.thirdHarvest);
+      els[`${prefix}FlorestaCane`].textContent = formatNumber(summary.florestaCane);
+      els[`${prefix}ValeCane`].textContent = formatNumber(summary.valeCane);
       els[`${prefix}OwnTransport`].textContent = formatNumber(summary.ownTransport);
       els[`${prefix}ThirdTransport`].textContent = formatNumber(summary.thirdTransport);
       els[`${prefix}Target`].textContent = formatNumber(summary.targetTotal);
-      els[`${prefix}TargetStatus`].textContent = `${formatPercent(summary.targetPercent)} atingido`;
+      els[`${prefix}TargetStatus`].textContent = `${formatPercent(summary.targetPercent)} atingido em ${targetDays} dia${targetDays === 1 ? "" : "s"} de meta`;
     }
 
     function clampPercent(value) {
@@ -3436,7 +3520,7 @@
     }
 
     function isMoagemRow(row) {
-      return row.type === TYPES.OWN_HARVEST || row.type === TYPES.THIRD_HARVEST;
+      return row.type === TYPES.OWN_HARVEST || row.type === TYPES.THIRD_HARVEST || isExternalCane(row.type);
     }
 
     function safraRealForMonth(month) {
@@ -3561,9 +3645,13 @@
           ? "Frentes 4001, 4002 e 4003"
           : type === TYPES.THIRD_HARVEST
             ? "Frentes 4007 e 4009"
-            : type === TYPES.OWN_TRANSPORT
-              ? "Por caminhão próprio"
-              : "Total transportado por terceiros"
+            : type === TYPES.FLORESTA_CANE
+              ? "Cana recebida da Floresta"
+              : type === TYPES.VALE_CANE
+                ? "Cana recebida da Vale"
+                : type === TYPES.OWN_TRANSPORT
+                  ? "Total transportado próprio"
+                  : "Total transportado por terceiros"
       }));
 
       els.typeChartWrap.innerHTML = `
@@ -3711,12 +3799,11 @@
       const grouped = new Map();
       rows
         .filter((row) => row.type === TYPES.OWN_TRANSPORT)
-        .filter((row) => row.fleet)
         .forEach((row) => {
-          const key = normalizeKey(row.fleet);
+          const key = row.date || "sem-data";
           if (!grouped.has(key)) {
             grouped.set(key, {
-              fleet: row.fleet,
+              fleet: row.date ? formatDate(row.date) : "Transporte próprio",
               production: 0,
               target: 0,
               records: 0,
@@ -3763,7 +3850,7 @@
 
     function renderOwnTruckRankingList(ranking) {
       if (!ranking.length) {
-        return '<div class="empty-state">Sem caminhões próprios lançados neste período.</div>';
+        return '<div class="empty-state">Sem transporte próprio lançado neste período.</div>';
       }
 
       return `
@@ -3784,7 +3871,7 @@
                     <div class="rank-fill ${item.percent >= 100 ? "over" : ""}" style="width: ${width}%"></div>
                   </div>
                   <div class="rank-values">
-                    <span>${formatNumber(item.production)} transportado · ${item.days} dia${item.days === 1 ? "" : "s"}</span>
+                    <span>${formatNumber(item.production)} transportado no dia</span>
                     <span>${hasTarget ? `Meta ${formatNumber(item.target)} · Falta ${formatNumber(item.remaining)}` : `${item.records} lançamento${item.records === 1 ? "" : "s"}`}</span>
                   </div>
                 </div>
@@ -3866,7 +3953,7 @@
             <strong>${formatNumber(thirdTotal)}</strong>
           </div>
           <div class="goal-metric">
-            <span>Caminhões / dias</span>
+            <span>Dias transp.</span>
             <strong>${truckCount} / ${transportDays}</strong>
           </div>
         </div>
@@ -3877,8 +3964,8 @@
         <div class="transport-ranking-grid">
           <section>
             <div class="chart-row-head" style="margin-bottom: 10px;">
-              <strong>Caminhões próprios</strong>
-              <span>Ranking por produção</span>
+              <strong>Transporte próprio</strong>
+              <span>Maiores dias</span>
             </div>
             ${renderOwnTruckRankingList(ownRanking)}
           </section>
@@ -3895,20 +3982,25 @@
 
     function renderAdvancedKpis(selectedRecords, rows, range, options = {}) {
       const summary = summarizeRows(rows, options);
+      const targetInfo = options.targetInfo || targetInfoForRange(range.start, range.end);
       const activeDays = selectedRecords.length;
-      const calendarDays = daysBetweenInclusive(range.start, range.end);
+      const selectedDays = targetInfo.selectedDays;
+      const targetWindowDays = options.targetDays ?? targetInfo.targetDays;
       const averageActive = activeDays ? summary.total / activeDays : 0;
-      const averageCalendar = calendarDays ? summary.total / calendarDays : 0;
+      const averageCalendar = targetWindowDays ? summary.total / targetWindowDays : 0;
       const daily = dailySummaries(selectedRecords);
       const best = [...daily].sort((a, b) => b.total - a.total || a.date.localeCompare(b.date))[0];
-      const targetDays = daily.filter((item) => item.targetPercent >= 100).length;
+      const achievedTargetDays = daily.filter((item) => item.targetPercent >= 100).length;
       const belowDays = daily.filter((item) => item.targetPercent < 85).length;
-      const noTargetRows = rows.filter((row) => targetForRow(row, targets, rowsForSameDate(row, rows)) <= 0).length;
+      const noTargetRows = rows.filter((row) => !isExternalCane(row.type) && targetForRow(row, targets, rowsForSameDate(row, rows)) <= 0).length;
       const monthRange = monthRangeFor(range.end);
-      const monthEnd = range.end > monthRange.end ? monthRange.end : range.end;
-      const monthRecords = recordsForRange(monthRange.start, monthEnd);
+      const today = todayInputValue();
+      let monthEnd = [range.end, monthRange.end, today].sort()[0];
+      if (monthEnd < monthRange.start) monthEnd = monthRange.start;
+      const monthRecords = monthRange.start > today ? [] : recordsForRange(monthRange.start, monthEnd);
       const monthRows = rowsFromRecords(monthRecords);
-      const monthSummary = summarizeRows(monthRows, { targetDays: monthRecords.length });
+      const monthTargetInfo = targetInfoForRange(monthRange.start, monthEnd);
+      const monthSummary = summarizeRows(monthRows, { targetDays: monthTargetInfo.targetDays });
       const monthElapsedDays = daysBetweenInclusive(monthRange.start, monthEnd);
       const monthTotalDays = daysBetweenInclusive(monthRange.start, monthRange.end);
       const projectedMonth = monthElapsedDays ? (monthSummary.total / monthElapsedDays) * monthTotalDays : 0;
@@ -3917,7 +4009,15 @@
         <div class="advanced-metrics">
           <div class="goal-metric">
             <span>Dias lançados</span>
-            <strong>${activeDays}/${calendarDays}</strong>
+            <strong>${activeDays}</strong>
+          </div>
+          <div class="goal-metric">
+            <span>Dias para meta</span>
+            <strong>${targetWindowDays}</strong>
+          </div>
+          <div class="goal-metric">
+            <span>Dias selecionados</span>
+            <strong>${selectedDays}</strong>
           </div>
           <div class="goal-metric">
             <span>Média ativa</span>
@@ -3928,8 +4028,8 @@
             <strong>${formatNumber(averageCalendar)}</strong>
           </div>
           <div class="goal-metric">
-            <span>Dias meta</span>
-            <strong>${targetDays}</strong>
+            <span>Dias meta batida</span>
+            <strong>${achievedTargetDays}</strong>
           </div>
           <div class="goal-metric">
             <span>Abaixo 85%</span>
@@ -4031,9 +4131,9 @@
     function renderDashboardAlerts(selectedRecords, rows, options = {}) {
       const daily = dailySummaries(selectedRecords);
       const summary = summarizeRows(rows, options);
-      const noTargetRows = rows.filter((row) => targetForRow(row, targets, rowsForSameDate(row, rows)) <= 0);
+      const noTargetRows = rows.filter((row) => !isExternalCane(row.type) && targetForRow(row, targets, rowsForSameDate(row, rows)) <= 0);
       const belowTarget = daily.filter((item) => item.targetPercent < 85);
-      const missingTypes = typeOptions.filter((type) => !rows.some((row) => row.type === type));
+      const missingTypes = typeOptions.filter((type) => !isExternalCane(type) && !rows.some((row) => row.type === type));
       const alerts = [];
 
       if (!selectedRecords.length) {
@@ -4221,6 +4321,8 @@
             date: record.date,
             ownHarvest: productionByType(rows, TYPES.OWN_HARVEST),
             thirdHarvest: productionByType(rows, TYPES.THIRD_HARVEST),
+            florestaCane: productionByType(rows, TYPES.FLORESTA_CANE),
+            valeCane: productionByType(rows, TYPES.VALE_CANE),
             ownTransport: productionByType(rows, TYPES.OWN_TRANSPORT),
             thirdTransport: productionByType(rows, TYPES.THIRD_TRANSPORT),
             total: summary.total,
@@ -4244,6 +4346,8 @@
               <th>Data</th>
               <th>Colheita própria</th>
               <th>Colheita terceira</th>
+              <th>Cana Floresta</th>
+              <th>Cana Vale</th>
               <th>Transp. próprio</th>
               <th>Transp. terceiro</th>
               <th>Total</th>
@@ -4256,6 +4360,8 @@
                 <td>${formatDate(item.date)}</td>
                 <td>${formatNumber(item.ownHarvest)}</td>
                 <td>${formatNumber(item.thirdHarvest)}</td>
+                <td>${formatNumber(item.florestaCane)}</td>
+                <td>${formatNumber(item.valeCane)}</td>
                 <td>${formatNumber(item.ownTransport)}</td>
                 <td>${formatNumber(item.thirdTransport)}</td>
                 <td>${formatNumber(item.total)}</td>
@@ -4270,27 +4376,35 @@
     function renderDashboard() {
       const range = dashboardRange();
       setDashboardRange(range.start, range.end);
+      const targetInfo = targetInfoForRange(range.start, range.end);
       const selectedRecords = recordsForRange(range.start, range.end);
       const rows = rowsFromRecords(selectedRecords);
-      const targetDays = selectedRecords.length;
+      const targetDays = targetInfo.targetDays;
       const rangeLabel = range.start === range.end
         ? formatDate(range.start)
         : `${formatDate(range.start)} a ${formatDate(range.end)}`;
       const monthRange = monthRangeFor(range.end);
       const monthRecords = recordsForRange(monthRange.start, monthRange.end);
-      const monthSummary = summarizeRows(rowsFromRecords(monthRecords), { targetDays: monthRecords.length });
+      const monthTargetInfo = targetInfoForRange(monthRange.start, monthRange.end);
+      const monthSummary = summarizeRows(rowsFromRecords(monthRecords), { targetDays: monthTargetInfo.targetDays });
       const allRecords = getCleanRecords(records);
-      const allSummary = summarizeRows(rowsFromRecords(allRecords), { targetDays: allRecords.length });
+      const allTargetInfo = allRecords.length
+        ? targetInfoForRange(allRecords[0].date, allRecords[allRecords.length - 1].date)
+        : { targetDays: 0 };
+      const allSummary = summarizeRows(rowsFromRecords(allRecords), { targetDays: allTargetInfo.targetDays });
+      const targetLabel = targetInfo.targetDays
+        ? ` Meta calculada por ${targetInfo.targetDays} dia${targetInfo.targetDays === 1 ? "" : "s"} (${formatDate(targetInfo.targetStart)} a ${formatDate(targetInfo.targetEnd)}).`
+        : " Meta do período sem dias vencidos para calcular.";
 
       els.dashboardSource.textContent = selectedRecords.length
-        ? `${selectedRecords.length} lançamento${selectedRecords.length === 1 ? "" : "s"} no período ${rangeLabel}.`
-        : `Nenhum lançamento salvo no período ${rangeLabel}.`;
+        ? `${selectedRecords.length} lançamento${selectedRecords.length === 1 ? "" : "s"} no período ${rangeLabel}.${targetLabel}`
+        : `Nenhum lançamento salvo no período ${rangeLabel}.${targetLabel}`;
       els.dashMonthAccumulated.textContent = formatNumber(monthSummary.total);
       els.dashMonthAccumulatedLabel.textContent = `Mês ${formatMonth(range.end)}`;
       els.dashAllAccumulated.textContent = formatNumber(allSummary.total);
 
       setStats("dash", rows, { targetDays });
-      renderAdvancedKpis(selectedRecords, rows, range, { targetDays });
+      renderAdvancedKpis(selectedRecords, rows, range, { targetDays, targetInfo });
       renderDashboardCharts(rows, { targetDays });
       renderDailyTrend(selectedRecords);
       renderOperationMix(rows, { targetDays });
@@ -4423,12 +4537,17 @@
 
     function openFrontWorkspace(front, type) {
       activeFront = { front: front || "", type: normalizeType(type) };
-      const isTransport = !needsFront(activeFront.type);
+      const isOwnTransport = activeFront.type === TYPES.OWN_TRANSPORT;
+      const isTransport = activeFront.type === TYPES.THIRD_TRANSPORT;
       const fleetLabel = fleetLabelForType(activeFront.type);
       els.frontWorkspace.hidden = false;
       els.activeFrontTitle.textContent = activeFront.front ? `${activeFront.front} · ${activeFront.type}` : activeFront.type;
       els.activeFrontHint.textContent = requiresFleet(activeFront.type)
         ? `Informe ${fleetLabel.toLowerCase()} e a produção, ou importe um arquivo do sistema.`
+        : isExternalCane(activeFront.type)
+          ? "Informe o total de cana enviada para Cambuí, ou importe um arquivo do sistema."
+        : isOwnTransport
+          ? "Informe o total transportado pelo transporte próprio, ou importe um arquivo do sistema."
         : isTransport
           ? "Informe o total transportado por terceiros, ou importe um arquivo do sistema."
           : "Informe a produção da frente, ou importe um arquivo do sistema.";
@@ -4508,7 +4627,7 @@
       els.manualNote.value = "";
       renderEntry();
       const toastMessage = activeFront.type === TYPES.OWN_TRANSPORT
-        ? "Produção do caminhão adicionada à conferência."
+        ? "Transporte próprio adicionado à conferência."
         : "Produção adicionada à conferência.";
       showToast(toastMessage);
     }
@@ -5308,7 +5427,7 @@
 
       const missingFleet = entries.some((row) => requiresFleet(row.type) && parseNumber(row.production) > 0 && !String(row.fleet || "").trim());
       if (missingFleet) {
-        showToast("Informe o caminhão próprio antes de salvar.");
+        showToast("Informe a identificação obrigatória antes de salvar.");
         return;
       }
 
@@ -5392,6 +5511,8 @@
               <th>Falta</th>
               <th>Frentes próprias</th>
               <th>Frentes terceiras</th>
+              <th>Cana Floresta</th>
+              <th>Cana Vale</th>
               <th>Transp. próprio</th>
               <th>Transp. terceiro</th>
               <th>Registros</th>
@@ -5410,6 +5531,8 @@
                   <td>${formatNumber(summary.remaining)}</td>
                   <td>${formatNumber(summary.ownHarvest)}</td>
                   <td>${formatNumber(summary.thirdHarvest)}</td>
+                  <td>${formatNumber(summary.florestaCane)}</td>
+                  <td>${formatNumber(summary.valeCane)}</td>
                   <td>${formatNumber(summary.ownTransport)}</td>
                   <td>${formatNumber(summary.thirdTransport)}</td>
                   <td>${summary.records}</td>
@@ -5733,6 +5856,8 @@
     document.querySelector("#deleteDayBtn").addEventListener("click", deleteSelectedDay);
     document.querySelector("#addOwnHarvesterBtn").addEventListener("click", () => addEntry(TYPES.OWN_HARVEST));
     document.querySelector("#addThirdFrontBtn").addEventListener("click", () => addEntry(TYPES.THIRD_HARVEST));
+    document.querySelector("#addFlorestaCaneBtn").addEventListener("click", () => addEntry(TYPES.FLORESTA_CANE));
+    document.querySelector("#addValeCaneBtn").addEventListener("click", () => addEntry(TYPES.VALE_CANE));
     document.querySelector("#addOwnTransportBtn").addEventListener("click", () => addEntry(TYPES.OWN_TRANSPORT));
     document.querySelector("#addThirdTransportBtn").addEventListener("click", () => addEntry(TYPES.THIRD_TRANSPORT));
     document.querySelector("#resetBtn").addEventListener("click", resetEntries);
