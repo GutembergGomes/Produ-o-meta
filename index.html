@@ -287,6 +287,53 @@
       grid-template-columns: repeat(2, minmax(160px, 220px)) 1fr auto;
     }
 
+    .report-period-filter {
+      grid-template-columns: repeat(2, minmax(160px, 220px)) minmax(260px, 1fr) auto;
+    }
+
+    .report-advanced-filter {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(145px, 1fr)) auto;
+      gap: 12px;
+      align-items: end;
+      padding: 14px 16px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .report-advanced-filter .actions {
+      align-self: end;
+    }
+
+    .report-filter-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-height: 34px;
+      align-items: center;
+      color: var(--muted);
+      font-size: .82rem;
+      font-weight: 780;
+    }
+
+    .report-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 3px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface-2);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .report-print-title {
+      display: none;
+    }
+
     .filter-note {
       min-height: 40px;
       display: flex;
@@ -470,6 +517,12 @@
       line-height: 1;
     }
 
+    .goal-metric small {
+      color: var(--muted);
+      font-size: .76rem;
+      font-weight: 730;
+    }
+
     .chart-list {
       display: grid;
       gap: 13px;
@@ -532,6 +585,36 @@
       font-weight: 800;
       text-align: right;
       white-space: nowrap;
+    }
+
+    .report-evolution-head {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .report-evolution-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .report-evolution-row {
+      display: grid;
+      gap: 7px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-3);
+    }
+
+    .report-evolution-meta {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 760;
     }
 
     .mix-grid {
@@ -1010,6 +1093,11 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
+      .report-evolution-head,
+      .report-evolution-meta {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
       .trend-row {
         grid-template-columns: 76px minmax(0, 1fr);
       }
@@ -1022,6 +1110,10 @@
       .transport-ranking-grid,
       .transport-summary {
         grid-template-columns: 1fr;
+      }
+
+      .report-advanced-filter {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
       }
 
       .settings-grid {
@@ -1039,6 +1131,11 @@
         grid-template-columns: 1fr;
       }
 
+      .report-period-filter,
+      .report-advanced-filter {
+        grid-template-columns: 1fr;
+      }
+
       .settings-grid {
         grid-template-columns: 1fr;
       }
@@ -1048,6 +1145,11 @@
       }
 
       .advanced-metrics {
+        grid-template-columns: 1fr;
+      }
+
+      .report-evolution-head,
+      .report-evolution-meta {
         grid-template-columns: 1fr;
       }
 
@@ -1078,15 +1180,45 @@
     @media print {
       body {
         background: white;
+        color: #111827;
       }
 
       .nav-band,
       .filter-bar,
+      .report-advanced-filter,
+      .report-filter-summary,
       .table-actions,
       .history-actions,
       .row-buttons,
       .toast {
         display: none !important;
+      }
+
+      body.print-reports .app-header,
+      body.print-reports .view:not(#reportsView) {
+        display: none !important;
+      }
+
+      body.print-reports #reportsView {
+        display: grid !important;
+        gap: 12px;
+      }
+
+      body.print-reports .report-print-title {
+        display: block;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #111827;
+      }
+
+      body.print-reports .report-print-title h1 {
+        margin: 0 0 4px;
+        font-size: 1.35rem;
+      }
+
+      body.print-reports .report-print-title p {
+        margin: 0;
+        color: #4b5563;
+        font-weight: 700;
       }
 
       .main,
@@ -1097,6 +1229,10 @@
       .panel,
       .stat {
         box-shadow: none;
+      }
+
+      table {
+        font-size: 10px;
       }
     }
   </style>
@@ -1118,6 +1254,7 @@
   <nav class="nav-band" aria-label="Navegação principal">
     <div class="nav-inner">
       <button class="nav-tab" type="button" data-view="dashboard" aria-selected="true">Dashboard</button>
+      <button class="nav-tab" type="button" data-view="reports" aria-selected="false">Relatórios Gerenciais</button>
       <button class="nav-tab" type="button" data-view="entry" aria-selected="false">Lançamento Diário</button>
       <button class="nav-tab" type="button" data-view="targets" aria-selected="false">Metas Diárias</button>
       <button class="nav-tab" type="button" data-view="history" aria-selected="false">Histórico</button>
@@ -1323,6 +1460,197 @@
           <h2>Lançamentos do período</h2>
         </div>
         <div class="table-wrap" id="dashboardRowsWrap"></div>
+      </section>
+    </section>
+
+    <section class="view" id="reportsView" hidden>
+      <div class="report-print-title" id="reportsPrintTitle">
+        <h1>Relatório Gerencial - Produção Diária da Cambuí</h1>
+        <p id="reportsPrintSubtitle">Período selecionado</p>
+      </div>
+
+      <div class="filter-bar dashboard-filter report-period-filter">
+        <div class="field">
+          <label for="reportsStartDate">Início do período</label>
+          <input id="reportsStartDate" type="date">
+        </div>
+        <div class="field">
+          <label for="reportsEndDate">Fim do período</label>
+          <input id="reportsEndDate" type="date">
+        </div>
+        <div class="filter-note" id="reportsSource">Selecione um período para gerar o relatório.</div>
+        <div class="actions">
+          <button class="btn-secondary" id="reportsTodayBtn" type="button">Hoje</button>
+          <button class="btn-secondary" id="reportsWeekBtn" type="button">Semana</button>
+          <button class="btn-secondary" id="reportsMonthBtn" type="button">Mês atual</button>
+          <button class="btn-secondary" id="reportsSafraBtn" type="button">Safra 2026</button>
+          <button class="btn-secondary" id="reportsAllBtn" type="button">Todo acumulado</button>
+          <button class="btn-secondary" id="exportReportsCsvBtn" type="button">CSV</button>
+          <button class="btn-primary" id="printReportsBtn" type="button">Gerar PDF</button>
+        </div>
+      </div>
+
+      <div class="report-advanced-filter" aria-label="Filtros avançados do relatório gerencial">
+        <div class="field">
+          <label for="reportsTypeFilter">Operação</label>
+          <select id="reportsTypeFilter">
+            <option value="all">Todas as operações</option>
+            <option value="harvest">Somente colheita/moagem</option>
+            <option value="external">Somente cana de outras unidades</option>
+            <option value="transport">Somente transporte</option>
+            <option value="own-harvest">Colheita própria</option>
+            <option value="third-harvest">Colheita terceira</option>
+            <option value="floresta-cane">Cana Floresta</option>
+            <option value="vale-cane">Cana Vale</option>
+            <option value="own-transport">Transporte próprio</option>
+            <option value="third-transport">Transporte terceiro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="reportsOriginFilter">Origem / frente</label>
+          <select id="reportsOriginFilter">
+            <option value="all">Todas as origens</option>
+            <option value="Frente 4001">Frente 4001</option>
+            <option value="Frente 4002">Frente 4002</option>
+            <option value="Frente 4003">Frente 4003</option>
+            <option value="Frente 4007">Frente 4007</option>
+            <option value="Frente 4009">Frente 4009</option>
+            <option value="Cana Floresta">Cana Floresta</option>
+            <option value="Cana Vale">Cana Vale</option>
+            <option value="Transporte Próprio">Transporte próprio</option>
+            <option value="Transporte Terceiro">Transporte terceiro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="reportsStatusFilter">Status do dia</label>
+          <select id="reportsStatusFilter">
+            <option value="all">Todos os dias</option>
+            <option value="achieved">Meta batida</option>
+            <option value="near">Entre 85% e 100%</option>
+            <option value="below">Abaixo de 85%</option>
+            <option value="open">Meta em aberto</option>
+            <option value="transport-gap">Transporte diferente da moagem</option>
+            <option value="no-transport">Sem transporte lançado</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="reportsMinProduction">Moagem mínima/dia</label>
+          <input id="reportsMinProduction" inputmode="decimal" placeholder="Ex.: 4.000">
+        </div>
+        <div class="field">
+          <label for="reportsSort">Ordenar diário</label>
+          <select id="reportsSort">
+            <option value="date-desc">Data recente</option>
+            <option value="date-asc">Data antiga</option>
+            <option value="production-desc">Maior moagem</option>
+            <option value="production-asc">Menor moagem</option>
+            <option value="target-desc">Maior % meta</option>
+            <option value="transport-desc">Maior % transporte</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="reportsSearch">Buscar</label>
+          <input id="reportsSearch" type="search" placeholder="Tipo, frente, observação">
+        </div>
+        <div class="actions">
+          <button class="btn-secondary" id="clearReportsFiltersBtn" type="button">Limpar filtros</button>
+        </div>
+      </div>
+
+      <div class="report-filter-summary" id="reportsFilterSummaryWrap"></div>
+
+      <section class="stats-grid" id="reportsKpiWrap" aria-label="Indicadores gerenciais"></section>
+
+      <section class="dashboard-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Resumo executivo</h2>
+          </div>
+          <div class="panel-body" id="reportsExecutiveWrap"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Leitura gerencial</h2>
+          </div>
+          <div class="panel-body" id="reportsInsightsWrap"></div>
+        </section>
+      </section>
+
+      <section class="dashboard-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Participação na moagem</h2>
+          </div>
+          <div class="panel-body" id="reportsParticipationWrap"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Transporte sobre moagem</h2>
+          </div>
+          <div class="panel-body" id="reportsTransportWrap"></div>
+        </section>
+      </section>
+
+      <section class="dashboard-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Origem da cana</h2>
+          </div>
+          <div class="table-wrap" id="reportsFrontWrap"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Detalhamento por operação</h2>
+          </div>
+          <div class="table-wrap" id="reportsTypeWrap"></div>
+        </section>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Ranking do período</h2>
+        </div>
+        <div class="panel-body" id="reportsRankingWrap"></div>
+      </section>
+
+      <section class="dashboard-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Evolução diária</h2>
+          </div>
+          <div class="panel-body" id="reportsDailyEvolutionWrap"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Evolução acumulada</h2>
+          </div>
+          <div class="table-wrap" id="reportsAccumulatedEvolutionWrap"></div>
+        </section>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Planejamento x real mensal</h2>
+        </div>
+        <div class="table-wrap" id="reportsMonthWrap"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Relatório diário gerencial</h2>
+        </div>
+        <div class="table-wrap" id="reportsDailyWrap"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Lançamentos filtrados</h2>
+        </div>
+        <div class="table-wrap" id="reportsRowsWrap"></div>
       </section>
     </section>
 
@@ -1807,6 +2135,7 @@
 
     const els = {
       dashboardView: document.querySelector("#dashboardView"),
+      reportsView: document.querySelector("#reportsView"),
       entryView: document.querySelector("#entryView"),
       targetsView: document.querySelector("#targetsView"),
       historyView: document.querySelector("#historyView"),
@@ -1815,6 +2144,30 @@
       dashboardStartDate: document.querySelector("#dashboardStartDate"),
       dashboardEndDate: document.querySelector("#dashboardEndDate"),
       dashboardSource: document.querySelector("#dashboardSource"),
+      reportsStartDate: document.querySelector("#reportsStartDate"),
+      reportsEndDate: document.querySelector("#reportsEndDate"),
+      reportsSource: document.querySelector("#reportsSource"),
+      reportsTypeFilter: document.querySelector("#reportsTypeFilter"),
+      reportsOriginFilter: document.querySelector("#reportsOriginFilter"),
+      reportsStatusFilter: document.querySelector("#reportsStatusFilter"),
+      reportsMinProduction: document.querySelector("#reportsMinProduction"),
+      reportsSort: document.querySelector("#reportsSort"),
+      reportsSearch: document.querySelector("#reportsSearch"),
+      reportsFilterSummaryWrap: document.querySelector("#reportsFilterSummaryWrap"),
+      reportsPrintSubtitle: document.querySelector("#reportsPrintSubtitle"),
+      reportsKpiWrap: document.querySelector("#reportsKpiWrap"),
+      reportsExecutiveWrap: document.querySelector("#reportsExecutiveWrap"),
+      reportsInsightsWrap: document.querySelector("#reportsInsightsWrap"),
+      reportsParticipationWrap: document.querySelector("#reportsParticipationWrap"),
+      reportsTransportWrap: document.querySelector("#reportsTransportWrap"),
+      reportsFrontWrap: document.querySelector("#reportsFrontWrap"),
+      reportsTypeWrap: document.querySelector("#reportsTypeWrap"),
+      reportsRankingWrap: document.querySelector("#reportsRankingWrap"),
+      reportsDailyEvolutionWrap: document.querySelector("#reportsDailyEvolutionWrap"),
+      reportsAccumulatedEvolutionWrap: document.querySelector("#reportsAccumulatedEvolutionWrap"),
+      reportsMonthWrap: document.querySelector("#reportsMonthWrap"),
+      reportsDailyWrap: document.querySelector("#reportsDailyWrap"),
+      reportsRowsWrap: document.querySelector("#reportsRowsWrap"),
       entryDate: document.querySelector("#entryDate"),
       frontCards: [...document.querySelectorAll(".front-card")],
       frontWorkspace: document.querySelector("#frontWorkspace"),
@@ -2792,6 +3145,7 @@
       renderTargets();
       refreshEntryFromSelectedDate({ silent: true });
       renderDashboard();
+      renderManagementReports();
       renderHistory();
       return true;
     }
@@ -2850,6 +3204,7 @@
       renderTargets();
       refreshEntryFromSelectedDate({ silent: true });
       renderDashboard();
+      renderManagementReports();
       renderHistory();
       return normalized.length;
     }
@@ -3498,6 +3853,7 @@
     function switchView(name) {
       const views = {
         dashboard: els.dashboardView,
+        reports: els.reportsView,
         entry: els.entryView,
         targets: els.targetsView,
         history: els.historyView
@@ -3509,6 +3865,7 @@
       els.navTabs.forEach((tab) => tab.setAttribute("aria-selected", String(tab.dataset.view === name)));
 
       if (name === "dashboard") renderDashboard();
+      if (name === "reports") renderManagementReports();
       if (name === "entry") renderEntry();
       if (name === "targets") renderTargets();
       if (name === "history") renderHistory();
@@ -4679,6 +5036,1002 @@
       `;
     }
 
+    function managementRange() {
+      return normalizeDateRange(els.reportsStartDate.value, els.reportsEndDate.value);
+    }
+
+    function managementFilters() {
+      return {
+        type: els.reportsTypeFilter.value || "all",
+        origin: els.reportsOriginFilter.value || "all",
+        status: els.reportsStatusFilter.value || "all",
+        minProduction: Math.max(0, parseNumber(els.reportsMinProduction.value)),
+        sort: els.reportsSort.value || "date-desc",
+        search: normalizeKey(els.reportsSearch.value)
+      };
+    }
+
+    function hasManagementRowFilters(filters = managementFilters()) {
+      return filters.type !== "all" || filters.origin !== "all" || Boolean(filters.search);
+    }
+
+    function hasManagementDailyFilters(filters = managementFilters()) {
+      return filters.status !== "all" || filters.minProduction > 0;
+    }
+
+    function setManagementRange(start, end) {
+      const range = normalizeDateRange(start, end);
+      els.reportsStartDate.value = range.start;
+      els.reportsEndDate.value = range.end;
+    }
+
+    function resetManagementFilters() {
+      els.reportsTypeFilter.value = "all";
+      els.reportsOriginFilter.value = "all";
+      els.reportsStatusFilter.value = "all";
+      els.reportsMinProduction.value = "";
+      els.reportsSort.value = "date-desc";
+      els.reportsSearch.value = "";
+    }
+
+    function reportTypeLabel(value) {
+      const labels = {
+        all: "Todas as operações",
+        harvest: "Somente colheita/moagem",
+        external: "Somente cana de outras unidades",
+        transport: "Somente transporte",
+        "own-harvest": "Colheita própria",
+        "third-harvest": "Colheita terceira",
+        "floresta-cane": "Cana Floresta",
+        "vale-cane": "Cana Vale",
+        "own-transport": "Transporte próprio",
+        "third-transport": "Transporte terceiro"
+      };
+      return labels[value] || value || "Todas as operações";
+    }
+
+    function reportStatusLabel(value) {
+      const labels = {
+        all: "Todos os dias",
+        achieved: "Meta batida",
+        near: "Entre 85% e 100%",
+        below: "Abaixo de 85%",
+        open: "Meta em aberto",
+        "transport-gap": "Transporte diferente da moagem",
+        "no-transport": "Sem transporte lançado"
+      };
+      return labels[value] || value || "Todos os dias";
+    }
+
+    function reportOriginForRow(row) {
+      const type = normalizeType(row.type);
+      if (row.front) return row.front;
+      if (type === TYPES.FLORESTA_CANE) return "Cana Floresta";
+      if (type === TYPES.VALE_CANE) return "Cana Vale";
+      if (type === TYPES.OWN_TRANSPORT) return "Transporte Próprio";
+      if (type === TYPES.THIRD_TRANSPORT) return "Transporte Terceiro";
+      return type || "Sem origem";
+    }
+
+    function managementTypeMatches(row, filter) {
+      const type = normalizeType(row.type);
+      if (!filter || filter === "all") return true;
+      if (filter === "harvest") return !isTransport(type);
+      if (filter === "external") return isExternalCane(type);
+      if (filter === "transport") return isTransport(type);
+      if (filter === "own-harvest") return type === TYPES.OWN_HARVEST;
+      if (filter === "third-harvest") return type === TYPES.THIRD_HARVEST;
+      if (filter === "floresta-cane") return type === TYPES.FLORESTA_CANE;
+      if (filter === "vale-cane") return type === TYPES.VALE_CANE;
+      if (filter === "own-transport") return type === TYPES.OWN_TRANSPORT;
+      if (filter === "third-transport") return type === TYPES.THIRD_TRANSPORT;
+      return true;
+    }
+
+    function managementStatusMatches(summary, status) {
+      if (!status || status === "all") return true;
+      if (status === "achieved") return summary.targetTotal > 0 && summary.targetPercent >= 100;
+      if (status === "near") return summary.targetTotal > 0 && summary.targetPercent >= 85 && summary.targetPercent < 100;
+      if (status === "below") return summary.targetTotal > 0 && summary.targetPercent < 85;
+      if (status === "open") return summary.targetTotal > 0 && summary.targetPercent < 100;
+      if (status === "transport-gap") return Math.abs(summary.transportTotal - summary.total) > 0.01;
+      if (status === "no-transport") return summary.transportTotal <= 0;
+      return true;
+    }
+
+    function managementRowSearchText(row) {
+      return normalizeKey([
+        row.date,
+        formatDate(row.date),
+        row.type,
+        row.front,
+        row.fleet,
+        reportOriginForRow(row),
+        row.note
+      ].join(" "));
+    }
+
+    function managementRowMatches(row, filters) {
+      if (!managementTypeMatches(row, filters.type)) return false;
+      if (filters.origin !== "all" && !sameText(reportOriginForRow(row), filters.origin)) return false;
+      if (filters.search && !managementRowSearchText(row).includes(filters.search)) return false;
+      return true;
+    }
+
+    function rowProductionTotal(rows) {
+      return (rows || []).reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+    }
+
+    function managementRecordsForFilters(sourceRecords, filters) {
+      return (sourceRecords || []).filter((record) => {
+        const dailyTarget = plannedTargetForDate(record.date);
+        const summary = summarizeRows(rowsFromRecords([record]), {
+          targetDays: 1,
+          targetTotal: dailyTarget
+        });
+
+        if (filters.minProduction > 0 && summary.total < filters.minProduction) return false;
+        return managementStatusMatches(summary, filters.status);
+      });
+    }
+
+    function managementTargetContext(info, filteredRecords, filters) {
+      if (!hasManagementDailyFilters(filters)) {
+        return {
+          targetDays: info.targetDays,
+          targetTotal: plannedTargetForInfo(info),
+          label: "período"
+        };
+      }
+
+      const targetTotal = (filteredRecords || []).reduce((sum, record) => sum + plannedTargetForDate(record.date), 0);
+      return {
+        targetDays: filteredRecords.length,
+        targetTotal,
+        label: "dias filtrados"
+      };
+    }
+
+    function managementDataForRange(range = managementRange()) {
+      const normalized = normalizeDateRange(range.start, range.end);
+      const filters = managementFilters();
+      const info = targetInfoForRange(normalized.start, normalized.end);
+      const selectedRecords = recordsForRange(normalized.start, normalized.end);
+      const filteredRecords = managementRecordsForFilters(selectedRecords, filters);
+      const targetContext = managementTargetContext(info, filteredRecords, filters);
+      const baseRows = rowsFromRecords(filteredRecords);
+      const rows = baseRows.filter((row) => managementRowMatches(row, filters));
+      const baseSummary = summarizeRows(baseRows, {
+        targetDays: targetContext.targetDays,
+        targetTotal: targetContext.targetTotal
+      });
+      const summary = summarizeRows(rows, {
+        targetDays: targetContext.targetDays,
+        targetTotal: targetContext.targetTotal
+      });
+
+      return { range: normalized, info, selectedRecords, filteredRecords, baseRows, rows, baseSummary, summary, filters, targetContext };
+    }
+
+    function shareRow({ label, value, total, detail }) {
+      const percent = progressFor(value, total);
+      const width = total > 0 ? clampPercent(percent) : 0;
+      return `
+        <div class="chart-row">
+          <div class="chart-row-head">
+            <strong>${escapeHtml(label)}</strong>
+            <span>${formatNumber(value)} / ${formatNumber(total)}</span>
+          </div>
+          <div class="chart-track" aria-label="${escapeHtml(label)} ${formatPercent(percent)}">
+            <div class="chart-fill ${percent >= 100 ? "over" : ""}" style="width: ${width}%"></div>
+          </div>
+          <div class="chart-row-head">
+            <span>${escapeHtml(detail || "% sobre moagem")}</span>
+            <span class="status-pill ${percent >= 100 ? "good" : ""}">${formatPercent(percent)}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderReportFilterSummary(data) {
+      const { range, info, filteredRecords, rows, baseRows, filters, targetContext } = data;
+      const rangeLabel = range.start === range.end
+        ? formatDate(range.start)
+        : `${formatDate(range.start)} a ${formatDate(range.end)}`;
+      const chips = [
+        `Período: ${rangeLabel}`,
+        `Meta: ${targetContext.targetDays} dia${targetContext.targetDays === 1 ? "" : "s"} (${targetContext.label})`,
+        `Dias exibidos: ${filteredRecords.length}`,
+        `Registros filtrados: ${rows.length}/${baseRows.length}`
+      ];
+
+      if (filters.type !== "all") chips.push(`Operação: ${reportTypeLabel(filters.type)}`);
+      if (filters.origin !== "all") chips.push(`Origem: ${filters.origin}`);
+      if (filters.status !== "all") chips.push(`Status: ${reportStatusLabel(filters.status)}`);
+      if (filters.minProduction > 0) chips.push(`Moagem mínima: ${formatNumber(filters.minProduction)}`);
+      if (filters.search) chips.push(`Busca: ${els.reportsSearch.value}`);
+
+      els.reportsFilterSummaryWrap.innerHTML = chips.map((chip) => `<span class="report-chip">${escapeHtml(chip)}</span>`).join("");
+    }
+
+    function renderReportsKpis(baseSummary, summary, info, filteredRecords, rows, targetContext) {
+      const difference = baseSummary.total - baseSummary.targetTotal;
+      const hasTarget = baseSummary.targetTotal > 0;
+      const gapLabel = hasTarget ? (difference >= 0 ? "Sobra" : "Falta") : "Sem meta";
+      const gapValue = hasTarget ? Math.abs(difference) : 0;
+      const launchedDays = filteredRecords.length;
+      const filteredVolume = rowProductionTotal(rows);
+      const filteredDays = new Set(rows.map((row) => row.date).filter(Boolean)).size;
+      const externalCane = baseSummary.florestaCane + baseSummary.valeCane;
+      const averagePerDay = launchedDays ? baseSummary.total / launchedDays : 0;
+      const kpis = [
+        { label: "Moagem do período", value: formatNumber(baseSummary.total), detail: "Base sem somar transporte" },
+        { label: "Meta analisada", value: formatNumber(baseSummary.targetTotal), detail: `${targetContext.targetDays} dia${targetContext.targetDays === 1 ? "" : "s"} de meta` },
+        { label: "% da meta", value: formatPercent(baseSummary.targetPercent), detail: hasTarget ? "Real sobre planejado" : "Meta não calculada" },
+        { label: gapLabel, value: formatNumber(gapValue), detail: difference >= 0 && hasTarget ? "Acima do planejado" : "Para atingir a meta" },
+        { label: "Volume filtrado", value: formatNumber(filteredVolume), detail: `${rows.length} registro${rows.length === 1 ? "" : "s"} em ${filteredDays} dia${filteredDays === 1 ? "" : "s"}` },
+        { label: "Moagem filtrada", value: formatNumber(summary.total), detail: `${formatPercent(progressFor(summary.total, baseSummary.total))} da moagem base` },
+        { label: "Colheita própria", value: formatPercent(baseSummary.ownHarvestPercent), detail: `${formatNumber(baseSummary.ownHarvest)} sobre moagem` },
+        { label: "Colheita terceira", value: formatPercent(baseSummary.thirdHarvestPercent), detail: `${formatNumber(baseSummary.thirdHarvest)} sobre moagem` },
+        { label: "Cana outras unid.", value: formatNumber(externalCane), detail: `${formatPercent(progressFor(externalCane, baseSummary.total))} da moagem` },
+        { label: "Transp. próprio", value: formatPercent(baseSummary.ownTransportPercent), detail: `${formatNumber(baseSummary.ownTransport)} entregue` },
+        { label: "Transp. terceiro", value: formatPercent(baseSummary.thirdTransportPercent), detail: `${formatNumber(baseSummary.thirdTransport)} entregue` },
+        { label: "Transporte total", value: formatNumber(baseSummary.transportTotal), detail: `${formatPercent(baseSummary.transportPercent)} sobre moagem` },
+        { label: "Dias lançados", value: `${launchedDays}/${info.targetDays || 0}`, detail: `${info.selectedDays} dia${info.selectedDays === 1 ? "" : "s"} no período` },
+        { label: "Média diária", value: formatNumber(averagePerDay), detail: "Moagem média nos dias exibidos" }
+      ];
+
+      els.reportsKpiWrap.innerHTML = kpis.map((item) => `
+        <article class="stat">
+          <span>${escapeHtml(item.label)}</span>
+          <strong>${escapeHtml(item.value)}</strong>
+          <small>${escapeHtml(item.detail)}</small>
+        </article>
+      `).join("");
+    }
+
+    function dailyReportItems(recordsList, rows, filters) {
+      const rowsByDate = new Map();
+      rows.forEach((row) => {
+        const date = row.date || "";
+        if (!date) return;
+        if (!rowsByDate.has(date)) rowsByDate.set(date, []);
+        rowsByDate.get(date).push(row);
+      });
+
+      const items = (recordsList || []).map((record) => {
+        const date = normalizeRecordDate(record.date);
+        const dayRows = rowsByDate.get(date) || [];
+        if (!dayRows.length && hasManagementRowFilters(filters)) return null;
+        const dailyTarget = plannedTargetForDate(date);
+        const baseSummary = summarizeRows(rowsFromRecords([record]), {
+          targetDays: 1,
+          targetTotal: dailyTarget
+        });
+        const filteredSummary = summarizeRows(dayRows, {
+          targetDays: 1,
+          targetTotal: dailyTarget
+        });
+        return {
+          date,
+          updatedAt: record.updatedAt,
+          ...baseSummary,
+          filteredTotal: filteredSummary.total,
+          filteredTransportTotal: filteredSummary.transportTotal,
+          filteredVolume: rowProductionTotal(dayRows),
+          filteredRows: dayRows.length
+        };
+      }).filter(Boolean);
+
+      return sortDailyReportItems(items, filters.sort);
+    }
+
+    function sortDailyReportItems(items, sort) {
+      const list = [...items];
+      if (sort === "date-asc") return list.sort((a, b) => a.date.localeCompare(b.date));
+      if (sort === "production-desc") return list.sort((a, b) => b.total - a.total || b.date.localeCompare(a.date));
+      if (sort === "production-asc") return list.sort((a, b) => a.total - b.total || b.date.localeCompare(a.date));
+      if (sort === "target-desc") return list.sort((a, b) => b.targetPercent - a.targetPercent || b.date.localeCompare(a.date));
+      if (sort === "transport-desc") return list.sort((a, b) => b.transportPercent - a.transportPercent || b.date.localeCompare(a.date));
+      return list.sort((a, b) => b.date.localeCompare(a.date));
+    }
+
+    function renderReportsExecutive(filteredRecords, rows, baseSummary, summary, info, filters) {
+      const summaries = dailyReportItems(filteredRecords, rows, filters);
+      const bestDay = [...summaries].sort((a, b) => b.total - a.total || a.date.localeCompare(b.date))[0];
+      const criticalDay = [...summaries].sort((a, b) => a.targetPercent - b.targetPercent || a.date.localeCompare(b.date))[0];
+      const externalCane = baseSummary.florestaCane + baseSummary.valeCane;
+      const averagePerDay = filteredRecords.length ? baseSummary.total / filteredRecords.length : 0;
+      const difference = baseSummary.total - baseSummary.targetTotal;
+      const targetText = baseSummary.targetTotal > 0
+        ? `${formatNumber(baseSummary.total)} de ${formatNumber(baseSummary.targetTotal)} (${formatPercent(baseSummary.targetPercent)})`
+        : `${formatNumber(baseSummary.total)} sem meta calculada`;
+      const targetPeriod = info.targetDays
+        ? `${formatDate(info.targetStart)} a ${formatDate(info.targetEnd)}`
+        : "sem dias vencidos de meta";
+      const filteredText = rowProductionTotal(rows) > 0
+        ? `${formatNumber(rowProductionTotal(rows))} em ${rows.length} registro${rows.length === 1 ? "" : "s"}`
+        : "Sem volume nos filtros";
+
+      els.reportsExecutiveWrap.innerHTML = `
+        <div class="summary-list">
+          <div class="summary-item">
+            <div class="summary-line">
+              <strong>Período analisado</strong>
+              <span>${formatDate(info.start)} a ${formatDate(info.end)}</span>
+            </div>
+            <div class="summary-line">
+              <span>${filteredRecords.length} dia${filteredRecords.length === 1 ? "" : "s"} exibido${filteredRecords.length === 1 ? "" : "s"}</span>
+              <span>${rows.length} registro${rows.length === 1 ? "" : "s"}</span>
+            </div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-line">
+              <strong>Meta planejada</strong>
+              <span>${escapeHtml(targetPeriod)}</span>
+            </div>
+            <div class="summary-line">
+              <span>${targetText}</span>
+              <span>${summary.targetTotal > 0 ? `${difference >= 0 ? "Sobra" : "Falta"} ${formatNumber(Math.abs(difference))}` : "Sem meta"}</span>
+            </div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-line">
+              <strong>Melhor dia</strong>
+              <span>${bestDay ? formatDate(bestDay.date) : "-"}</span>
+            </div>
+            <div class="summary-line">
+              <span>${bestDay ? `${formatNumber(bestDay.total)} moído` : "Sem dado"}</span>
+              <span>${bestDay ? formatPercent(bestDay.targetPercent) : "-"}</span>
+            </div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-line">
+              <strong>Dia mais crítico</strong>
+              <span>${criticalDay ? formatDate(criticalDay.date) : "-"}</span>
+            </div>
+            <div class="summary-line">
+              <span>${criticalDay ? `${formatNumber(criticalDay.total)} moído` : "Sem dado"}</span>
+              <span>${criticalDay ? formatPercent(criticalDay.targetPercent) : "-"}</span>
+            </div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-line">
+              <strong>Média diária</strong>
+              <span>${formatNumber(averagePerDay)}</span>
+            </div>
+            <div class="summary-line">
+              <span>Cana Floresta + Vale</span>
+              <span>${formatNumber(externalCane)}</span>
+            </div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-line">
+              <strong>Transporte entregue</strong>
+              <span>${formatNumber(baseSummary.transportTotal)}</span>
+            </div>
+            <div class="summary-line">
+              <span>Próprio ${formatPercent(baseSummary.ownTransportPercent)}</span>
+              <span>Terceiro ${formatPercent(baseSummary.thirdTransportPercent)}</span>
+            </div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-line">
+              <strong>Resultado filtrado</strong>
+              <span>${formatPercent(progressFor(summary.total, baseSummary.total))}</span>
+            </div>
+            <div class="summary-line">
+              <span>${filteredText}</span>
+              <span>${formatNumber(summary.total)} moagem</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderReportsInsights(filteredRecords, rows, baseSummary, filters) {
+      const dailyItems = dailyReportItems(filteredRecords, rows, filters);
+      const belowDays = dailyItems.filter((item) => item.targetTotal > 0 && item.targetPercent < 85);
+      const noTransportDays = dailyItems.filter((item) => item.transportTotal <= 0);
+      const transportGap = baseSummary.transportTotal - baseSummary.total;
+      const trendItems = chronologicalDailyReportItems(filteredRecords, rows, filters);
+      const trendStats = reportEvolutionStats(trendItems);
+      const alerts = [];
+
+      if (!filteredRecords.length) {
+        alerts.push({ tone: "alert", title: "Sem dados no filtro", text: "O período ou os filtros selecionados não retornaram lançamentos." });
+      } else if (baseSummary.targetTotal > 0 && baseSummary.targetPercent >= 100) {
+        alerts.push({ tone: "good", title: "Meta batida", text: `${formatPercent(baseSummary.targetPercent)} da meta foi atingido no recorte analisado.` });
+      } else if (baseSummary.targetTotal > 0) {
+        alerts.push({ tone: baseSummary.targetPercent < 85 ? "alert" : "", title: "Meta em aberto", text: `${formatNumber(baseSummary.remaining)} faltando para bater a meta do recorte.` });
+      }
+
+      if (Math.abs(transportGap) > 0.01) {
+        alerts.push({
+          tone: transportGap < 0 ? "alert" : "",
+          title: "Transporte diferente da moagem",
+          text: `Transporte está ${transportGap >= 0 ? "acima" : "abaixo"} da moagem em ${formatNumber(Math.abs(transportGap))}.`
+        });
+      } else if (baseSummary.total > 0) {
+        alerts.push({ tone: "good", title: "Transporte alinhado", text: "O total transportado está batendo com a moagem do recorte." });
+      }
+
+      if (belowDays.length) {
+        const worst = [...belowDays].sort((a, b) => a.targetPercent - b.targetPercent)[0];
+        alerts.push({ tone: "alert", title: `${belowDays.length} dia${belowDays.length === 1 ? "" : "s"} abaixo de 85%`, text: `Pior dia: ${formatDate(worst.date)} com ${formatPercent(worst.targetPercent)} da meta.` });
+      }
+
+      if (noTransportDays.length) {
+        alerts.push({ tone: "alert", title: `${noTransportDays.length} dia${noTransportDays.length === 1 ? "" : "s"} sem transporte`, text: "Há dia com moagem, mas sem transporte próprio ou terceiro lançado." });
+      }
+
+      if (trendItems.length > 1) {
+        alerts.push({
+          tone: trendStats.lastDelta >= 0 ? "good" : "alert",
+          title: trendStats.lastDelta >= 0 ? "Tendência recente em alta" : "Tendência recente em queda",
+          text: `Última variação: ${formatNumber(trendStats.lastDelta)}. Média dos últimos 3 lançamentos: ${formatNumber(trendStats.averageThree)}.`
+        });
+      }
+
+      if (hasManagementRowFilters(filters)) {
+        alerts.push({ tone: "", title: "Filtro de detalhe aplicado", text: `${rows.length} lançamento${rows.length === 1 ? "" : "s"} compõem os rankings e tabelas filtradas.` });
+      }
+
+      els.reportsInsightsWrap.innerHTML = `
+        <div class="alert-grid">
+          ${alerts.map((item) => `
+            <div class="alert-item ${item.tone}">
+              <strong>${escapeHtml(item.title)}</strong>
+              <span>${escapeHtml(item.text)}</span>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function renderReportsParticipation(summary) {
+      if (summary.total <= 0) {
+        els.reportsParticipationWrap.innerHTML = '<div class="empty-state">Sem moagem no período para calcular participação.</div>';
+        return;
+      }
+
+      els.reportsParticipationWrap.innerHTML = [
+        shareRow({ label: "Colheita própria", value: summary.ownHarvest, total: summary.total, detail: "% do moído pelas frentes próprias" }),
+        shareRow({ label: "Colheita terceira", value: summary.thirdHarvest, total: summary.total, detail: "% do moído pelas frentes terceiras" }),
+        shareRow({ label: "Cana Floresta", value: summary.florestaCane, total: summary.total, detail: "% recebido de outra unidade" }),
+        shareRow({ label: "Cana Vale", value: summary.valeCane, total: summary.total, detail: "% recebido de outra unidade" })
+      ].join("");
+    }
+
+    function renderReportsTransport(summary) {
+      if (summary.total <= 0 && summary.transportTotal <= 0) {
+        els.reportsTransportWrap.innerHTML = '<div class="empty-state">Sem moagem ou transporte no período selecionado.</div>';
+        return;
+      }
+
+      els.reportsTransportWrap.innerHTML = [
+        shareRow({ label: "Transporte próprio", value: summary.ownTransport, total: summary.total, detail: "% entregue por caminhões próprios" }),
+        shareRow({ label: "Transporte terceiro", value: summary.thirdTransport, total: summary.total, detail: "% entregue por terceiros" }),
+        shareRow({ label: "Total transportado", value: summary.transportTotal, total: summary.total, detail: "% transportado sobre a moagem" })
+      ].join("");
+    }
+
+    function renderReportsFront(rows, baseSummary) {
+      const grouped = new Map();
+      rows.filter((row) => isFrontProduction(row.type)).forEach((row) => {
+        const name = row.front || "Sem frente";
+        const key = `${name}|${row.type}`;
+        if (!grouped.has(key)) {
+          grouped.set(key, { name, type: row.type, production: 0, records: 0 });
+        }
+        const item = grouped.get(key);
+        item.production += Number(row.production) || 0;
+        item.records += 1;
+      });
+
+      const externalItems = [
+        {
+          name: "Cana Floresta",
+          type: "Outra unidade",
+          production: productionByType(rows, TYPES.FLORESTA_CANE),
+          records: rows.filter((row) => row.type === TYPES.FLORESTA_CANE).length
+        },
+        {
+          name: "Cana Vale",
+          type: "Outra unidade",
+          production: productionByType(rows, TYPES.VALE_CANE),
+          records: rows.filter((row) => row.type === TYPES.VALE_CANE).length
+        }
+      ].filter((item) => item.production > 0 || item.records > 0);
+
+      const items = [...grouped.values(), ...externalItems]
+        .sort((a, b) => b.production - a.production || a.name.localeCompare(b.name));
+
+      if (!items.length) {
+        els.reportsFrontWrap.innerHTML = '<div class="empty-state">Sem origem de cana para o período selecionado.</div>';
+        return;
+      }
+
+      els.reportsFrontWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Origem</th>
+              <th>Tipo</th>
+              <th>Moagem</th>
+              <th>% moagem</th>
+              <th>Registros</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map((item) => `
+              <tr>
+                <td>${escapeHtml(item.name)}</td>
+                <td>${escapeHtml(item.type)}</td>
+                <td>${formatNumber(item.production)}</td>
+                <td>${formatPercent(progressFor(item.production, baseSummary.total))}</td>
+                <td>${item.records}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderReportsType(rows, baseSummary, targetDays) {
+      const items = typeOptions.map((type) => {
+        const typeRows = rows.filter((row) => row.type === type);
+        const production = typeRows.reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+        const target = targetForType(type) * targetDays;
+        return { type, production, target, records: typeRows.length };
+      }).filter((item) => item.production > 0 || item.records > 0);
+
+      if (!items.length) {
+        els.reportsTypeWrap.innerHTML = '<div class="empty-state">Sem operação para detalhar nos filtros atuais.</div>';
+        return;
+      }
+
+      els.reportsTypeWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Operação</th>
+              <th>Volume</th>
+              <th>% moagem</th>
+              <th>Meta cad.</th>
+              <th>% meta</th>
+              <th>Registros</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map((item) => `
+              <tr>
+                <td>${escapeHtml(item.type)}</td>
+                <td>${formatNumber(item.production)}</td>
+                <td>${formatPercent(progressFor(item.production, baseSummary.total))}</td>
+                <td>${formatNumber(item.target)}</td>
+                <td>${formatPercent(progressFor(item.production, item.target))}</td>
+                <td>${item.records}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderReportsRanking(rows, baseSummary) {
+      const grouped = new Map();
+      rows.forEach((row) => {
+        const origin = reportOriginForRow(row);
+        const key = normalizeKey(origin);
+        if (!grouped.has(key)) {
+          grouped.set(key, { origin, types: new Set(), production: 0, records: 0, days: new Set() });
+        }
+        const item = grouped.get(key);
+        item.types.add(row.type);
+        item.production += Number(row.production) || 0;
+        item.records += 1;
+        if (row.date) item.days.add(row.date);
+      });
+
+      const items = [...grouped.values()]
+        .map((item) => ({
+          ...item,
+          typeLabel: [...item.types].join(", "),
+          daysCount: item.days.size,
+          percent: progressFor(item.production, baseSummary.total)
+        }))
+        .sort((a, b) => b.production - a.production || a.origin.localeCompare(b.origin));
+
+      if (!items.length) {
+        els.reportsRankingWrap.innerHTML = '<div class="empty-state">Sem lançamentos para montar ranking no filtro atual.</div>';
+        return;
+      }
+
+      els.reportsRankingWrap.innerHTML = `
+        <div class="rank-list">
+          ${items.map((item, index) => `
+            <div class="rank-item">
+              <div class="rank-position">${index + 1}</div>
+              <div class="rank-main">
+                <div class="rank-headline">
+                  <strong>${escapeHtml(item.origin)}</strong>
+                  <span class="status-pill">${formatPercent(item.percent)}</span>
+                </div>
+                <div class="rank-track" aria-label="${escapeHtml(item.origin)} ${formatPercent(item.percent)}">
+                  <div class="rank-fill ${item.percent >= 100 ? "over" : ""}" style="width: ${baseSummary.total > 0 ? clampPercent(item.percent) : 0}%"></div>
+                </div>
+                <div class="rank-values">
+                  <span>${formatNumber(item.production)} em ${item.records} registro${item.records === 1 ? "" : "s"}</span>
+                  <span>${escapeHtml(item.typeLabel)} · ${item.daysCount} dia${item.daysCount === 1 ? "" : "s"}</span>
+                </div>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function chronologicalDailyReportItems(filteredRecords, rows, filters) {
+      return dailyReportItems(filteredRecords, rows, { ...filters, sort: "date-asc" });
+    }
+
+    function reportEvolutionStats(items) {
+      const deltas = items.map((item, index) => ({
+        date: item.date,
+        total: item.total,
+        delta: index > 0 ? item.total - items[index - 1].total : 0
+      }));
+      const lastDelta = deltas.length > 1 ? deltas[deltas.length - 1].delta : 0;
+      const bestRise = deltas.slice(1).sort((a, b) => b.delta - a.delta)[0] || null;
+      const worstDrop = deltas.slice(1).sort((a, b) => a.delta - b.delta)[0] || null;
+      const lastThree = items.slice(-3);
+      const averageThree = lastThree.length
+        ? lastThree.reduce((sum, item) => sum + item.total, 0) / lastThree.length
+        : 0;
+      const achievedDays = items.filter((item) => item.targetTotal > 0 && item.targetPercent >= 100).length;
+      const averageTransportPercent = items.length
+        ? items.reduce((sum, item) => sum + item.transportPercent, 0) / items.length
+        : 0;
+
+      return { lastDelta, bestRise, worstDrop, averageThree, achievedDays, averageTransportPercent };
+    }
+
+    function renderReportsDailyEvolution(filteredRecords, rows, filters) {
+      const items = chronologicalDailyReportItems(filteredRecords, rows, filters);
+      if (!items.length) {
+        els.reportsDailyEvolutionWrap.innerHTML = '<div class="empty-state">Sem lançamentos para montar a evolução diária.</div>';
+        return;
+      }
+
+      const stats = reportEvolutionStats(items);
+      const maxValue = Math.max(...items.map((item) => Math.max(item.total, item.targetTotal, item.filteredVolume)), 1);
+
+      els.reportsDailyEvolutionWrap.innerHTML = `
+        <div class="report-evolution-head">
+          <div class="goal-metric">
+            <span>Última variação</span>
+            <strong>${formatNumber(stats.lastDelta)}</strong>
+            <small>${items.length > 1 ? "Contra o dia anterior" : "Sem dia anterior"}</small>
+          </div>
+          <div class="goal-metric">
+            <span>Média 3 dias</span>
+            <strong>${formatNumber(stats.averageThree)}</strong>
+            <small>Últimos dias lançados</small>
+          </div>
+          <div class="goal-metric">
+            <span>Dias meta batida</span>
+            <strong>${stats.achievedDays}/${items.length}</strong>
+            <small>No filtro atual</small>
+          </div>
+          <div class="goal-metric">
+            <span>Média transp.</span>
+            <strong>${formatPercent(stats.averageTransportPercent)}</strong>
+            <small>Sobre moagem</small>
+          </div>
+        </div>
+        <div class="report-evolution-list">
+          ${items.map((item, index) => {
+            const previous = index > 0 ? items[index - 1] : null;
+            const delta = previous ? item.total - previous.total : 0;
+            const width = clampPercent((item.total / maxValue) * 100);
+            const targetWidth = clampPercent((item.targetTotal / maxValue) * 100);
+            const status = statusForProgress(item.targetPercent);
+            return `
+              <div class="report-evolution-row">
+                <div class="chart-row-head">
+                  <strong>${formatDate(item.date)}</strong>
+                  <span>${formatNumber(item.total)} moído · ${formatPercent(item.targetPercent)} da meta</span>
+                </div>
+                <div class="chart-track" aria-label="${formatDate(item.date)} moagem ${formatNumber(item.total)}">
+                  <div class="chart-fill ${item.targetPercent >= 100 ? "over" : ""}" style="width: ${width}%"></div>
+                </div>
+                <div class="chart-track" aria-label="${formatDate(item.date)} meta ${formatNumber(item.targetTotal)}">
+                  <div class="chart-fill" style="width: ${targetWidth}%; opacity: .48;"></div>
+                </div>
+                <div class="report-evolution-meta">
+                  <span>Meta ${formatNumber(item.targetTotal)}</span>
+                  <span>Filtro ${formatNumber(item.filteredVolume)}</span>
+                  <span>Variação ${previous ? formatNumber(delta) : "-"}</span>
+                  <span class="status-pill ${status.className}">${status.label}</span>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function renderReportsAccumulatedEvolution(filteredRecords, rows, filters) {
+      const items = chronologicalDailyReportItems(filteredRecords, rows, filters);
+      if (!items.length) {
+        els.reportsAccumulatedEvolutionWrap.innerHTML = '<div class="empty-state">Sem lançamentos para montar a evolução acumulada.</div>';
+        return;
+      }
+
+      let accumulatedReal = 0;
+      let accumulatedTarget = 0;
+      let accumulatedFiltered = 0;
+      const rowsHtml = items.map((item) => {
+        accumulatedReal += item.total;
+        accumulatedTarget += item.targetTotal;
+        accumulatedFiltered += item.filteredVolume;
+        const difference = accumulatedReal - accumulatedTarget;
+        return `
+          <tr>
+            <td>${formatDate(item.date)}</td>
+            <td>${formatNumber(accumulatedReal)}</td>
+            <td>${formatNumber(accumulatedTarget)}</td>
+            <td>${formatNumber(difference)}</td>
+            <td>${formatPercent(progressFor(accumulatedReal, accumulatedTarget))}</td>
+            <td>${formatNumber(accumulatedFiltered)}</td>
+          </tr>
+        `;
+      }).join("");
+
+      els.reportsAccumulatedEvolutionWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Real acum.</th>
+              <th>Previsto acum.</th>
+              <th>Diferença</th>
+              <th>% acum.</th>
+              <th>Filtro acum.</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      `;
+    }
+
+    function monthlyReportRows(filters = managementFilters()) {
+      return safraPlanMonths.map((month) => {
+        const monthRecords = managementRecordsForFilters(recordsForRange(month.start, month.end), filters);
+        const targetContext = hasManagementDailyFilters(filters)
+          ? {
+            targetDays: monthRecords.length,
+            targetTotal: monthRecords.reduce((sum, record) => sum + plannedTargetForDate(record.date), 0)
+          }
+          : { targetDays: month.days, targetTotal: month.planned };
+        const baseRows = rowsFromRecords(monthRecords);
+        const rows = baseRows.filter((row) => managementRowMatches(row, filters));
+        const baseSummary = summarizeRows(baseRows, {
+          targetDays: targetContext.targetDays,
+          targetTotal: targetContext.targetTotal
+        });
+        const summary = summarizeRows(rows, {
+          targetDays: targetContext.targetDays,
+          targetTotal: targetContext.targetTotal
+        });
+
+        return { ...month, records: monthRecords.length, baseSummary, summary, filteredVolume: rowProductionTotal(rows), targetContext };
+      });
+    }
+
+    function renderReportsMonth(filters) {
+      const items = monthlyReportRows(filters);
+      const totals = items.reduce((acc, item) => {
+        acc.days += item.targetContext.targetDays;
+        acc.records += item.records;
+        acc.planned += item.targetContext.targetTotal;
+        acc.total += item.baseSummary.total;
+        acc.filteredVolume += item.filteredVolume;
+        acc.ownHarvest += item.baseSummary.ownHarvest;
+        acc.thirdHarvest += item.baseSummary.thirdHarvest;
+        acc.transportTotal += item.baseSummary.transportTotal;
+        return acc;
+      }, { days: 0, records: 0, planned: 0, total: 0, filteredVolume: 0, ownHarvest: 0, thirdHarvest: 0, transportTotal: 0 });
+
+      els.reportsMonthWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Mês</th>
+              <th>Dias</th>
+              <th>Previsto</th>
+              <th>Real moagem</th>
+              <th>Volume filtrado</th>
+              <th>Diferença</th>
+              <th>% meta</th>
+              <th>% própria</th>
+              <th>% terceira</th>
+              <th>Transp. total</th>
+              <th>% transp.</th>
+              <th>Dias lançados</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map((item) => {
+              const difference = item.baseSummary.total - item.targetContext.targetTotal;
+              return `
+                <tr>
+                  <td>${escapeHtml(item.label)}/${item.key.slice(2, 4)}</td>
+                  <td>${item.targetContext.targetDays}</td>
+                  <td>${formatNumber(item.targetContext.targetTotal)}</td>
+                  <td>${formatNumber(item.baseSummary.total)}</td>
+                  <td>${formatNumber(item.filteredVolume)}</td>
+                  <td>${formatNumber(difference)}</td>
+                  <td>${formatPercent(progressFor(item.baseSummary.total, item.targetContext.targetTotal))}</td>
+                  <td>${formatPercent(item.baseSummary.ownHarvestPercent)}</td>
+                  <td>${formatPercent(item.baseSummary.thirdHarvestPercent)}</td>
+                  <td>${formatNumber(item.baseSummary.transportTotal)}</td>
+                  <td>${formatPercent(item.baseSummary.transportPercent)}</td>
+                  <td>${item.records}</td>
+                </tr>
+              `;
+            }).join("")}
+            <tr>
+              <td><strong>Total</strong></td>
+              <td><strong>${totals.days}</strong></td>
+              <td><strong>${formatNumber(totals.planned)}</strong></td>
+              <td><strong>${formatNumber(totals.total)}</strong></td>
+              <td><strong>${formatNumber(totals.filteredVolume)}</strong></td>
+              <td><strong>${formatNumber(totals.total - totals.planned)}</strong></td>
+              <td><strong>${formatPercent(progressFor(totals.total, totals.planned))}</strong></td>
+              <td><strong>${formatPercent(progressFor(totals.ownHarvest, totals.total))}</strong></td>
+              <td><strong>${formatPercent(progressFor(totals.thirdHarvest, totals.total))}</strong></td>
+              <td><strong>${formatNumber(totals.transportTotal)}</strong></td>
+              <td><strong>${formatPercent(progressFor(totals.transportTotal, totals.total))}</strong></td>
+              <td><strong>${totals.records}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderReportsDaily(filteredRecords, rows, filters) {
+      const items = dailyReportItems(filteredRecords, rows, filters);
+      if (!items.length) {
+        els.reportsDailyWrap.innerHTML = '<div class="empty-state">Sem lançamentos salvos para gerar relatório diário.</div>';
+        return;
+      }
+
+      els.reportsDailyWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Moagem</th>
+              <th>Volume filtrado</th>
+              <th>Meta</th>
+              <th>% meta</th>
+              <th>% própria</th>
+              <th>% terceira</th>
+              <th>% transp. próprio</th>
+              <th>% transp. terceiro</th>
+              <th>% transp. total</th>
+              <th>Falta</th>
+              <th>Registros</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map((item) => `
+              <tr>
+                <td>${formatDate(item.date)}</td>
+                <td>${formatNumber(item.total)}</td>
+                <td>${formatNumber(item.filteredVolume)}</td>
+                <td>${formatNumber(item.targetTotal)}</td>
+                <td>${formatPercent(item.targetPercent)}</td>
+                <td>${formatPercent(item.ownHarvestPercent)}</td>
+                <td>${formatPercent(item.thirdHarvestPercent)}</td>
+                <td>${formatPercent(item.ownTransportPercent)}</td>
+                <td>${formatPercent(item.thirdTransportPercent)}</td>
+                <td>${formatPercent(item.transportPercent)}</td>
+                <td>${formatNumber(item.remaining)}</td>
+                <td>${item.filteredRows}/${item.records}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderReportsRows(rows, baseSummary) {
+      const items = [...rows].sort((a, b) => b.date.localeCompare(a.date) || a.type.localeCompare(b.type));
+      if (!items.length) {
+        els.reportsRowsWrap.innerHTML = '<div class="empty-state">Nenhum lançamento encontrado com os filtros atuais.</div>';
+        return;
+      }
+
+      els.reportsRowsWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Operação</th>
+              <th>Origem</th>
+              <th>Produção</th>
+              <th>% moagem</th>
+              <th>Meta cad.</th>
+              <th>% meta</th>
+              <th>Observação</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map((row) => {
+              const target = targetForRow(row, targets, rowsForSameDate(row, rows));
+              return `
+                <tr>
+                  <td>${formatDate(row.date)}</td>
+                  <td>${escapeHtml(row.type)}</td>
+                  <td>${escapeHtml(reportOriginForRow(row))}</td>
+                  <td>${formatNumber(row.production)}</td>
+                  <td>${formatPercent(progressFor(row.production, baseSummary.total))}</td>
+                  <td>${formatNumber(target)}</td>
+                  <td>${formatPercent(progressFor(row.production, target))}</td>
+                  <td>${escapeHtml(row.note || "")}</td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function updateReportsPrintSubtitle(data) {
+      const { range, filteredRecords, rows, baseSummary } = data;
+      const rangeLabel = range.start === range.end
+        ? formatDate(range.start)
+        : `${formatDate(range.start)} a ${formatDate(range.end)}`;
+      els.reportsPrintSubtitle.textContent = `${rangeLabel} · Moagem ${formatNumber(baseSummary.total)} · ${filteredRecords.length} dia${filteredRecords.length === 1 ? "" : "s"} · ${rows.length} registro${rows.length === 1 ? "" : "s"} filtrado${rows.length === 1 ? "" : "s"}`;
+    }
+
+    function renderManagementReports() {
+      if (!els.reportsStartDate || !els.reportsEndDate) return;
+
+      const data = managementDataForRange();
+      const { range, info, selectedRecords, filteredRecords, rows, baseRows, baseSummary, summary, filters, targetContext } = data;
+      setManagementRange(range.start, range.end);
+      const rangeLabel = range.start === range.end
+        ? formatDate(range.start)
+        : `${formatDate(range.start)} a ${formatDate(range.end)}`;
+      const targetLabel = targetContext.targetDays
+        ? ` Meta considerada: ${formatNumber(baseSummary.targetTotal)} para ${targetContext.targetDays} dia${targetContext.targetDays === 1 ? "" : "s"} (${targetContext.label}).`
+        : " Sem dias vencidos de meta no período.";
+
+      els.reportsSource.textContent = selectedRecords.length
+        ? `${selectedRecords.length} lançamento${selectedRecords.length === 1 ? "" : "s"} no período ${rangeLabel}. Exibindo ${filteredRecords.length} dia${filteredRecords.length === 1 ? "" : "s"} e ${rows.length}/${baseRows.length} registro${baseRows.length === 1 ? "" : "s"}.${targetLabel}`
+        : `Nenhum lançamento salvo no período ${rangeLabel}.${targetLabel}`;
+
+      renderReportFilterSummary(data);
+      updateReportsPrintSubtitle(data);
+      renderReportsKpis(baseSummary, summary, info, filteredRecords, rows, targetContext);
+      renderReportsExecutive(filteredRecords, rows, baseSummary, summary, info, filters);
+      renderReportsInsights(filteredRecords, rows, baseSummary, filters);
+      renderReportsParticipation(baseSummary);
+      renderReportsTransport(baseSummary);
+      renderReportsFront(rows, baseSummary);
+      renderReportsType(rows, baseSummary, targetContext.targetDays);
+      renderReportsRanking(rows, baseSummary);
+      renderReportsDailyEvolution(filteredRecords, rows, filters);
+      renderReportsAccumulatedEvolution(filteredRecords, rows, filters);
+      renderReportsMonth(filters);
+      renderReportsDaily(filteredRecords, rows, filters);
+      renderReportsRows(rows, baseSummary);
+    }
+
     function renderEntry() {
       renderEntryRows();
       setStats("entry", getCleanEntries(entries));
@@ -5441,6 +6794,7 @@
       renderTargets();
       renderEntry();
       renderDashboard();
+      renderManagementReports();
       renderHistory();
 
       const syncState = await syncOrQueue("targets-save", {}, () => syncTargetsToFirebase({
@@ -5605,6 +6959,7 @@
       setDashboardRange(date, date);
       renderEntry();
       renderDashboard();
+      renderManagementReports();
       renderTargets();
       renderHistory();
 
@@ -5757,6 +7112,7 @@
         closeFrontWorkspace();
       }
       renderDashboard();
+      renderManagementReports();
       renderTargets();
       renderHistory();
 
@@ -5824,6 +7180,495 @@
       downloadFile(`producao-cambui-${todayInputValue()}.json`, JSON.stringify(payload, null, 2), "application/json");
       addAuditEntry("backup", "Backup JSON exportado manualmente.");
       showToast("Backup JSON exportado.");
+    }
+
+    function exportManagementReportCsv() {
+      const data = managementDataForRange();
+      const { range, filteredRecords, rows, baseSummary, summary, targetContext, filters } = data;
+      const dailyItems = dailyReportItems(filteredRecords, rows, filters);
+      const accumulatedItems = chronologicalDailyReportItems(filteredRecords, rows, filters);
+      let accumulatedReal = 0;
+      let accumulatedTarget = 0;
+      let accumulatedFiltered = 0;
+      const filteredVolume = rowProductionTotal(rows);
+      const lines = [
+        ["Relatório Gerencial - Produção Diária da Cambuí"],
+        ["Período", `${formatDate(range.start)} a ${formatDate(range.end)}`],
+        ["Operação", reportTypeLabel(filters.type)],
+        ["Origem", filters.origin === "all" ? "Todas as origens" : filters.origin],
+        ["Status", reportStatusLabel(filters.status)],
+        ["Moagem mínima", filters.minProduction ? formatNumber(filters.minProduction) : ""],
+        ["Busca", els.reportsSearch.value || ""],
+        [],
+        ["Resumo"],
+        ["Moagem do período", formatNumber(baseSummary.total)],
+        ["Meta analisada", formatNumber(baseSummary.targetTotal)],
+        ["Dias de meta", targetContext.targetDays],
+        ["% meta", formatPercent(baseSummary.targetPercent)],
+        ["Falta", formatNumber(baseSummary.remaining)],
+        ["Volume filtrado", formatNumber(filteredVolume)],
+        ["Moagem filtrada", formatNumber(summary.total)],
+        ["Transporte próprio", formatNumber(baseSummary.ownTransport), formatPercent(baseSummary.ownTransportPercent)],
+        ["Transporte terceiro", formatNumber(baseSummary.thirdTransport), formatPercent(baseSummary.thirdTransportPercent)],
+        ["Transporte total", formatNumber(baseSummary.transportTotal), formatPercent(baseSummary.transportPercent)],
+        [],
+        ["Diário"],
+        ["Data", "Moagem", "Volume filtrado", "Meta", "% meta", "% própria", "% terceira", "% transp. próprio", "% transp. terceiro", "% transp. total", "Falta", "Registros filtrados"],
+        ...dailyItems.map((item) => [
+          formatDate(item.date),
+          formatNumber(item.total),
+          formatNumber(item.filteredVolume),
+          formatNumber(item.targetTotal),
+          formatPercent(item.targetPercent),
+          formatPercent(item.ownHarvestPercent),
+          formatPercent(item.thirdHarvestPercent),
+          formatPercent(item.ownTransportPercent),
+          formatPercent(item.thirdTransportPercent),
+          formatPercent(item.transportPercent),
+          formatNumber(item.remaining),
+          `${item.filteredRows}/${item.records}`
+        ]),
+        [],
+        ["Evolução acumulada"],
+        ["Data", "Real acumulado", "Previsto acumulado", "Diferença", "% acumulado", "Filtro acumulado"],
+        ...accumulatedItems.map((item) => {
+          accumulatedReal += item.total;
+          accumulatedTarget += item.targetTotal;
+          accumulatedFiltered += item.filteredVolume;
+          return [
+            formatDate(item.date),
+            formatNumber(accumulatedReal),
+            formatNumber(accumulatedTarget),
+            formatNumber(accumulatedReal - accumulatedTarget),
+            formatPercent(progressFor(accumulatedReal, accumulatedTarget)),
+            formatNumber(accumulatedFiltered)
+          ];
+        }),
+        [],
+        ["Lançamentos filtrados"],
+        ["Data", "Operação", "Origem", "Produção", "% moagem", "Meta cadastrada", "% meta", "Observação"],
+        ...rows.map((row) => {
+          const target = targetForRow(row, targets, rowsForSameDate(row, rows));
+          return [
+            formatDate(row.date),
+            row.type,
+            reportOriginForRow(row),
+            formatNumber(row.production),
+            formatPercent(progressFor(row.production, baseSummary.total)),
+            formatNumber(target),
+            formatPercent(progressFor(row.production, target)),
+            row.note || ""
+          ];
+        })
+      ];
+
+      const content = lines.map((line) => line.map(csvCell).join(";")).join("\n");
+      downloadFile(`relatorio-gerencial-cambui-${range.start}-${range.end}.csv`, content, "text/csv;charset=utf-8");
+      showToast("Relatório gerencial CSV exportado.");
+    }
+
+    function reportOriginItems(rows, baseSummary) {
+      const grouped = new Map();
+      rows.forEach((row) => {
+        const origin = reportOriginForRow(row);
+        const key = normalizeKey(origin);
+        if (!grouped.has(key)) {
+          grouped.set(key, { origin, types: new Set(), production: 0, records: 0, days: new Set() });
+        }
+        const item = grouped.get(key);
+        item.types.add(row.type);
+        item.production += Number(row.production) || 0;
+        item.records += 1;
+        if (row.date) item.days.add(row.date);
+      });
+
+      return [...grouped.values()]
+        .map((item) => ({
+          ...item,
+          typeLabel: [...item.types].join(", "),
+          daysCount: item.days.size,
+          percent: progressFor(item.production, baseSummary.total)
+        }))
+        .sort((a, b) => b.production - a.production || a.origin.localeCompare(b.origin));
+    }
+
+    function reportTypeItems(rows, baseSummary, targetDays) {
+      return typeOptions.map((type) => {
+        const typeRows = rows.filter((row) => row.type === type);
+        const production = typeRows.reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+        const target = targetForType(type) * targetDays;
+        return {
+          type,
+          production,
+          target,
+          percent: progressFor(production, baseSummary.total),
+          targetPercent: progressFor(production, target),
+          records: typeRows.length
+        };
+      }).filter((item) => item.production > 0 || item.records > 0);
+    }
+
+    function pdfPercent(value, total) {
+      return total > 0 ? Math.max(0, Math.min(100, (Number(value) || 0) / total * 100)) : 0;
+    }
+
+    function pdfPolyline(points) {
+      return points.map((point) => `${Math.round(point.x * 100) / 100},${Math.round(point.y * 100) / 100}`).join(" ");
+    }
+
+    function pdfDailyBarChart(items) {
+      const source = items.length > 45 ? items.slice(-45) : items;
+      if (!source.length) return '<div class="pdf-empty">Sem dados para o gráfico diário.</div>';
+      const width = 940;
+      const height = 300;
+      const left = 48;
+      const right = 16;
+      const top = 22;
+      const bottom = 46;
+      const chartWidth = width - left - right;
+      const chartHeight = height - top - bottom;
+      const maxValue = Math.max(...source.map((item) => Math.max(item.total, item.targetTotal, item.filteredVolume)), 1);
+      const step = chartWidth / source.length;
+      const barWidth = Math.max(3, Math.min(16, step * 0.45));
+      const targetWidth = Math.max(2, Math.min(10, step * 0.28));
+
+      const bars = source.map((item, index) => {
+        const center = left + index * step + step / 2;
+        const realHeight = (item.total / maxValue) * chartHeight;
+        const targetHeight = (item.targetTotal / maxValue) * chartHeight;
+        const filteredHeight = (item.filteredVolume / maxValue) * chartHeight;
+        const realY = top + chartHeight - realHeight;
+        const targetY = top + chartHeight - targetHeight;
+        const filteredY = top + chartHeight - filteredHeight;
+        const label = source.length <= 18 || index % Math.ceil(source.length / 18) === 0
+          ? `<text x="${center}" y="${height - 18}" text-anchor="middle" class="axis-label">${escapeHtml(formatDate(item.date).slice(0, 5))}</text>`
+          : "";
+        return `
+          <rect x="${center - barWidth - 1}" y="${realY}" width="${barWidth}" height="${realHeight}" rx="3" class="bar-real"></rect>
+          <rect x="${center + 1}" y="${filteredY}" width="${barWidth}" height="${filteredHeight}" rx="3" class="bar-filter"></rect>
+          <rect x="${center - targetWidth / 2}" y="${targetY - 3}" width="${targetWidth}" height="6" rx="2" class="bar-target"></rect>
+          ${label}
+        `;
+      }).join("");
+
+      return `
+        <svg class="pdf-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Evolução diária">
+          <line x1="${left}" y1="${top + chartHeight}" x2="${width - right}" y2="${top + chartHeight}" class="axis"></line>
+          <line x1="${left}" y1="${top}" x2="${left}" y2="${top + chartHeight}" class="axis"></line>
+          <text x="8" y="${top + 6}" class="axis-label">${formatNumber(maxValue)}</text>
+          <text x="8" y="${top + chartHeight}" class="axis-label">0</text>
+          ${bars}
+          <g transform="translate(${left}, 8)">
+            <rect width="10" height="10" rx="2" class="bar-real"></rect><text x="16" y="10" class="legend">Moagem</text>
+            <rect x="86" width="10" height="10" rx="2" class="bar-filter"></rect><text x="102" y="10" class="legend">Filtro</text>
+            <rect x="152" width="10" height="10" rx="2" class="bar-target"></rect><text x="168" y="10" class="legend">Meta</text>
+          </g>
+        </svg>
+        ${items.length > source.length ? `<div class="pdf-note">Gráfico exibindo os últimos ${source.length} dias. As tabelas mantêm o período completo.</div>` : ""}
+      `;
+    }
+
+    function pdfAccumulatedLineChart(items) {
+      if (!items.length) return '<div class="pdf-empty">Sem dados para a evolução acumulada.</div>';
+      const width = 940;
+      const height = 300;
+      const left = 52;
+      const right = 18;
+      const top = 24;
+      const bottom = 44;
+      const chartWidth = width - left - right;
+      const chartHeight = height - top - bottom;
+      let real = 0;
+      let target = 0;
+      let filtered = 0;
+      const accumulated = items.map((item) => {
+        real += item.total;
+        target += item.targetTotal;
+        filtered += item.filteredVolume;
+        return { date: item.date, real, target, filtered };
+      });
+      const maxValue = Math.max(...accumulated.flatMap((item) => [item.real, item.target, item.filtered]), 1);
+      const xFor = (index) => left + (items.length === 1 ? chartWidth / 2 : (index / (items.length - 1)) * chartWidth);
+      const yFor = (value) => top + chartHeight - (value / maxValue) * chartHeight;
+      const realPoints = accumulated.map((item, index) => ({ x: xFor(index), y: yFor(item.real) }));
+      const targetPoints = accumulated.map((item, index) => ({ x: xFor(index), y: yFor(item.target) }));
+      const filteredPoints = accumulated.map((item, index) => ({ x: xFor(index), y: yFor(item.filtered) }));
+      const labels = accumulated.map((item, index) => {
+        if (items.length > 18 && index % Math.ceil(items.length / 18) !== 0) return "";
+        return `<text x="${xFor(index)}" y="${height - 16}" text-anchor="middle" class="axis-label">${escapeHtml(formatDate(item.date).slice(0, 5))}</text>`;
+      }).join("");
+
+      return `
+        <svg class="pdf-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Evolução acumulada">
+          <line x1="${left}" y1="${top + chartHeight}" x2="${width - right}" y2="${top + chartHeight}" class="axis"></line>
+          <line x1="${left}" y1="${top}" x2="${left}" y2="${top + chartHeight}" class="axis"></line>
+          <text x="8" y="${top + 6}" class="axis-label">${formatNumber(maxValue)}</text>
+          <text x="8" y="${top + chartHeight}" class="axis-label">0</text>
+          <polyline points="${pdfPolyline(targetPoints)}" class="line-target"></polyline>
+          <polyline points="${pdfPolyline(filteredPoints)}" class="line-filter"></polyline>
+          <polyline points="${pdfPolyline(realPoints)}" class="line-real"></polyline>
+          ${labels}
+          <g transform="translate(${left}, 8)">
+            <line x1="0" y1="5" x2="18" y2="5" class="line-real"></line><text x="24" y="9" class="legend">Real</text>
+            <line x1="78" y1="5" x2="96" y2="5" class="line-target"></line><text x="102" y="9" class="legend">Previsto</text>
+            <line x1="168" y1="5" x2="186" y2="5" class="line-filter"></line><text x="192" y="9" class="legend">Filtro</text>
+          </g>
+        </svg>
+      `;
+    }
+
+    function pdfHorizontalBars(items, options = {}) {
+      const visible = items.slice(0, options.limit || 8);
+      if (!visible.length) return '<div class="pdf-empty">Sem dados para gráfico.</div>';
+      const maxValue = Math.max(...visible.map((item) => item.value), 1);
+      return `
+        <div class="pdf-bars">
+          ${visible.map((item) => {
+            const width = pdfPercent(item.value, options.total || maxValue);
+            return `
+              <div class="pdf-bar-row">
+                <div class="pdf-bar-label">${escapeHtml(item.label)}</div>
+                <div class="pdf-bar-track">
+                  <div class="pdf-bar-fill" style="width:${width}%"></div>
+                </div>
+                <div class="pdf-bar-value">${formatNumber(item.value)} · ${options.total ? formatPercent(progressFor(item.value, options.total)) : formatPercent(progressFor(item.value, maxValue))}</div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function pdfTable(headers, rows, options = {}) {
+      const limitedRows = options.limit ? rows.slice(0, options.limit) : rows;
+      return `
+        <table class="pdf-table">
+          <thead>
+            <tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>
+          </thead>
+          <tbody>
+            ${limitedRows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("")}
+          </tbody>
+        </table>
+        ${options.limit && rows.length > options.limit ? `<div class="pdf-note">Exibindo ${options.limit} de ${rows.length} linhas neste PDF. O CSV mantém todas.</div>` : ""}
+      `;
+    }
+
+    function buildManagementPdfHtml() {
+      const data = managementDataForRange();
+      const { range, filteredRecords, rows, baseSummary, summary, targetContext, filters } = data;
+      const dailyItems = chronologicalDailyReportItems(filteredRecords, rows, filters);
+      const originItems = reportOriginItems(rows, baseSummary);
+      const typeItems = reportTypeItems(rows, baseSummary, targetContext.targetDays);
+      const externalCane = baseSummary.florestaCane + baseSummary.valeCane;
+      const filteredVolume = rowProductionTotal(rows);
+      const rangeLabel = range.start === range.end ? formatDate(range.start) : `${formatDate(range.start)} a ${formatDate(range.end)}`;
+      const generatedAt = formatDateTime(new Date().toISOString());
+      const filterChips = [
+        `Operação: ${reportTypeLabel(filters.type)}`,
+        `Origem: ${filters.origin === "all" ? "Todas" : filters.origin}`,
+        `Status: ${reportStatusLabel(filters.status)}`,
+        `Moagem mínima: ${filters.minProduction ? formatNumber(filters.minProduction) : "Sem filtro"}`,
+        `Busca: ${els.reportsSearch.value || "Sem busca"}`
+      ];
+      const kpis = [
+        ["Moagem", formatNumber(baseSummary.total), "Sem somar transporte"],
+        ["Meta", formatNumber(baseSummary.targetTotal), `${targetContext.targetDays} dia${targetContext.targetDays === 1 ? "" : "s"}`],
+        ["% meta", formatPercent(baseSummary.targetPercent), baseSummary.targetTotal > 0 ? "Real / previsto" : "Sem meta"],
+        ["Falta/Sobra", formatNumber(Math.abs(baseSummary.total - baseSummary.targetTotal)), baseSummary.total >= baseSummary.targetTotal ? "Acima da meta" : "Para meta"],
+        ["Volume filtrado", formatNumber(filteredVolume), `${rows.length} registro${rows.length === 1 ? "" : "s"}`],
+        ["Própria", formatPercent(baseSummary.ownHarvestPercent), formatNumber(baseSummary.ownHarvest)],
+        ["Terceira", formatPercent(baseSummary.thirdHarvestPercent), formatNumber(baseSummary.thirdHarvest)],
+        ["Outras unidades", formatNumber(externalCane), formatPercent(progressFor(externalCane, baseSummary.total))],
+        ["Transp. próprio", formatPercent(baseSummary.ownTransportPercent), formatNumber(baseSummary.ownTransport)],
+        ["Transp. terceiro", formatPercent(baseSummary.thirdTransportPercent), formatNumber(baseSummary.thirdTransport)],
+        ["Transporte total", formatNumber(baseSummary.transportTotal), formatPercent(baseSummary.transportPercent)],
+        ["Dias exibidos", `${filteredRecords.length}`, `${dailyItems.length} no gráfico`]
+      ];
+      const mixItems = [
+        { label: "Colheita própria", value: baseSummary.ownHarvest },
+        { label: "Colheita terceira", value: baseSummary.thirdHarvest },
+        { label: "Cana Floresta", value: baseSummary.florestaCane },
+        { label: "Cana Vale", value: baseSummary.valeCane }
+      ].filter((item) => item.value > 0);
+      const transportItems = [
+        { label: "Transporte próprio", value: baseSummary.ownTransport },
+        { label: "Transporte terceiro", value: baseSummary.thirdTransport },
+        { label: "Total transportado", value: baseSummary.transportTotal }
+      ].filter((item) => item.value > 0);
+      const dailyRows = dailyItems.map((item) => [
+        formatDate(item.date),
+        formatNumber(item.total),
+        formatNumber(item.filteredVolume),
+        formatNumber(item.targetTotal),
+        formatPercent(item.targetPercent),
+        formatPercent(item.ownHarvestPercent),
+        formatPercent(item.thirdHarvestPercent),
+        formatPercent(item.transportPercent)
+      ]);
+      const originRows = originItems.map((item) => [
+        item.origin,
+        item.typeLabel,
+        formatNumber(item.production),
+        formatPercent(item.percent),
+        String(item.records)
+      ]);
+      const typeRows = typeItems.map((item) => [
+        item.type,
+        formatNumber(item.production),
+        formatPercent(item.percent),
+        formatNumber(item.target),
+        formatPercent(item.targetPercent),
+        String(item.records)
+      ]);
+
+      return `<!doctype html>
+        <html lang="pt-BR">
+        <head>
+          <meta charset="utf-8">
+          <title>Relatório Gerencial Cambuí ${escapeHtml(rangeLabel)}</title>
+          <style>
+            @page { size: A4 landscape; margin: 10mm; }
+            * { box-sizing: border-box; }
+            body { margin: 0; color: #172017; background: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 11px; }
+            .pdf-page { display: grid; gap: 12px; }
+            .pdf-cover { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: end; padding-bottom: 12px; border-bottom: 3px solid #1f6f3a; }
+            h1, h2, h3, p { margin: 0; }
+            h1 { font-size: 22px; letter-spacing: .2px; }
+            h2 { font-size: 14px; color: #18361f; }
+            h3 { font-size: 12px; color: #334155; }
+            .muted { color: #64748b; font-weight: 700; }
+            .pdf-meta { text-align: right; display: grid; gap: 4px; color: #475569; font-weight: 700; }
+            .pdf-chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+            .pdf-chip { border: 1px solid #cbd5e1; border-radius: 999px; padding: 4px 8px; background: #f8fafc; color: #334155; font-weight: 700; }
+            .pdf-kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+            .pdf-kpi { border: 1px solid #d8e4d4; border-radius: 8px; padding: 8px; background: #f8fbf7; min-height: 58px; display: grid; gap: 4px; align-content: start; }
+            .pdf-kpi span { color: #64748b; font-size: 9px; font-weight: 900; text-transform: uppercase; }
+            .pdf-kpi strong { font-size: 15px; color: #111827; }
+            .pdf-kpi small { color: #64748b; font-weight: 700; }
+            .pdf-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+            .pdf-section { border: 1px solid #d9e5d4; border-radius: 8px; padding: 10px; break-inside: avoid; background: #fff; }
+            .pdf-section.full { grid-column: 1 / -1; }
+            .pdf-title { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; margin-bottom: 8px; }
+            .pdf-chart { width: 100%; height: auto; display: block; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; }
+            .axis { stroke: #94a3b8; stroke-width: 1; }
+            .axis-label, .legend { fill: #475569; font-size: 10px; font-weight: 700; }
+            .bar-real, .line-real { fill: #2f6f3a; stroke: #2f6f3a; stroke-width: 3; }
+            .bar-filter, .line-filter { fill: #0f8b8d; stroke: #0f8b8d; stroke-width: 3; }
+            .bar-target, .line-target { fill: #2563eb; stroke: #2563eb; stroke-width: 3; }
+            .line-real, .line-filter, .line-target { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+            .pdf-bars { display: grid; gap: 7px; }
+            .pdf-bar-row { display: grid; grid-template-columns: 132px 1fr 120px; gap: 8px; align-items: center; }
+            .pdf-bar-label { font-weight: 800; color: #1f2937; overflow-wrap: anywhere; }
+            .pdf-bar-track { height: 10px; border-radius: 999px; overflow: hidden; background: #e5e7eb; }
+            .pdf-bar-fill { height: 100%; border-radius: inherit; background: #2f6f3a; }
+            .pdf-bar-value { color: #475569; font-weight: 800; text-align: right; white-space: nowrap; }
+            .pdf-table { width: 100%; border-collapse: collapse; font-size: 9.5px; }
+            .pdf-table th { text-align: left; background: #eaf3e8; color: #18361f; border: 1px solid #cbd5c7; padding: 5px; }
+            .pdf-table td { border: 1px solid #e2e8f0; padding: 4px 5px; }
+            .pdf-table tr:nth-child(even) td { background: #f8fafc; }
+            .pdf-note, .pdf-empty { color: #64748b; font-weight: 700; margin-top: 6px; }
+            .pdf-footer { margin-top: 4px; padding-top: 8px; border-top: 1px solid #cbd5e1; color: #64748b; display: flex; justify-content: space-between; font-weight: 700; }
+            @media print { .pdf-section { break-inside: avoid; } .pdf-page { gap: 10px; } }
+          </style>
+        </head>
+        <body>
+          <main class="pdf-page">
+            <header class="pdf-cover">
+              <div>
+                <h1>Relatório Gerencial - Produção Diária da Cambuí</h1>
+                <p class="muted">Período ${escapeHtml(rangeLabel)} · relatório com gráficos e filtros aplicados</p>
+              </div>
+              <div class="pdf-meta">
+                <span>Usina Cambuí</span>
+                <span>Gerado em ${escapeHtml(generatedAt)}</span>
+              </div>
+            </header>
+            <section class="pdf-chip-row">
+              ${filterChips.map((chip) => `<span class="pdf-chip">${escapeHtml(chip)}</span>`).join("")}
+            </section>
+            <section class="pdf-kpis">
+              ${kpis.map(([label, value, detail]) => `
+                <div class="pdf-kpi">
+                  <span>${escapeHtml(label)}</span>
+                  <strong>${escapeHtml(value)}</strong>
+                  <small>${escapeHtml(detail)}</small>
+                </div>
+              `).join("")}
+            </section>
+            <section class="pdf-grid-2">
+              <div class="pdf-section">
+                <div class="pdf-title"><h2>Evolução diária</h2><span class="muted">Moagem x filtro x meta</span></div>
+                ${pdfDailyBarChart(dailyItems)}
+              </div>
+              <div class="pdf-section">
+                <div class="pdf-title"><h2>Evolução acumulada</h2><span class="muted">Real x previsto</span></div>
+                ${pdfAccumulatedLineChart(dailyItems)}
+              </div>
+              <div class="pdf-section">
+                <div class="pdf-title"><h2>Mix da moagem</h2><span class="muted">% sobre moagem</span></div>
+                ${pdfHorizontalBars(mixItems, { total: baseSummary.total })}
+              </div>
+              <div class="pdf-section">
+                <div class="pdf-title"><h2>Transporte sobre moagem</h2><span class="muted">Próprio e terceiro</span></div>
+                ${pdfHorizontalBars(transportItems, { total: baseSummary.total })}
+              </div>
+              <div class="pdf-section">
+                <div class="pdf-title"><h2>Ranking de origens</h2><span class="muted">Top por volume</span></div>
+                ${pdfHorizontalBars(originItems.map((item) => ({ label: item.origin, value: item.production })), { total: Math.max(baseSummary.total, 1), limit: 10 })}
+              </div>
+              <div class="pdf-section">
+                <div class="pdf-title"><h2>Detalhamento por operação</h2><span class="muted">Volume e meta cadastrada</span></div>
+                ${pdfTable(["Operação", "Volume", "% moagem", "Meta", "% meta", "Reg."], typeRows, { limit: 8 })}
+              </div>
+              <div class="pdf-section full">
+                <div class="pdf-title"><h2>Relatório diário</h2><span class="muted">Base completa do período filtrado</span></div>
+                ${pdfTable(["Data", "Moagem", "Filtro", "Meta", "% meta", "% próp.", "% terc.", "% transp."], dailyRows, { limit: 40 })}
+              </div>
+              <div class="pdf-section full">
+                <div class="pdf-title"><h2>Origens da cana e transporte</h2><span class="muted">Ranking detalhado</span></div>
+                ${pdfTable(["Origem", "Tipo", "Volume", "% moagem", "Reg."], originRows, { limit: 30 })}
+              </div>
+            </section>
+            <footer class="pdf-footer">
+              <span>Produção Diária da Cambuí</span>
+              <span>Transporte apresentado separado da moagem, conforme regra do sistema.</span>
+            </footer>
+          </main>
+        </body>
+        </html>`;
+    }
+
+    function printManagementReportPdf() {
+      renderManagementReports();
+      const html = buildManagementPdfHtml();
+      const frame = document.createElement("iframe");
+      frame.style.position = "fixed";
+      frame.style.right = "0";
+      frame.style.bottom = "0";
+      frame.style.width = "0";
+      frame.style.height = "0";
+      frame.style.border = "0";
+      frame.setAttribute("aria-hidden", "true");
+      document.body.appendChild(frame);
+      const frameWindow = frame.contentWindow;
+      const frameDocument = frame.contentDocument || (frameWindow ? frameWindow.document : null);
+
+      if (!frameWindow || !frameDocument) {
+        frame.remove();
+        showToast("Não foi possível gerar o PDF neste navegador.");
+        return;
+      }
+
+      frameDocument.open();
+      frameDocument.write(html);
+      frameDocument.close();
+      showToast("Relatório PDF com gráficos gerado. Escolha salvar como PDF.");
+      setTimeout(() => {
+        frameWindow.focus();
+        frameWindow.print();
+      }, 250);
+      setTimeout(() => frame.remove(), 2500);
     }
 
     async function importJson(file) {
@@ -5898,7 +7743,67 @@
 
     els.dashboardStartDate.addEventListener("change", renderDashboard);
     els.dashboardEndDate.addEventListener("change", renderDashboard);
+    els.reportsStartDate.addEventListener("change", renderManagementReports);
+    els.reportsEndDate.addEventListener("change", renderManagementReports);
+    [els.reportsTypeFilter, els.reportsOriginFilter, els.reportsStatusFilter, els.reportsSort].forEach((field) => {
+      field.addEventListener("change", renderManagementReports);
+    });
+    els.reportsSearch.addEventListener("input", renderManagementReports);
+    els.reportsMinProduction.addEventListener("input", renderManagementReports);
+    els.reportsMinProduction.addEventListener("change", () => {
+      const value = parseNumber(els.reportsMinProduction.value);
+      els.reportsMinProduction.value = value > 0 ? formatNumber(value) : "";
+      renderManagementReports();
+    });
     els.historySearch.addEventListener("input", renderHistory);
+
+    document.querySelector("#reportsTodayBtn").addEventListener("click", () => {
+      const today = todayInputValue();
+      setManagementRange(today, today);
+      renderManagementReports();
+    });
+
+    document.querySelector("#reportsWeekBtn").addEventListener("click", () => {
+      const range = weekRangeFor(todayInputValue());
+      setManagementRange(range.start, range.end);
+      renderManagementReports();
+    });
+
+    document.querySelector("#reportsMonthBtn").addEventListener("click", () => {
+      const today = todayInputValue();
+      const range = monthRangeFor(today);
+      setManagementRange(range.start, today);
+      renderManagementReports();
+    });
+
+    document.querySelector("#reportsSafraBtn").addEventListener("click", () => {
+      const firstMonth = safraPlanMonths[0];
+      const lastMonth = safraPlanMonths[safraPlanMonths.length - 1];
+      setManagementRange(firstMonth.start, lastMonth.end);
+      renderManagementReports();
+    });
+
+    document.querySelector("#reportsAllBtn").addEventListener("click", () => {
+      const plantRecords = getCleanRecords(records).filter((record) => recordBelongsToPlant(record));
+      const first = plantRecords[0];
+      const latest = plantRecords[plantRecords.length - 1];
+      if (!first || !latest) {
+        const today = todayInputValue();
+        setManagementRange(today, today);
+        showToast("Ainda não há lançamento salvo.");
+      } else {
+        setManagementRange(first.date, latest.date);
+      }
+      renderManagementReports();
+    });
+
+    document.querySelector("#clearReportsFiltersBtn").addEventListener("click", () => {
+      resetManagementFilters();
+      renderManagementReports();
+    });
+
+    document.querySelector("#exportReportsCsvBtn").addEventListener("click", exportManagementReportCsv);
+    document.querySelector("#printReportsBtn").addEventListener("click", printManagementReportPdf);
 
     els.frontCards.forEach((card) => {
       card.addEventListener("click", () => openFrontWorkspace(card.dataset.front, card.dataset.type));
@@ -6077,6 +7982,10 @@
       showToast("Modo offline ativo. O sistema vai sincronizar quando a internet voltar.");
     });
 
+    window.addEventListener("afterprint", () => {
+      document.body.classList.remove("print-reports");
+    });
+
     applyTheme(currentTheme);
     renderFirebaseConfigForm();
     renderFirebaseStatus();
@@ -6087,11 +7996,14 @@
     const initialDate = todayInputValue();
     const initialDashboardRecord = recordForDate(initialDate) || latestRecord();
     const initialDashboardDate = initialDashboardRecord ? initialDashboardRecord.date : initialDate;
+    const initialReportRange = monthRangeFor(initialDate);
     setDashboardRange(initialDashboardDate, initialDashboardDate);
+    setManagementRange(initialReportRange.start, initialDate);
     els.entryDate.value = initialDate;
     renderTargets();
     refreshEntryFromSelectedDate({ clearWhenMissing: true, silent: true });
     renderDashboard();
+    renderManagementReports();
     renderHistory();
 
     ensureFirebaseReady({ silent: true }).then((ready) => {
