@@ -1158,12 +1158,12 @@
         <article class="stat">
           <span>Frentes próprias</span>
           <strong id="dashOwnHarvest">0</strong>
-          <small>4001, 4002 e 4003</small>
+          <small id="dashOwnHarvestPercent">0% da moagem</small>
         </article>
         <article class="stat">
           <span>Frentes terceiras</span>
           <strong id="dashThirdHarvest">0</strong>
-          <small>4007 e 4009</small>
+          <small id="dashThirdHarvestPercent">0% da moagem</small>
         </article>
         <article class="stat">
           <span>Cana Floresta</span>
@@ -1352,12 +1352,12 @@
         <article class="stat">
           <span>Colheita própria</span>
           <strong id="entryOwnHarvest">0</strong>
-          <small>Total por frente</small>
+          <small id="entryOwnHarvestPercent">0% da moagem</small>
         </article>
         <article class="stat">
           <span>Colheita terceira</span>
           <strong id="entryThirdHarvest">0</strong>
-          <small>Por frente</small>
+          <small id="entryThirdHarvestPercent">0% da moagem</small>
         </article>
         <article class="stat">
           <span>Cana Floresta</span>
@@ -1777,13 +1777,13 @@
     ];
 
     const safraPlanMonths = [
-      { key: "2026-04", label: "Abr", days: 8, planned: 68064 },
-      { key: "2026-05", label: "Mai", days: 31, planned: 333498 },
-      { key: "2026-06", label: "Jun", days: 30, planned: 323640 },
-      { key: "2026-07", label: "Jul", days: 31, planned: 353400 },
-      { key: "2026-08", label: "Ago", days: 31, planned: 340194 },
-      { key: "2026-09", label: "Set", days: 30, planned: 325368 },
-      { key: "2026-10", label: "Out", days: 22, planned: 202042 }
+      { key: "2026-04", label: "Abr", start: "2026-04-23", end: "2026-04-30", days: 8, planned: 68064 },
+      { key: "2026-05", label: "Mai", start: "2026-05-01", end: "2026-05-31", days: 31, planned: 333498 },
+      { key: "2026-06", label: "Jun", start: "2026-06-01", end: "2026-06-30", days: 30, planned: 323640 },
+      { key: "2026-07", label: "Jul", start: "2026-07-01", end: "2026-07-31", days: 31, planned: 353400 },
+      { key: "2026-08", label: "Ago", start: "2026-08-01", end: "2026-08-31", days: 31, planned: 340194 },
+      { key: "2026-09", label: "Set", start: "2026-09-01", end: "2026-09-30", days: 30, planned: 325368 },
+      { key: "2026-10", label: "Out", start: "2026-10-01", end: "2026-10-22", days: 22, planned: 202042 }
     ];
 
     const defaultEntries = [];
@@ -1859,7 +1859,9 @@
       auditWrap: document.querySelector("#auditWrap"),
       dashTotal: document.querySelector("#dashTotal"),
       dashOwnHarvest: document.querySelector("#dashOwnHarvest"),
+      dashOwnHarvestPercent: document.querySelector("#dashOwnHarvestPercent"),
       dashThirdHarvest: document.querySelector("#dashThirdHarvest"),
+      dashThirdHarvestPercent: document.querySelector("#dashThirdHarvestPercent"),
       dashFlorestaCane: document.querySelector("#dashFlorestaCane"),
       dashValeCane: document.querySelector("#dashValeCane"),
       dashOwnTransport: document.querySelector("#dashOwnTransport"),
@@ -1875,7 +1877,9 @@
       dashAllAccumulated: document.querySelector("#dashAllAccumulated"),
       entryTotal: document.querySelector("#entryTotal"),
       entryOwnHarvest: document.querySelector("#entryOwnHarvest"),
+      entryOwnHarvestPercent: document.querySelector("#entryOwnHarvestPercent"),
       entryThirdHarvest: document.querySelector("#entryThirdHarvest"),
+      entryThirdHarvestPercent: document.querySelector("#entryThirdHarvestPercent"),
       entryFlorestaCane: document.querySelector("#entryFlorestaCane"),
       entryValeCane: document.querySelector("#entryValeCane"),
       entryOwnTransport: document.querySelector("#entryOwnTransport"),
@@ -2037,14 +2041,67 @@
       }
 
       const targetEnd = range.end > today ? today : range.end;
+      const calendarTargetDays = daysBetweenInclusive(range.start, targetEnd);
+      const plannedDays = plannedDaysForRange(range.start, targetEnd);
       return {
         ...range,
         selectedDays,
         targetStart: range.start,
         targetEnd,
-        targetDays: daysBetweenInclusive(range.start, targetEnd),
+        targetDays: plannedDays || calendarTargetDays,
         cappedAtToday: range.end > today
       };
+    }
+
+    function plannedDaysForRange(start, end) {
+      const range = normalizeDateRange(start, end);
+      let plannedDays = 0;
+
+      safraPlanMonths.forEach((month) => {
+        const segmentStart = range.start > month.start ? range.start : month.start;
+        const segmentEnd = range.end < month.end ? range.end : month.end;
+        if (segmentStart <= segmentEnd) {
+          plannedDays += daysBetweenInclusive(segmentStart, segmentEnd);
+        }
+      });
+
+      return plannedDays;
+    }
+
+    function plannedTargetForRange(start, end) {
+      const range = normalizeDateRange(start, end);
+      const totalDays = daysBetweenInclusive(range.start, range.end);
+      let plannedDays = 0;
+      let total = 0;
+
+      safraPlanMonths.forEach((month) => {
+        const monthStart = month.start;
+        const monthEnd = month.end;
+        const segmentStart = range.start > monthStart ? range.start : monthStart;
+        const segmentEnd = range.end < monthEnd ? range.end : monthEnd;
+
+        if (segmentStart > segmentEnd) return;
+
+        const days = daysBetweenInclusive(segmentStart, segmentEnd);
+        plannedDays += days;
+        total += (month.planned / month.days) * days;
+      });
+
+      if (!plannedDays) {
+        total = totalRegisteredTarget() * totalDays;
+      }
+
+      return Math.round(total * 1000) / 1000;
+    }
+
+    function plannedTargetForDate(date) {
+      const cleanDate = normalizeRecordDate(date);
+      return cleanDate ? plannedTargetForRange(cleanDate, cleanDate) : totalRegisteredTarget();
+    }
+
+    function plannedTargetForInfo(info) {
+      if (!info || !info.targetDays) return 0;
+      return plannedTargetForRange(info.targetStart, info.targetEnd);
     }
 
     function monthRangeFor(date) {
@@ -3300,10 +3357,13 @@
 
     function summarizeRows(rows, options = {}) {
       const targetDays = options.targetDays ?? targetDaysForRows(rows);
+      const targetTotal = options.targetTotal ?? totalRegisteredTarget() * targetDays;
       const summary = {
         total: 0,
         ownHarvest: 0,
         thirdHarvest: 0,
+        ownHarvestPercent: 0,
+        thirdHarvestPercent: 0,
         florestaCane: 0,
         valeCane: 0,
         ownTransport: 0,
@@ -3312,7 +3372,7 @@
         thirdTransportPercent: 0,
         transportTotal: 0,
         transportPercent: 0,
-        targetTotal: totalRegisteredTarget() * targetDays,
+        targetTotal,
         rowTargetTotal: 0,
         remaining: 0,
         targetPercent: 0,
@@ -3337,6 +3397,8 @@
         }
       });
 
+      summary.ownHarvestPercent = progressFor(summary.ownHarvest, summary.total);
+      summary.thirdHarvestPercent = progressFor(summary.thirdHarvest, summary.total);
       summary.transportTotal = summary.ownTransport + summary.thirdTransport;
       summary.ownTransportPercent = progressFor(summary.ownTransport, summary.total);
       summary.thirdTransportPercent = progressFor(summary.thirdTransport, summary.total);
@@ -3457,7 +3519,9 @@
       const targetDays = options.targetDays ?? targetDaysForRows(rows);
       els[`${prefix}Total`].textContent = formatNumber(summary.total);
       els[`${prefix}OwnHarvest`].textContent = formatNumber(summary.ownHarvest);
+      els[`${prefix}OwnHarvestPercent`].textContent = `${formatPercent(summary.ownHarvestPercent)} da moagem`;
       els[`${prefix}ThirdHarvest`].textContent = formatNumber(summary.thirdHarvest);
+      els[`${prefix}ThirdHarvestPercent`].textContent = `${formatPercent(summary.thirdHarvestPercent)} da moagem`;
       els[`${prefix}FlorestaCane`].textContent = formatNumber(summary.florestaCane);
       els[`${prefix}ValeCane`].textContent = formatNumber(summary.valeCane);
       els[`${prefix}OwnTransport`].textContent = formatNumber(summary.ownTransport);
@@ -3540,7 +3604,10 @@
 
     function safraRealForMonth(month) {
       const monthRecords = getCleanRecords(records)
-        .filter((record) => normalizeRecordDate(record.date).startsWith(month.key));
+        .filter((record) => {
+          const date = normalizeRecordDate(record.date);
+          return date >= month.start && date <= month.end;
+        });
       const rows = rowsFromRecords(monthRecords).filter(isMoagemRow);
       const real = rows.reduce((sum, row) => sum + (Number(row.production) || 0), 0);
       const launchedDays = new Set(rows.map((row) => row.date).filter(Boolean)).size;
@@ -3563,7 +3630,10 @@
       const totalReal = items.reduce((sum, item) => sum + item.real, 0);
       const totalLaunchedDays = new Set(
         getCleanRecords(records)
-          .filter((record) => safraPlanMonths.some((month) => normalizeRecordDate(record.date).startsWith(month.key)))
+          .filter((record) => {
+            const date = normalizeRecordDate(record.date);
+            return safraPlanMonths.some((month) => date >= month.start && date <= month.end);
+          })
           .flatMap((record) => rowsFromRecords([record]).filter(isMoagemRow).map((row) => row.date))
           .filter(Boolean)
       ).size;
@@ -4030,7 +4100,10 @@
       const monthRecords = monthRange.start > today ? [] : recordsForRange(monthRange.start, monthEnd);
       const monthRows = rowsFromRecords(monthRecords);
       const monthTargetInfo = targetInfoForRange(monthRange.start, monthEnd);
-      const monthSummary = summarizeRows(monthRows, { targetDays: monthTargetInfo.targetDays });
+      const monthSummary = summarizeRows(monthRows, {
+        targetDays: monthTargetInfo.targetDays,
+        targetTotal: plannedTargetForInfo(monthTargetInfo)
+      });
       const monthElapsedDays = daysBetweenInclusive(monthRange.start, monthEnd);
       const monthTotalDays = daysBetweenInclusive(monthRange.start, monthRange.end);
       const projectedMonth = monthElapsedDays ? (monthSummary.total / monthElapsedDays) * monthTotalDays : 0;
@@ -4218,7 +4291,10 @@
       return (recordsList || [])
         .map((record) => {
           const rows = rowsFromRecords([record]);
-          const summary = summarizeRows(rows, { targetDays: 1 });
+          const summary = summarizeRows(rows, {
+            targetDays: 1,
+            targetTotal: plannedTargetForDate(record.date)
+          });
           return {
             date: record.date,
             updatedAt: record.updatedAt,
@@ -4321,6 +4397,8 @@
             <tr>
               <th>Data</th>
               <th>Produção</th>
+              <th>% Própria</th>
+              <th>% Terceira</th>
               <th>Transporte</th>
               <th>% Próprio</th>
               <th>% Terceiro</th>
@@ -4337,6 +4415,8 @@
               <tr>
                 <td>${formatDate(item.date)}</td>
                 <td>${formatNumber(item.total)}</td>
+                <td>${formatPercent(item.ownHarvestPercent)}</td>
+                <td>${formatPercent(item.thirdHarvestPercent)}</td>
                 <td>${formatNumber(item.transportTotal)}</td>
                 <td>${formatPercent(item.ownTransportPercent)}</td>
                 <td>${formatPercent(item.thirdTransportPercent)}</td>
@@ -4357,11 +4437,16 @@
       return (recordsList || [])
         .map((record) => {
           const rows = rowsFromRecords([record]);
-          const summary = summarizeRows(rows, { targetDays: 1 });
+          const summary = summarizeRows(rows, {
+            targetDays: 1,
+            targetTotal: plannedTargetForDate(record.date)
+          });
           return {
             date: record.date,
             ownHarvest: productionByType(rows, TYPES.OWN_HARVEST),
+            ownHarvestPercent: summary.ownHarvestPercent,
             thirdHarvest: productionByType(rows, TYPES.THIRD_HARVEST),
+            thirdHarvestPercent: summary.thirdHarvestPercent,
             florestaCane: productionByType(rows, TYPES.FLORESTA_CANE),
             valeCane: productionByType(rows, TYPES.VALE_CANE),
             ownTransport: productionByType(rows, TYPES.OWN_TRANSPORT),
@@ -4390,7 +4475,9 @@
             <tr>
               <th>Data</th>
               <th>Colheita própria</th>
+              <th>% própria</th>
               <th>Colheita terceira</th>
+              <th>% terceira</th>
               <th>Cana Floresta</th>
               <th>Cana Vale</th>
               <th>Transp. próprio</th>
@@ -4408,7 +4495,9 @@
               <tr>
                 <td>${formatDate(item.date)}</td>
                 <td>${formatNumber(item.ownHarvest)}</td>
+                <td>${formatPercent(item.ownHarvestPercent)}</td>
                 <td>${formatNumber(item.thirdHarvest)}</td>
+                <td>${formatPercent(item.thirdHarvestPercent)}</td>
                 <td>${formatNumber(item.florestaCane)}</td>
                 <td>${formatNumber(item.valeCane)}</td>
                 <td>${formatNumber(item.ownTransport)}</td>
@@ -4433,20 +4522,27 @@
       const selectedRecords = recordsForRange(range.start, range.end);
       const rows = rowsFromRecords(selectedRecords);
       const targetDays = targetInfo.targetDays;
+      const targetTotal = plannedTargetForInfo(targetInfo);
       const rangeLabel = range.start === range.end
         ? formatDate(range.start)
         : `${formatDate(range.start)} a ${formatDate(range.end)}`;
       const monthRange = monthRangeFor(range.end);
       const monthRecords = recordsForRange(monthRange.start, monthRange.end);
       const monthTargetInfo = targetInfoForRange(monthRange.start, monthRange.end);
-      const monthSummary = summarizeRows(rowsFromRecords(monthRecords), { targetDays: monthTargetInfo.targetDays });
+      const monthSummary = summarizeRows(rowsFromRecords(monthRecords), {
+        targetDays: monthTargetInfo.targetDays,
+        targetTotal: plannedTargetForInfo(monthTargetInfo)
+      });
       const allRecords = getCleanRecords(records);
       const allTargetInfo = allRecords.length
         ? targetInfoForRange(allRecords[0].date, allRecords[allRecords.length - 1].date)
         : { targetDays: 0 };
-      const allSummary = summarizeRows(rowsFromRecords(allRecords), { targetDays: allTargetInfo.targetDays });
+      const allSummary = summarizeRows(rowsFromRecords(allRecords), {
+        targetDays: allTargetInfo.targetDays,
+        targetTotal: plannedTargetForInfo(allTargetInfo)
+      });
       const targetLabel = targetInfo.targetDays
-        ? ` Meta calculada por ${targetInfo.targetDays} dia${targetInfo.targetDays === 1 ? "" : "s"} (${formatDate(targetInfo.targetStart)} a ${formatDate(targetInfo.targetEnd)}).`
+        ? ` Meta da safra calculada por ${targetInfo.targetDays} dia${targetInfo.targetDays === 1 ? "" : "s"} de safra no período (${formatDate(targetInfo.targetStart)} a ${formatDate(targetInfo.targetEnd)}).`
         : " Meta do período sem dias vencidos para calcular.";
 
       els.dashboardSource.textContent = selectedRecords.length
@@ -4456,15 +4552,15 @@
       els.dashMonthAccumulatedLabel.textContent = `Mês ${formatMonth(range.end)}`;
       els.dashAllAccumulated.textContent = formatNumber(allSummary.total);
 
-      setStats("dash", rows, { targetDays });
-      renderAdvancedKpis(selectedRecords, rows, range, { targetDays, targetInfo });
-      renderDashboardCharts(rows, { targetDays });
+      setStats("dash", rows, { targetDays, targetTotal });
+      renderAdvancedKpis(selectedRecords, rows, range, { targetDays, targetInfo, targetTotal });
+      renderDashboardCharts(rows, { targetDays, targetTotal });
       renderDailyTrend(selectedRecords);
-      renderOperationMix(rows, { targetDays });
-      renderDashboardAlerts(selectedRecords, rows, { targetDays });
+      renderOperationMix(rows, { targetDays, targetTotal });
+      renderDashboardAlerts(selectedRecords, rows, { targetDays, targetTotal });
       renderTypeSummary(rows);
       renderFrontSummary(rows);
-      renderDashboardHighlights(selectedRecords, rows, { targetDays });
+      renderDashboardHighlights(selectedRecords, rows, { targetDays, targetTotal });
       renderDailySummary(selectedRecords);
       renderDailyMatrix(selectedRecords);
       renderDashboardRows(rows);
@@ -5563,7 +5659,9 @@
               <th>% Meta</th>
               <th>Falta</th>
               <th>Frentes próprias</th>
+              <th>% próprias</th>
               <th>Frentes terceiras</th>
+              <th>% terceiras</th>
               <th>Cana Floresta</th>
               <th>Cana Vale</th>
               <th>Transp. próprio</th>
@@ -5578,7 +5676,10 @@
           </thead>
           <tbody>
             ${filtered.map((record) => {
-              const summary = summarizeRows(record.rows);
+              const summary = summarizeRows(record.rows, {
+                targetDays: 1,
+                targetTotal: plannedTargetForDate(record.date)
+              });
               return `
                 <tr>
                   <td>${formatDate(record.date)}</td>
@@ -5587,7 +5688,9 @@
                   <td>${formatPercent(summary.targetPercent)}</td>
                   <td>${formatNumber(summary.remaining)}</td>
                   <td>${formatNumber(summary.ownHarvest)}</td>
+                  <td>${formatPercent(summary.ownHarvestPercent)}</td>
                   <td>${formatNumber(summary.thirdHarvest)}</td>
+                  <td>${formatPercent(summary.thirdHarvestPercent)}</td>
                   <td>${formatNumber(summary.florestaCane)}</td>
                   <td>${formatNumber(summary.valeCane)}</td>
                   <td>${formatNumber(summary.ownTransport)}</td>
@@ -6006,7 +6109,6 @@
       if (!pendingSyncQueue.length) return;
       return flushPendingSyncQueue({ silent: true });
     });
-    
   </script>
 </body>
 </html>
