@@ -1765,6 +1765,14 @@
               <input id="patioEntryArrivalField" type="datetime-local">
             </div>
             <div class="field">
+              <label for="patioEntryLoadStart">Início carga</label>
+              <input id="patioEntryLoadStart" type="datetime-local">
+            </div>
+            <div class="field">
+              <label for="patioEntryLoadEnd">Fim carga</label>
+              <input id="patioEntryLoadEnd" type="datetime-local">
+            </div>
+            <div class="field">
               <label for="patioEntryDepartureField">Saída frente/palha</label>
               <input id="patioEntryDepartureField" type="datetime-local">
             </div>
@@ -1783,7 +1791,7 @@
           </div>
           <div class="patio-entry-footer">
             <div class="patio-preview">
-              <span>Tempo na frente: <strong id="patioEntryFieldPreview">0 min</strong></span>
+              <span>Tempo palha: <strong id="patioEntryFieldPreview">0 min</strong></span>
               <span>Ciclo total: <strong id="patioEntryCyclePreview">-</strong></span>
             </div>
             <div class="actions">
@@ -2401,6 +2409,8 @@
       patioEntryFront: document.querySelector("#patioEntryFront"),
       patioEntryDepartureTraffic: document.querySelector("#patioEntryDepartureTraffic"),
       patioEntryArrivalField: document.querySelector("#patioEntryArrivalField"),
+      patioEntryLoadStart: document.querySelector("#patioEntryLoadStart"),
+      patioEntryLoadEnd: document.querySelector("#patioEntryLoadEnd"),
       patioEntryDepartureField: document.querySelector("#patioEntryDepartureField"),
       patioEntryArrivalMill: document.querySelector("#patioEntryArrivalMill"),
       patioEntryWeighingStart: document.querySelector("#patioEntryWeighingStart"),
@@ -4158,7 +4168,18 @@
     }
 
     function patioRecordDate(record) {
-      return String(record.departureTraffic || record.arrivalField || record.departureField || record.arrivalMill || "").slice(0, 10);
+      return String(record.departureTraffic || record.arrivalField || record.loadStart || record.loadEnd || record.departureField || record.arrivalMill || "").slice(0, 10);
+    }
+
+    function refreshPatioDerivedTimes(record) {
+      record.toFieldMinutes = patioMinutesBetween(record.departureTraffic, record.arrivalField);
+      record.waitLoadMinutes = patioMinutesBetween(record.arrivalField, record.loadStart);
+      record.afterLoadWaitMinutes = patioMinutesBetween(record.loadEnd, record.departureField);
+      record.loadedReturnMinutes = patioMinutesBetween(record.departureField, record.arrivalMill);
+      record.weighingWaitMinutes = patioMinutesBetween(record.arrivalMill, record.weighingStart);
+      record.weighingMinutes = patioMinutesBetween(record.weighingStart, record.weighingEnd);
+      record.cycleMinutes = patioMinutesBetween(record.departureTraffic, record.weighingEnd);
+      return record;
     }
 
     function normalizePatioRecord(row) {
@@ -4188,6 +4209,21 @@
         "Chegada Palha",
         "Chegada frente"
       ]));
+      const loadStart = patioDateTimeValue(valueFromRow(row, [
+        "loadStart",
+        "Dt./Hr.  Inicio de  Carga",
+        "Dt./Hr. Inicio de Carga",
+        "Dt./Hr. Início de Carga",
+        "Inicio de Carga",
+        "Início de Carga",
+        "Inicio Carga"
+      ]));
+      const loadEnd = patioDateTimeValue(valueFromRow(row, [
+        "loadEnd",
+        "Dt./Hr. Fim Carga",
+        "Fim Carga",
+        "Fim de Carga"
+      ]));
       const departureField = patioDateTimeValue(valueFromRow(row, [
         "departureField",
         "Dt hr saida palha",
@@ -4215,6 +4251,8 @@
       const date = String(row.date || patioRecordDate({
         departureTraffic,
         arrivalField,
+        loadStart,
+        loadEnd,
         departureField,
         arrivalMill
       }) || "").slice(0, 10);
@@ -4228,9 +4266,18 @@
         "Tempo de patio",
         "Tempo de pátio"
       ]));
+      if (!fieldMinutes) fieldMinutes = patioMinutesBetween(loadStart, loadEnd);
       if (!fieldMinutes) fieldMinutes = patioMinutesBetween(arrivalField, departureField);
 
       if (!truck || !front || !date) return null;
+
+      const source = String(row.source || row.origem || "Sistema").trim();
+      const sourceKey = normalizeKey(source);
+      const transportClass = sourceKey.includes("terceir")
+        ? "Terceiro"
+        : sourceKey.includes("proprio") || sourceKey.includes("proprios")
+          ? "Próprio"
+          : String(row.transportClass || row.transportType || "").trim();
 
       const record = {
         id: row.id || makeId(),
@@ -4240,24 +4287,34 @@
         date,
         departureTraffic,
         arrivalField,
+        loadStart,
+        loadEnd,
         departureField,
         fieldMinutes,
         arrivalMill,
         weighingStart,
         weighingEnd,
-        source: String(row.source || row.origem || "Planilha").trim()
+        source,
+        transportClass
       };
 
-      record.toFieldMinutes = patioMinutesBetween(record.departureTraffic, record.arrivalField);
-      record.loadedReturnMinutes = patioMinutesBetween(record.departureField, record.arrivalMill);
-      record.weighingWaitMinutes = patioMinutesBetween(record.arrivalMill, record.weighingStart);
-      record.weighingMinutes = patioMinutesBetween(record.weighingStart, record.weighingEnd);
-      record.cycleMinutes = patioMinutesBetween(record.departureTraffic, record.weighingEnd);
-      return record;
+      return refreshPatioDerivedTimes(record);
     }
 
     function getCleanPatioRecords(source = patioRecords) {
       const grouped = new Map();
+      const mergeDistinctText = (current, incoming) => {
+        const values = [
+          ...String(current || "").split(" / "),
+          ...String(incoming || "").split(" / ")
+        ].map((item) => item.trim()).filter(Boolean);
+        const unique = [];
+        values.forEach((value) => {
+          if (!unique.some((item) => sameText(item, value))) unique.push(value);
+        });
+        return unique.join(" / ");
+      };
+
       (source || []).forEach((row) => {
         const normalized = normalizePatioRecord(row);
         if (!normalized) return;
@@ -4265,9 +4322,30 @@
           normalized.date,
           normalizeKey(normalized.truck),
           normalizeKey(normalized.front),
-          normalized.departureTraffic || normalized.arrivalField || normalized.departureField
+          normalized.departureTraffic || normalized.arrivalField || normalized.loadStart || normalized.departureField
         ].join("|");
-        grouped.set(key, normalized);
+        const current = grouped.get(key);
+        if (!current) {
+          grouped.set(key, normalized);
+          return;
+        }
+
+        current.source = mergeDistinctText(current.source, normalized.source);
+        current.transportClass = mergeDistinctText(current.transportClass, normalized.transportClass);
+        [
+          "departureTraffic",
+          "arrivalField",
+          "loadStart",
+          "loadEnd",
+          "departureField",
+          "arrivalMill",
+          "weighingStart",
+          "weighingEnd"
+        ].forEach((field) => {
+          if (!current[field] && normalized[field]) current[field] = normalized[field];
+        });
+        if (!current.fieldMinutes && normalized.fieldMinutes) current.fieldMinutes = normalized.fieldMinutes;
+        refreshPatioDerivedTimes(current);
       });
 
       return [...grouped.values()].sort((a, b) => {
@@ -4307,6 +4385,10 @@
       return { key: "good", label: "Até 60 min", className: "good" };
     }
 
+    function patioTransportLabel(record) {
+      return String(record.transportClass || record.source || "Sistema").trim() || "Sistema";
+    }
+
     function datetimeLocalInputValue(value) {
       return value ? String(value).slice(0, 16) : "";
     }
@@ -4319,6 +4401,8 @@
       els.patioEntryFront.value = "";
       els.patioEntryDepartureTraffic.value = "";
       els.patioEntryArrivalField.value = "";
+      els.patioEntryLoadStart.value = "";
+      els.patioEntryLoadEnd.value = "";
       els.patioEntryDepartureField.value = "";
       els.patioEntryArrivalMill.value = "";
       els.patioEntryWeighingStart.value = "";
@@ -4336,6 +4420,8 @@
       els.patioEntryFront.value = record.front || "";
       els.patioEntryDepartureTraffic.value = datetimeLocalInputValue(record.departureTraffic);
       els.patioEntryArrivalField.value = datetimeLocalInputValue(record.arrivalField);
+      els.patioEntryLoadStart.value = datetimeLocalInputValue(record.loadStart);
+      els.patioEntryLoadEnd.value = datetimeLocalInputValue(record.loadEnd);
       els.patioEntryDepartureField.value = datetimeLocalInputValue(record.departureField);
       els.patioEntryArrivalMill.value = datetimeLocalInputValue(record.arrivalMill);
       els.patioEntryWeighingStart.value = datetimeLocalInputValue(record.weighingStart);
@@ -4349,6 +4435,8 @@
       const dateFromTimes = [
         els.patioEntryDepartureTraffic.value,
         els.patioEntryArrivalField.value,
+        els.patioEntryLoadStart.value,
+        els.patioEntryLoadEnd.value,
         els.patioEntryDepartureField.value,
         els.patioEntryArrivalMill.value,
         els.patioEntryWeighingStart.value,
@@ -4363,6 +4451,8 @@
         date,
         departureTraffic: els.patioEntryDepartureTraffic.value,
         arrivalField: els.patioEntryArrivalField.value,
+        loadStart: els.patioEntryLoadStart.value,
+        loadEnd: els.patioEntryLoadEnd.value,
         departureField: els.patioEntryDepartureField.value,
         arrivalMill: els.patioEntryArrivalMill.value,
         weighingStart: els.patioEntryWeighingStart.value,
@@ -4382,8 +4472,8 @@
         showToast("Informe data, caminhão e frente.");
         return false;
       }
-      if (!record.arrivalField || !record.departureField) {
-        showToast("Informe chegada e saída da frente para calcular o tempo de pátio.");
+      if (!(record.loadStart && record.loadEnd) && !(record.arrivalField && record.departureField)) {
+        showToast("Informe início/fim de carga ou chegada/saída da palha para calcular o tempo.");
         return false;
       }
       return true;
@@ -4475,7 +4565,7 @@
         .filter((record) => status === "all" || patioStatusFor(record).key === status)
         .filter((record) => {
           if (!search) return true;
-          return normalizeKey(`${record.truck} ${record.front} ${record.plant}`).includes(search);
+          return normalizeKey(`${record.truck} ${record.front} ${record.plant} ${record.source} ${record.transportClass}`).includes(search);
         });
 
       return rows.sort((a, b) => {
@@ -4550,7 +4640,7 @@
         ["Viagens", rows.length, "Registros filtrados"],
         ["Caminhões", trucks.size, "Frotas identificadas"],
         ["Frentes", fronts.size, "Frentes no período"],
-        ["Média na frente", formatMinutes(average(rows.map((record) => record.fieldMinutes))), "Tempo palha/pátio"],
+        ["Média palha", formatMinutes(average(rows.map((record) => record.fieldMinutes))), "Início/fim carga"],
         ["Maior tempo", maxRecord ? formatMinutes(maxRecord.fieldMinutes) : "0 min", maxRecord ? `${maxRecord.truck} · ${maxRecord.front}` : "Sem registro"],
         ["Ciclo médio", formatMinutes(average(rows.map((record) => record.cycleMinutes))), "Saída tráfego até pesagem"],
         ["Pesagem média", formatMinutes(average(rows.map((record) => record.weighingMinutes))), "Início até saída pesagem"],
@@ -4677,8 +4767,8 @@
       els.patioInsightsWrap.innerHTML = `
         <div class="alert-grid">
           <div class="alert-item ${criticalRows.length ? "alert" : "good"}">
-            <strong>${criticalRows.length ? `${criticalRows.length} viagem${criticalRows.length === 1 ? "" : "s"} acima de 90 min` : "Tempo na frente controlado"}</strong>
-            <span>${criticalRows.length ? "Priorize as frentes/caminhões com maior tempo médio na frente." : "Nenhuma viagem filtrada passou de 90 minutos na frente."}</span>
+            <strong>${criticalRows.length ? `${criticalRows.length} viagem${criticalRows.length === 1 ? "" : "s"} acima de 90 min` : "Tempo de palha controlado"}</strong>
+            <span>${criticalRows.length ? "Priorize as frentes/caminhões com maior tempo médio de palha." : "Nenhuma viagem filtrada passou de 90 minutos na palha."}</span>
           </div>
           <div class="alert-item ${missingRows.length ? "alert" : "good"}">
             <strong>${missingRows.length ? `${missingRows.length} sem saída de pesagem` : "Pesagem completa"}</strong>
@@ -4712,12 +4802,15 @@
             <tr>
               <th>Data</th>
               <th>Caminhão</th>
+              <th>Origem</th>
               <th>Frente</th>
               <th>Saída tráfego</th>
-              <th>Chegada frente</th>
-              <th>Saída frente</th>
-              <th>Tempo frente</th>
-              <th>Retorno usina</th>
+              <th>Chegada palha</th>
+              <th>Início carga</th>
+              <th>Fim carga</th>
+              <th>Saída palha</th>
+              <th>Tempo palha</th>
+              <th>Tempo usina</th>
               <th>Pesagem</th>
               <th>Ciclo total</th>
               <th>Status</th>
@@ -4731,12 +4824,15 @@
                 <tr>
                   <td>${formatDate(record.date)}</td>
                   <td>${escapeHtml(record.truck)}</td>
+                  <td>${escapeHtml(patioTransportLabel(record))}</td>
                   <td>${escapeHtml(record.front)}</td>
                   <td>${formatDateTime(record.departureTraffic)}</td>
                   <td>${formatDateTime(record.arrivalField)}</td>
+                  <td>${formatDateTime(record.loadStart)}</td>
+                  <td>${formatDateTime(record.loadEnd)}</td>
                   <td>${formatDateTime(record.departureField)}</td>
                   <td>${formatMinutes(record.fieldMinutes)}</td>
-                  <td>${formatMinutes(record.loadedReturnMinutes)}</td>
+                  <td>${formatMinutes(patioMillMinutes(record))}</td>
                   <td>${formatMinutes(record.weighingMinutes)}</td>
                   <td>${record.cycleMinutes ? formatMinutes(record.cycleMinutes) : "-"}</td>
                   <td><span class="status-pill ${status.className}">${escapeHtml(status.label)}</span></td>
@@ -6533,7 +6629,7 @@
           <div class="goal-metric">
             <span>Média palha</span>
             <strong>${formatMinutes(summary.avgPalha)}</strong>
-            <small>Chegada frente até saída frente</small>
+            <small>Início carga até fim carga</small>
           </div>
           <div class="goal-metric">
             <span>Média usina</span>
@@ -8291,6 +8387,7 @@
         ["Transporte total", formatNumber(baseSummary.transportTotal), formatPercent(baseSummary.transportPercent)],
         [],
         ["Tempos de palha e usina"],
+        ["Base do tempo de palha", "Início carga até fim carga quando disponível"],
         ["Viagens", patioSummary.trips],
         ["Caminhões", patioSummary.trucks],
         ["Frentes", patioSummary.fronts],
@@ -8760,7 +8857,7 @@
       ]);
       const patioSummaryRows = [
         ["Viagens", String(patioSummary.trips), `${patioSummary.trucks} caminhão${patioSummary.trucks === 1 ? "" : "ões"} · ${patioSummary.fronts} frente${patioSummary.fronts === 1 ? "" : "s"}`],
-        ["Média palha", formatMinutes(patioSummary.avgPalha), "Chegada frente até saída frente"],
+        ["Média palha", formatMinutes(patioSummary.avgPalha), "Início carga até fim carga"],
         ["Média usina", formatMinutes(patioSummary.avgUsina), "Chegada usina até saída pesagem"],
         ["Maior palha", patioSummary.maxPalha ? formatMinutes(patioSummary.maxPalha.fieldMinutes) : "0 min", patioSummary.maxPalha ? `${patioSummary.maxPalha.truck} · ${patioSummary.maxPalha.front}` : "Sem registro"],
         ["Maior usina", patioSummary.maxUsina ? formatMinutes(patioMillMinutes(patioSummary.maxUsina)) : "0 min", patioSummary.maxUsina ? `${patioSummary.maxUsina.truck} · ${patioSummary.maxUsina.front}` : "Sem registro"],
@@ -9069,9 +9166,16 @@
         const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
         return workbook.SheetNames.flatMap((sheetName) => {
           const sheet = workbook.Sheets[sheetName];
+          const sheetKey = normalizeKey(sheetName);
+          const transportClass = sheetKey.includes("terceir")
+            ? "Terceiro"
+            : sheetKey.includes("proprio")
+              ? "Próprio"
+              : "";
           return XLSX.utils.sheet_to_json(sheet, { defval: "", raw: true }).map((row) => ({
             ...row,
-            source: sheetName
+            source: sheetName,
+            transportClass
           }));
         });
       }
@@ -9099,7 +9203,10 @@
         }
 
         createAutoBackup("Antes de importar tempo de pátio", { skipAudit: true });
-        patioRecords = getCleanPatioRecords([...patioRecords, ...imported]);
+        const beforeTotal = getCleanPatioRecords(patioRecords).length;
+        const mergedRecords = getCleanPatioRecords([...patioRecords, ...imported]);
+        const consolidatedTotal = Math.max(mergedRecords.length - beforeTotal, 0);
+        patioRecords = mergedRecords;
         persistPatioRecords();
 
         const latest = imported.sort((a, b) => b.date.localeCompare(a.date))[0];
@@ -9108,7 +9215,7 @@
           setPatioRange(range.start, latest.date);
         }
 
-        addAuditEntry("importacao", `${imported.length} viagem${imported.length === 1 ? "" : "s"} de tempo de pátio importada${imported.length === 1 ? "" : "s"}.`);
+        addAuditEntry("importacao", `${imported.length} linha${imported.length === 1 ? "" : "s"} de tempo de pátio lida${imported.length === 1 ? "" : "s"}; ${consolidatedTotal} viagem${consolidatedTotal === 1 ? "" : "s"} consolidada${consolidatedTotal === 1 ? "" : "s"}.`);
         renderPatio();
 
         await syncOrQueue("upload-all", { source: "patio-import" }, () => uploadAllDataToFirebase({
@@ -9118,7 +9225,7 @@
           errorStatus: "Tempo de pátio salvo localmente, mas a sincronizacao falhou."
         }));
 
-        showToast(`${imported.length} viagem${imported.length === 1 ? "" : "s"} importada${imported.length === 1 ? "" : "s"} no tempo de pátio.`);
+        showToast(`${imported.length} linha${imported.length === 1 ? "" : "s"} lida${imported.length === 1 ? "" : "s"}; ${consolidatedTotal} viagem${consolidatedTotal === 1 ? "" : "s"} consolidada${consolidatedTotal === 1 ? "" : "s"}.`);
       } catch {
         showToast("Não foi possível importar a planilha de tempo de pátio.");
       } finally {
@@ -9132,15 +9239,22 @@
         "data",
         "usina",
         "caminhao",
+        "origem",
+        "classe_transporte",
         "frente",
         "saida_trafego",
-        "chegada_frente",
-        "saida_frente",
-        "tempo_frente_min",
+        "chegada_palha",
+        "inicio_carga",
+        "fim_carga",
+        "saida_palha",
+        "tempo_palha_min",
+        "espera_carga_min",
+        "pos_carga_min",
         "chegada_usina",
         "inicio_pesagem",
         "saida_pesagem",
         "retorno_usina_min",
+        "tempo_usina_min",
         "pesagem_min",
         "ciclo_total_min",
         "status"
@@ -9151,15 +9265,22 @@
           record.date,
           record.plant,
           record.truck,
+          record.source,
+          record.transportClass,
           record.front,
           record.departureTraffic,
           record.arrivalField,
+          record.loadStart,
+          record.loadEnd,
           record.departureField,
           record.fieldMinutes,
+          record.waitLoadMinutes,
+          record.afterLoadWaitMinutes,
           record.arrivalMill,
           record.weighingStart,
           record.weighingEnd,
           record.loadedReturnMinutes,
+          patioMillMinutes(record),
           record.weighingMinutes,
           record.cycleMinutes,
           status.label
@@ -9249,6 +9370,8 @@
       els.patioEntryFront,
       els.patioEntryDepartureTraffic,
       els.patioEntryArrivalField,
+      els.patioEntryLoadStart,
+      els.patioEntryLoadEnd,
       els.patioEntryDepartureField,
       els.patioEntryArrivalMill,
       els.patioEntryWeighingStart,
