@@ -835,6 +835,42 @@
       padding: 14px;
     }
 
+    .patio-entry-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      align-items: end;
+    }
+
+    .patio-entry-footer {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .patio-preview {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .patio-preview span {
+      min-height: 32px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface-3);
+    }
+
     .workspace-actions {
       display: flex;
       flex-wrap: wrap;
@@ -1089,6 +1125,10 @@
         grid-template-columns: 1fr;
       }
 
+      .patio-entry-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
       .advanced-metrics {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
@@ -1133,6 +1173,11 @@
 
       .report-period-filter,
       .report-advanced-filter {
+        grid-template-columns: 1fr;
+      }
+
+      .patio-entry-grid,
+      .patio-entry-footer {
         grid-template-columns: 1fr;
       }
 
@@ -1255,6 +1300,7 @@
     <div class="nav-inner">
       <button class="nav-tab" type="button" data-view="dashboard" aria-selected="true">Dashboard</button>
       <button class="nav-tab" type="button" data-view="reports" aria-selected="false">Relatórios Gerenciais</button>
+      <button class="nav-tab" type="button" data-view="patio" aria-selected="false">Tempo de Pátio</button>
       <button class="nav-tab" type="button" data-view="entry" aria-selected="false">Lançamento Diário</button>
       <button class="nav-tab" type="button" data-view="targets" aria-selected="false">Metas Diárias</button>
       <button class="nav-tab" type="button" data-view="history" aria-selected="false">Histórico</button>
@@ -1593,6 +1639,13 @@
         </section>
       </section>
 
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Tempos de palha e usina</h2>
+        </div>
+        <div class="panel-body" id="reportsPatioTimesWrap"></div>
+      </section>
+
       <section class="dashboard-grid">
         <section class="panel">
           <div class="panel-head">
@@ -1651,6 +1704,168 @@
           <h2>Lançamentos filtrados</h2>
         </div>
         <div class="table-wrap" id="reportsRowsWrap"></div>
+      </section>
+    </section>
+
+    <section class="view" id="patioView" hidden>
+      <div class="filter-bar dashboard-filter report-period-filter">
+        <div class="field">
+          <label for="patioStartDate">Início do período</label>
+          <input id="patioStartDate" type="date">
+        </div>
+        <div class="field">
+          <label for="patioEndDate">Fim do período</label>
+          <input id="patioEndDate" type="date">
+        </div>
+        <div class="filter-note" id="patioSource">Lance as viagens no sistema para iniciar a análise.</div>
+        <div class="actions">
+          <button class="btn-secondary" id="patioTodayBtn" type="button">Hoje</button>
+          <button class="btn-secondary" id="patioMonthBtn" type="button">Mês atual</button>
+          <button class="btn-secondary" id="patioAllBtn" type="button">Todo período</button>
+          <button class="btn-secondary" id="importPatioBtn" type="button">Importar planilha antiga</button>
+          <button class="btn-secondary" id="exportPatioCsvBtn" type="button">CSV</button>
+          <button class="btn-secondary btn-danger" id="clearPatioBtn" type="button">Limpar dados</button>
+          <input class="file-input" id="patioImportFile" type="file" accept=".csv,.json,.xls,.xlsx,application/json,text/csv">
+        </div>
+      </div>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Novo lançamento de tempo de pátio</h2>
+          <span class="status-pill" id="patioEntryMode">Novo</span>
+        </div>
+        <div class="panel-body">
+          <input id="patioEntryId" type="hidden">
+          <div class="patio-entry-grid">
+            <div class="field">
+              <label for="patioEntryDate">Data</label>
+              <input id="patioEntryDate" type="date">
+            </div>
+            <div class="field">
+              <label for="patioEntryTruck">Caminhão</label>
+              <input id="patioEntryTruck" type="text" inputmode="numeric" placeholder="Ex.: 6998">
+            </div>
+            <div class="field">
+              <label for="patioEntryFront">Frente</label>
+              <select id="patioEntryFront">
+                <option value="">Selecione</option>
+                <option value="Frente 4001">Frente 4001</option>
+                <option value="Frente 4002">Frente 4002</option>
+                <option value="Frente 4003">Frente 4003</option>
+                <option value="Frente 4007">Frente 4007</option>
+                <option value="Frente 4009">Frente 4009</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="patioEntryDepartureTraffic">Saída central tráfego</label>
+              <input id="patioEntryDepartureTraffic" type="datetime-local">
+            </div>
+            <div class="field">
+              <label for="patioEntryArrivalField">Chegada frente/palha</label>
+              <input id="patioEntryArrivalField" type="datetime-local">
+            </div>
+            <div class="field">
+              <label for="patioEntryDepartureField">Saída frente/palha</label>
+              <input id="patioEntryDepartureField" type="datetime-local">
+            </div>
+            <div class="field">
+              <label for="patioEntryArrivalMill">Chegada usina</label>
+              <input id="patioEntryArrivalMill" type="datetime-local">
+            </div>
+            <div class="field">
+              <label for="patioEntryWeighingStart">Início pesagem</label>
+              <input id="patioEntryWeighingStart" type="datetime-local">
+            </div>
+            <div class="field">
+              <label for="patioEntryWeighingEnd">Saída pesagem</label>
+              <input id="patioEntryWeighingEnd" type="datetime-local">
+            </div>
+          </div>
+          <div class="patio-entry-footer">
+            <div class="patio-preview">
+              <span>Tempo na frente: <strong id="patioEntryFieldPreview">0 min</strong></span>
+              <span>Ciclo total: <strong id="patioEntryCyclePreview">-</strong></span>
+            </div>
+            <div class="actions">
+              <button class="btn-secondary" id="resetPatioEntryBtn" type="button">Novo</button>
+              <button class="btn-primary" id="savePatioEntryBtn" type="button">Salvar lançamento</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="report-advanced-filter" aria-label="Filtros do tempo de pátio">
+        <div class="field">
+          <label for="patioFrontFilter">Frente</label>
+          <select id="patioFrontFilter">
+            <option value="all">Todas as frentes</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="patioStatusFilter">Status</label>
+          <select id="patioStatusFilter">
+            <option value="all">Todos</option>
+            <option value="good">Até 60 min</option>
+            <option value="warn">61 a 90 min</option>
+            <option value="alert">Acima de 90 min</option>
+            <option value="missing">Sem tempo final</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="patioSort">Ordenar</label>
+          <select id="patioSort">
+            <option value="date-desc">Mais recente</option>
+            <option value="date-asc">Mais antigo</option>
+            <option value="field-desc">Maior tempo na frente</option>
+            <option value="cycle-desc">Maior ciclo</option>
+            <option value="truck-asc">Caminhão</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="patioSearch">Buscar caminhão</label>
+          <input id="patioSearch" type="search" placeholder="Ex.: 6998 ou 4002">
+        </div>
+      </div>
+
+      <section class="stats-grid" id="patioKpiWrap" aria-label="Indicadores de tempo de pátio"></section>
+
+      <section class="dashboard-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Tempo por frente</h2>
+          </div>
+          <div class="panel-body" id="patioFrontChartWrap"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Ranking dos caminhões</h2>
+          </div>
+          <div class="panel-body" id="patioTruckRankingWrap"></div>
+        </section>
+      </section>
+
+      <section class="dashboard-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Evolução diária</h2>
+          </div>
+          <div class="table-wrap" id="patioDailyWrap"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Leitura operacional</h2>
+          </div>
+          <div class="panel-body" id="patioInsightsWrap"></div>
+        </section>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Viagens lançadas</h2>
+        </div>
+        <div class="table-wrap" id="patioRowsWrap"></div>
       </section>
     </section>
 
@@ -2063,6 +2278,7 @@
   <script>
     const STORAGE_KEY = "cambui.daily.production.flow.v5";
     const TARGETS_KEY = "cambui.daily.production.targets.v1";
+    const PATIO_STORAGE_KEY = "cambui.daily.production.patio.v1";
     const FIREBASE_CONFIG_KEY = "cambui.daily.production.firebase.config.v1";
     const THEME_KEY = "cambui.daily.production.theme.v1";
     const FIREBASE_APP_NAME = "cambui-production-app";
@@ -2079,7 +2295,7 @@
       "cambui.daily.operations.v1"
     ];
     const PLANT = "Usina Cambuí";
-    const APP_VERSION = 7;
+    const APP_VERSION = 8;
 
     const TYPES = {
       OWN_HARVEST: "Colheita Própria",
@@ -2136,6 +2352,7 @@
     const els = {
       dashboardView: document.querySelector("#dashboardView"),
       reportsView: document.querySelector("#reportsView"),
+      patioView: document.querySelector("#patioView"),
       entryView: document.querySelector("#entryView"),
       targetsView: document.querySelector("#targetsView"),
       historyView: document.querySelector("#historyView"),
@@ -2160,6 +2377,7 @@
       reportsInsightsWrap: document.querySelector("#reportsInsightsWrap"),
       reportsParticipationWrap: document.querySelector("#reportsParticipationWrap"),
       reportsTransportWrap: document.querySelector("#reportsTransportWrap"),
+      reportsPatioTimesWrap: document.querySelector("#reportsPatioTimesWrap"),
       reportsFrontWrap: document.querySelector("#reportsFrontWrap"),
       reportsTypeWrap: document.querySelector("#reportsTypeWrap"),
       reportsRankingWrap: document.querySelector("#reportsRankingWrap"),
@@ -2168,6 +2386,33 @@
       reportsMonthWrap: document.querySelector("#reportsMonthWrap"),
       reportsDailyWrap: document.querySelector("#reportsDailyWrap"),
       reportsRowsWrap: document.querySelector("#reportsRowsWrap"),
+      patioStartDate: document.querySelector("#patioStartDate"),
+      patioEndDate: document.querySelector("#patioEndDate"),
+      patioSource: document.querySelector("#patioSource"),
+      patioFrontFilter: document.querySelector("#patioFrontFilter"),
+      patioStatusFilter: document.querySelector("#patioStatusFilter"),
+      patioSort: document.querySelector("#patioSort"),
+      patioSearch: document.querySelector("#patioSearch"),
+      patioImportFile: document.querySelector("#patioImportFile"),
+      patioEntryMode: document.querySelector("#patioEntryMode"),
+      patioEntryId: document.querySelector("#patioEntryId"),
+      patioEntryDate: document.querySelector("#patioEntryDate"),
+      patioEntryTruck: document.querySelector("#patioEntryTruck"),
+      patioEntryFront: document.querySelector("#patioEntryFront"),
+      patioEntryDepartureTraffic: document.querySelector("#patioEntryDepartureTraffic"),
+      patioEntryArrivalField: document.querySelector("#patioEntryArrivalField"),
+      patioEntryDepartureField: document.querySelector("#patioEntryDepartureField"),
+      patioEntryArrivalMill: document.querySelector("#patioEntryArrivalMill"),
+      patioEntryWeighingStart: document.querySelector("#patioEntryWeighingStart"),
+      patioEntryWeighingEnd: document.querySelector("#patioEntryWeighingEnd"),
+      patioEntryFieldPreview: document.querySelector("#patioEntryFieldPreview"),
+      patioEntryCyclePreview: document.querySelector("#patioEntryCyclePreview"),
+      patioKpiWrap: document.querySelector("#patioKpiWrap"),
+      patioFrontChartWrap: document.querySelector("#patioFrontChartWrap"),
+      patioTruckRankingWrap: document.querySelector("#patioTruckRankingWrap"),
+      patioDailyWrap: document.querySelector("#patioDailyWrap"),
+      patioInsightsWrap: document.querySelector("#patioInsightsWrap"),
+      patioRowsWrap: document.querySelector("#patioRowsWrap"),
       entryDate: document.querySelector("#entryDate"),
       frontCards: [...document.querySelectorAll(".front-card")],
       frontWorkspace: document.querySelector("#frontWorkspace"),
@@ -2255,6 +2500,7 @@
 
     let records = loadRecords();
     let targets = loadTargets();
+    let patioRecords = loadPatioRecords();
     let firebaseConfig = loadFirebaseConfig();
     let autoBackups = loadAutoBackups();
     let auditLog = loadAuditLog();
@@ -2991,7 +3237,8 @@
           version: APP_VERSION,
           updatedAt: new Date().toISOString(),
           targets: getCleanTargets(),
-          recordCount: records.length
+          recordCount: records.length,
+          patioRecordCount: getCleanPatioRecords(patioRecords).length
         }, { merge: true });
       }, {
         silent: true,
@@ -3010,7 +3257,8 @@
           version: APP_VERSION,
           updatedAt: new Date().toISOString(),
           targets: getCleanTargets(),
-          recordCount: records.length
+          recordCount: records.length,
+          patioRecordCount: getCleanPatioRecords(patioRecords).length
         }, { merge: true });
       }, options);
     }
@@ -3034,6 +3282,7 @@
           updatedAt: cleanRecord.updatedAt,
           targets: getCleanTargets(),
           recordCount: records.length,
+          patioRecordCount: getCleanPatioRecords(patioRecords).length,
           lastRecordDate: cleanRecord.date
         }, { merge: true });
         await root.collection("records").doc(cleanRecord.date).set(cleanRecord, { merge: true });
@@ -3064,7 +3313,8 @@
           version: APP_VERSION,
           updatedAt: new Date().toISOString(),
           targets: getCleanTargets(),
-          recordCount: records.length
+          recordCount: records.length,
+          patioRecordCount: getCleanPatioRecords(patioRecords).length
         }, { merge: true });
       }, options);
     }
@@ -3081,6 +3331,8 @@
           updatedAt: new Date().toISOString(),
           targets: getCleanTargets(),
           recordCount: cleanRecords.length,
+          patioRecordCount: getCleanPatioRecords(patioRecords).length,
+          patioRecords: getCleanPatioRecords(patioRecords),
           lastRecordDate: lastRecord ? lastRecord.date : ""
         }, { merge: true });
 
@@ -3125,8 +3377,11 @@
 
       const remoteTargets = downloaded.meta && downloaded.meta.targets ? cloneTargets(downloaded.meta.targets) : null;
       const remoteRecords = consolidateRecords(downloaded.records || []);
+      const remotePatioRecords = downloaded.meta && Array.isArray(downloaded.meta.patioRecords)
+        ? getCleanPatioRecords(downloaded.meta.patioRecords)
+        : [];
 
-      if (!remoteTargets && !remoteRecords.length) {
+      if (!remoteTargets && !remoteRecords.length && !remotePatioRecords.length) {
         if (!options.silent) showToast("Nenhum dado encontrado no Firebase.");
         return false;
       }
@@ -3141,11 +3396,17 @@
         persistRecords();
       }
 
+      if (remotePatioRecords.length) {
+        patioRecords = getCleanPatioRecords([...patioRecords, ...remotePatioRecords]);
+        persistPatioRecords();
+      }
+
       renderOptions();
       renderTargets();
       refreshEntryFromSelectedDate({ silent: true });
       renderDashboard();
       renderManagementReports();
+      renderPatio();
       renderHistory();
       return true;
     }
@@ -3173,7 +3434,8 @@
         version: APP_VERSION,
         exportedAt,
         targets: getCleanTargets(),
-        records: getCleanRecords(records)
+        records: getCleanRecords(records),
+        patioRecords: getCleanPatioRecords(patioRecords)
       };
     }
 
@@ -3199,12 +3461,21 @@
         records = consolidateRecords(normalized);
       }
 
+      if (!Array.isArray(payload) && Array.isArray(payload.patioRecords)) {
+        const normalizedPatio = getCleanPatioRecords(payload.patioRecords);
+        patioRecords = mergeRecords
+          ? getCleanPatioRecords([...patioRecords, ...normalizedPatio])
+          : normalizedPatio;
+        persistPatioRecords();
+      }
+
       persistRecords();
       renderOptions();
       renderTargets();
       refreshEntryFromSelectedDate({ silent: true });
       renderDashboard();
       renderManagementReports();
+      renderPatio();
       renderHistory();
       return normalized.length;
     }
@@ -3807,6 +4078,698 @@
       ));
     }
 
+    function formatMinutes(value) {
+      const minutes = Math.max(0, Math.round(Number(value) || 0));
+      const hours = Math.floor(minutes / 60);
+      const rest = minutes % 60;
+      if (!hours) return `${rest} min`;
+      return `${hours}h ${String(rest).padStart(2, "0")}min`;
+    }
+
+    function localIsoFromDate(value) {
+      if (!(value instanceof Date) || Number.isNaN(value.getTime())) return "";
+      const pad = (number) => String(number).padStart(2, "0");
+      return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}:${pad(value.getSeconds())}`;
+    }
+
+    function excelSerialToLocalIso(value) {
+      const serial = Number(value);
+      if (!Number.isFinite(serial) || serial < 20000) return "";
+      const date = new Date(Math.round((serial - 25569) * 86400000));
+      const pad = (number) => String(number).padStart(2, "0");
+      return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`;
+    }
+
+    function patioDateTimeValue(value) {
+      if (value instanceof Date) return localIsoFromDate(value);
+      if (typeof value === "number") return excelSerialToLocalIso(value);
+      const text = String(value || "").trim();
+      if (!text) return "";
+
+      if (/^\d{4}-\d{2}-\d{2}/.test(text)) {
+        return text.includes("T") ? text.slice(0, 19) : text.replace(" ", "T").slice(0, 19);
+      }
+
+      const br = text.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+      if (br) {
+        let [, day, month, year, hour, minute, second = "00"] = br;
+        if (year.length === 2) year = `20${year}`;
+        return `${year.padStart(4, "0")}-${month.padStart(2, "0")}-${day.padStart(2, "0")}T${hour.padStart(2, "0")}:${minute.padStart(2, "0")}:${second.padStart(2, "0")}`;
+      }
+
+      const parsed = new Date(text);
+      return Number.isNaN(parsed.getTime()) ? "" : localIsoFromDate(parsed);
+    }
+
+    function patioDurationMinutes(value) {
+      if (typeof value === "number") {
+        if (!Number.isFinite(value)) return 0;
+        return Math.max(0, Math.round(value > 0 && value <= 1 ? value * 1440 : value));
+      }
+
+      const text = String(value || "").trim();
+      if (!text) return 0;
+      const time = text.match(/^(\d+):(\d{2})(?::(\d{2}))?$/);
+      if (time) {
+        return (Number(time[1]) || 0) * 60 + (Number(time[2]) || 0) + Math.round((Number(time[3]) || 0) / 60);
+      }
+      return Math.max(0, Math.round(parseNumber(text)));
+    }
+
+    function patioMinutesBetween(start, end) {
+      if (!start || !end) return 0;
+      const from = new Date(start);
+      const to = new Date(end);
+      if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return 0;
+      const minutes = Math.round((to - from) / 60000);
+      return minutes > 0 ? minutes : 0;
+    }
+
+    function patioMillMinutes(record) {
+      return patioMinutesBetween(record.arrivalMill, record.weighingEnd)
+        || ((Number(record.weighingWaitMinutes) || 0) + (Number(record.weighingMinutes) || 0));
+    }
+
+    function normalizePatioFront(value) {
+      const text = String(value || "").trim();
+      if (!text) return "";
+      const digits = text.match(/\d{3,}/);
+      return digits ? `Frente ${digits[0]}` : text;
+    }
+
+    function patioRecordDate(record) {
+      return String(record.departureTraffic || record.arrivalField || record.departureField || record.arrivalMill || "").slice(0, 10);
+    }
+
+    function normalizePatioRecord(row) {
+      const truck = String(valueFromRow(row, [
+        "truck",
+        "caminhão",
+        "caminhao",
+        "Caminhão",
+        "Caminhao"
+      ]) || "").trim();
+      const front = normalizePatioFront(valueFromRow(row, [
+        "front",
+        "frente",
+        "Frente saida",
+        "Frente saída",
+        "Frente de saída"
+      ]));
+      const departureTraffic = patioDateTimeValue(valueFromRow(row, [
+        "departureTraffic",
+        "Dt./Hr. Saida Central Trafego",
+        "Dt Hr Saida Central Trafego",
+        "Saida Central Trafego"
+      ]));
+      const arrivalField = patioDateTimeValue(valueFromRow(row, [
+        "arrivalField",
+        "Dt./Hr. Chegada Palha",
+        "Chegada Palha",
+        "Chegada frente"
+      ]));
+      const departureField = patioDateTimeValue(valueFromRow(row, [
+        "departureField",
+        "Dt hr saida palha",
+        "Saida palha",
+        "Saída palha",
+        "Saida frente"
+      ]));
+      const arrivalMill = patioDateTimeValue(valueFromRow(row, [
+        "arrivalMill",
+        "Dt./Hr. Chegada Usina",
+        "Chegada Usina"
+      ]));
+      const weighingStart = patioDateTimeValue(valueFromRow(row, [
+        "weighingStart",
+        "Dt./Hr. Início Pesagem",
+        "Dt./Hr. Inicio Pesagem",
+        "Inicio Pesagem"
+      ]));
+      const weighingEnd = patioDateTimeValue(valueFromRow(row, [
+        "weighingEnd",
+        "Dt./Hr. Saída Pesagem",
+        "Dt./Hr. Saida Pesagem",
+        "Saida Pesagem"
+      ]));
+      const date = String(row.date || patioRecordDate({
+        departureTraffic,
+        arrivalField,
+        departureField,
+        arrivalMill
+      }) || "").slice(0, 10);
+      let fieldMinutes = patioDurationMinutes(valueFromRow(row, [
+        "fieldMinutes",
+        "minutos",
+        "minutos ",
+        "Temp. palha",
+        "Temp palha",
+        "Tempo palha",
+        "Tempo de patio",
+        "Tempo de pátio"
+      ]));
+      if (!fieldMinutes) fieldMinutes = patioMinutesBetween(arrivalField, departureField);
+
+      if (!truck || !front || !date) return null;
+
+      const record = {
+        id: row.id || makeId(),
+        plant: String(valueFromRow(row, ["plant", "Usina", "Unidade"]) || PLANT).trim() || PLANT,
+        truck,
+        front,
+        date,
+        departureTraffic,
+        arrivalField,
+        departureField,
+        fieldMinutes,
+        arrivalMill,
+        weighingStart,
+        weighingEnd,
+        source: String(row.source || row.origem || "Planilha").trim()
+      };
+
+      record.toFieldMinutes = patioMinutesBetween(record.departureTraffic, record.arrivalField);
+      record.loadedReturnMinutes = patioMinutesBetween(record.departureField, record.arrivalMill);
+      record.weighingWaitMinutes = patioMinutesBetween(record.arrivalMill, record.weighingStart);
+      record.weighingMinutes = patioMinutesBetween(record.weighingStart, record.weighingEnd);
+      record.cycleMinutes = patioMinutesBetween(record.departureTraffic, record.weighingEnd);
+      return record;
+    }
+
+    function getCleanPatioRecords(source = patioRecords) {
+      const grouped = new Map();
+      (source || []).forEach((row) => {
+        const normalized = normalizePatioRecord(row);
+        if (!normalized) return;
+        const key = [
+          normalized.date,
+          normalizeKey(normalized.truck),
+          normalizeKey(normalized.front),
+          normalized.departureTraffic || normalized.arrivalField || normalized.departureField
+        ].join("|");
+        grouped.set(key, normalized);
+      });
+
+      return [...grouped.values()].sort((a, b) => {
+        const dateCompare = a.date.localeCompare(b.date);
+        if (dateCompare) return dateCompare;
+        return String(a.departureTraffic || "").localeCompare(String(b.departureTraffic || ""));
+      });
+    }
+
+    function loadPatioRecords() {
+      try {
+        const raw = localStorage.getItem(PATIO_STORAGE_KEY);
+        return getCleanPatioRecords(raw ? JSON.parse(raw) : []);
+      } catch {
+        return [];
+      }
+    }
+
+    function persistPatioRecords() {
+      patioRecords = getCleanPatioRecords(patioRecords);
+      localStorage.setItem(PATIO_STORAGE_KEY, JSON.stringify(patioRecords));
+    }
+
+    function firstPatioRecord() {
+      return getCleanPatioRecords(patioRecords)[0] || null;
+    }
+
+    function latestPatioRecord() {
+      const cleanRecords = getCleanPatioRecords(patioRecords);
+      return cleanRecords[cleanRecords.length - 1] || null;
+    }
+
+    function patioStatusFor(record) {
+      if (!record.weighingEnd) return { key: "missing", label: "Sem saída pesagem", className: "alert" };
+      if (record.fieldMinutes > 90) return { key: "alert", label: "Acima de 90 min", className: "alert" };
+      if (record.fieldMinutes > 60) return { key: "warn", label: "61 a 90 min", className: "" };
+      return { key: "good", label: "Até 60 min", className: "good" };
+    }
+
+    function datetimeLocalInputValue(value) {
+      return value ? String(value).slice(0, 16) : "";
+    }
+
+    function resetPatioEntryForm(options = {}) {
+      const baseDate = options.date || els.patioEntryDate.value || todayInputValue();
+      els.patioEntryId.value = "";
+      els.patioEntryDate.value = baseDate;
+      els.patioEntryTruck.value = "";
+      els.patioEntryFront.value = "";
+      els.patioEntryDepartureTraffic.value = "";
+      els.patioEntryArrivalField.value = "";
+      els.patioEntryDepartureField.value = "";
+      els.patioEntryArrivalMill.value = "";
+      els.patioEntryWeighingStart.value = "";
+      els.patioEntryWeighingEnd.value = "";
+      els.patioEntryMode.textContent = "Novo";
+      els.patioEntryMode.className = "status-pill";
+      renderPatioEntryPreview();
+    }
+
+    function fillPatioEntryForm(record) {
+      if (!record) return;
+      els.patioEntryId.value = record.id || "";
+      els.patioEntryDate.value = record.date || todayInputValue();
+      els.patioEntryTruck.value = record.truck || "";
+      els.patioEntryFront.value = record.front || "";
+      els.patioEntryDepartureTraffic.value = datetimeLocalInputValue(record.departureTraffic);
+      els.patioEntryArrivalField.value = datetimeLocalInputValue(record.arrivalField);
+      els.patioEntryDepartureField.value = datetimeLocalInputValue(record.departureField);
+      els.patioEntryArrivalMill.value = datetimeLocalInputValue(record.arrivalMill);
+      els.patioEntryWeighingStart.value = datetimeLocalInputValue(record.weighingStart);
+      els.patioEntryWeighingEnd.value = datetimeLocalInputValue(record.weighingEnd);
+      els.patioEntryMode.textContent = "Editando";
+      els.patioEntryMode.className = "status-pill good";
+      renderPatioEntryPreview();
+    }
+
+    function patioEntryRecordFromForm() {
+      const dateFromTimes = [
+        els.patioEntryDepartureTraffic.value,
+        els.patioEntryArrivalField.value,
+        els.patioEntryDepartureField.value,
+        els.patioEntryArrivalMill.value,
+        els.patioEntryWeighingStart.value,
+        els.patioEntryWeighingEnd.value
+      ].find(Boolean);
+      const date = els.patioEntryDate.value || String(dateFromTimes || "").slice(0, 10);
+      return normalizePatioRecord({
+        id: els.patioEntryId.value || makeId(),
+        plant: PLANT,
+        truck: els.patioEntryTruck.value,
+        front: els.patioEntryFront.value,
+        date,
+        departureTraffic: els.patioEntryDepartureTraffic.value,
+        arrivalField: els.patioEntryArrivalField.value,
+        departureField: els.patioEntryDepartureField.value,
+        arrivalMill: els.patioEntryArrivalMill.value,
+        weighingStart: els.patioEntryWeighingStart.value,
+        weighingEnd: els.patioEntryWeighingEnd.value,
+        source: "Sistema"
+      });
+    }
+
+    function renderPatioEntryPreview() {
+      const record = patioEntryRecordFromForm();
+      els.patioEntryFieldPreview.textContent = record ? formatMinutes(record.fieldMinutes) : "0 min";
+      els.patioEntryCyclePreview.textContent = record && record.cycleMinutes ? formatMinutes(record.cycleMinutes) : "-";
+    }
+
+    function validatePatioEntry(record) {
+      if (!record || !record.date || !record.truck || !record.front) {
+        showToast("Informe data, caminhão e frente.");
+        return false;
+      }
+      if (!record.arrivalField || !record.departureField) {
+        showToast("Informe chegada e saída da frente para calcular o tempo de pátio.");
+        return false;
+      }
+      return true;
+    }
+
+    async function savePatioEntry() {
+      const record = patioEntryRecordFromForm();
+      if (!validatePatioEntry(record)) return;
+
+      const editingId = els.patioEntryId.value;
+      createAutoBackup(editingId ? "Antes de editar tempo de pátio" : "Antes de lançar tempo de pátio", { skipAudit: true });
+      patioRecords = getCleanPatioRecords([
+        ...patioRecords.filter((item) => item.id !== editingId),
+        record
+      ]);
+      persistPatioRecords();
+      setPatioRange(record.date, record.date);
+      resetPatioEntryForm({ date: record.date });
+      renderPatio();
+      addAuditEntry("lancamento", `Tempo de pátio do caminhão ${record.truck} em ${formatDate(record.date)} salvo no sistema.`);
+
+      await syncOrQueue("upload-all", { source: "patio-entry" }, () => uploadAllDataToFirebase({
+        silent: true,
+        pendingMessage: "Enviando lançamento de tempo de pátio...",
+        successStatus: "Tempo de pátio sincronizado com o Firebase.",
+        errorStatus: "Tempo de pátio salvo localmente, mas a sincronizacao falhou."
+      }));
+
+      showToast(editingId ? "Lançamento de tempo de pátio atualizado." : "Lançamento de tempo de pátio salvo.");
+    }
+
+    function editPatioRecord(id) {
+      const record = getCleanPatioRecords(patioRecords).find((item) => item.id === id);
+      if (!record) return;
+      fillPatioEntryForm(record);
+      setPatioRange(record.date, record.date);
+      renderPatio();
+      els.patioEntryTruck.focus();
+    }
+
+    async function deletePatioRecord(id) {
+      const record = getCleanPatioRecords(patioRecords).find((item) => item.id === id);
+      if (!record) return;
+      if (!window.confirm(`Excluir o lançamento do caminhão ${record.truck} em ${formatDate(record.date)}?`)) return;
+
+      createAutoBackup("Antes de excluir tempo de pátio", { skipAudit: true });
+      patioRecords = getCleanPatioRecords(patioRecords.filter((item) => item.id !== id));
+      persistPatioRecords();
+      if (els.patioEntryId.value === id) resetPatioEntryForm({ date: record.date });
+      renderPatio();
+      addAuditEntry("exclusao", `Tempo de pátio do caminhão ${record.truck} em ${formatDate(record.date)} removido.`);
+
+      await syncOrQueue("upload-all", { source: "patio-delete" }, () => uploadAllDataToFirebase({
+        silent: true,
+        pendingMessage: "Enviando exclusão de tempo de pátio...",
+        successStatus: "Exclusão de tempo de pátio sincronizada.",
+        errorStatus: "Tempo de pátio removido localmente, mas a sincronizacao falhou."
+      }));
+
+      showToast("Lançamento de tempo de pátio excluído.");
+    }
+
+    function patioRange() {
+      return normalizeDateRange(els.patioStartDate.value, els.patioEndDate.value);
+    }
+
+    function setPatioRange(start, end) {
+      const range = normalizeDateRange(start, end);
+      els.patioStartDate.value = range.start;
+      els.patioEndDate.value = range.end;
+    }
+
+    function average(values) {
+      const clean = values.map((value) => Number(value) || 0).filter((value) => value > 0);
+      if (!clean.length) return 0;
+      return clean.reduce((sum, value) => sum + value, 0) / clean.length;
+    }
+
+    function patioFilteredRecords() {
+      const range = patioRange();
+      const front = els.patioFrontFilter.value || "all";
+      const status = els.patioStatusFilter.value || "all";
+      const search = normalizeKey(els.patioSearch.value);
+      const sort = els.patioSort.value || "date-desc";
+
+      const rows = getCleanPatioRecords(patioRecords)
+        .filter((record) => record.date >= range.start && record.date <= range.end)
+        .filter((record) => front === "all" || record.front === front)
+        .filter((record) => status === "all" || patioStatusFor(record).key === status)
+        .filter((record) => {
+          if (!search) return true;
+          return normalizeKey(`${record.truck} ${record.front} ${record.plant}`).includes(search);
+        });
+
+      return rows.sort((a, b) => {
+        if (sort === "date-asc") return `${a.date}${a.departureTraffic}`.localeCompare(`${b.date}${b.departureTraffic}`);
+        if (sort === "field-desc") return b.fieldMinutes - a.fieldMinutes;
+        if (sort === "cycle-desc") return b.cycleMinutes - a.cycleMinutes;
+        if (sort === "truck-asc") return a.truck.localeCompare(b.truck, "pt-BR", { numeric: true }) || a.date.localeCompare(b.date);
+        return `${b.date}${b.departureTraffic}`.localeCompare(`${a.date}${a.departureTraffic}`);
+      });
+    }
+
+    function aggregatePatioBy(rows, groupGetter) {
+      const grouped = new Map();
+      rows.forEach((record) => {
+        const name = groupGetter(record) || "Sem identificação";
+        if (!grouped.has(name)) {
+          grouped.set(name, {
+            name,
+            trips: 0,
+            trucks: new Set(),
+            fieldMinutes: [],
+            millMinutes: [],
+            cycleMinutes: [],
+            weighingMinutes: [],
+            maxFieldMinutes: 0,
+            maxMillMinutes: 0,
+            alerts: 0
+          });
+        }
+        const item = grouped.get(name);
+        const status = patioStatusFor(record);
+        const millMinutes = patioMillMinutes(record);
+        item.trips += 1;
+        item.trucks.add(record.truck);
+        item.fieldMinutes.push(record.fieldMinutes);
+        item.millMinutes.push(millMinutes);
+        item.cycleMinutes.push(record.cycleMinutes);
+        item.weighingMinutes.push(record.weighingMinutes);
+        item.maxFieldMinutes = Math.max(item.maxFieldMinutes, record.fieldMinutes);
+        item.maxMillMinutes = Math.max(item.maxMillMinutes, millMinutes);
+        if (status.key === "alert" || status.key === "missing") item.alerts += 1;
+      });
+
+      return [...grouped.values()].map((item) => ({
+        ...item,
+        trucksCount: item.trucks.size,
+        avgFieldMinutes: average(item.fieldMinutes),
+        avgMillMinutes: average(item.millMinutes),
+        avgCycleMinutes: average(item.cycleMinutes),
+        avgWeighingMinutes: average(item.weighingMinutes)
+      }));
+    }
+
+    function renderPatioFrontOptions() {
+      const selected = els.patioFrontFilter.value || "all";
+      const fronts = [...new Set(getCleanPatioRecords(patioRecords).map((record) => record.front).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true }));
+      els.patioFrontFilter.innerHTML = [
+        '<option value="all">Todas as frentes</option>',
+        ...fronts.map((front) => `<option value="${escapeHtml(front)}">${escapeHtml(front)}</option>`)
+      ].join("");
+      els.patioFrontFilter.value = fronts.includes(selected) ? selected : "all";
+    }
+
+    function renderPatioKpis(rows) {
+      const trucks = new Set(rows.map((record) => record.truck));
+      const fronts = new Set(rows.map((record) => record.front));
+      const maxRecord = [...rows].sort((a, b) => b.fieldMinutes - a.fieldMinutes)[0] || null;
+      const missing = rows.filter((record) => !record.weighingEnd).length;
+      const alerts = rows.filter((record) => patioStatusFor(record).key === "alert").length;
+      const kpis = [
+        ["Viagens", rows.length, "Registros filtrados"],
+        ["Caminhões", trucks.size, "Frotas identificadas"],
+        ["Frentes", fronts.size, "Frentes no período"],
+        ["Média na frente", formatMinutes(average(rows.map((record) => record.fieldMinutes))), "Tempo palha/pátio"],
+        ["Maior tempo", maxRecord ? formatMinutes(maxRecord.fieldMinutes) : "0 min", maxRecord ? `${maxRecord.truck} · ${maxRecord.front}` : "Sem registro"],
+        ["Ciclo médio", formatMinutes(average(rows.map((record) => record.cycleMinutes))), "Saída tráfego até pesagem"],
+        ["Pesagem média", formatMinutes(average(rows.map((record) => record.weighingMinutes))), "Início até saída pesagem"],
+        ["Alertas", alerts + missing, `${alerts} acima de 90 min · ${missing} sem saída`]
+      ];
+
+      els.patioKpiWrap.innerHTML = kpis.map(([label, value, detail]) => `
+        <article class="stat">
+          <span>${escapeHtml(label)}</span>
+          <strong>${escapeHtml(value)}</strong>
+          <small>${escapeHtml(detail)}</small>
+        </article>
+      `).join("");
+    }
+
+    function patioBarList(items, options = {}) {
+      if (!items.length) return '<div class="empty-state">Sem dados para montar este ranking.</div>';
+      const visible = items.slice(0, options.limit || 10);
+      const max = Math.max(...visible.map((item) => item.value), 1);
+      return `
+        <div class="rank-list">
+          ${visible.map((item, index) => `
+            <div class="rank-item">
+              <div class="rank-position">${index + 1}</div>
+              <div class="rank-main">
+                <div class="rank-headline">
+                  <strong>${escapeHtml(item.label)}</strong>
+                  <span>${escapeHtml(item.valueLabel)}</span>
+                </div>
+                <div class="rank-track">
+                  <div class="rank-fill ${item.tone || ""}" style="width:${clampPercent(progressFor(item.value, max))}%"></div>
+                </div>
+                <div class="rank-values">
+                  <span>${escapeHtml(item.detail)}</span>
+                  <span>${escapeHtml(item.extra || "")}</span>
+                </div>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function renderPatioFrontChart(rows) {
+      const items = aggregatePatioBy(rows, (record) => record.front)
+        .sort((a, b) => b.avgFieldMinutes - a.avgFieldMinutes || b.trips - a.trips)
+        .map((item) => ({
+          label: item.name,
+          value: item.avgFieldMinutes,
+          valueLabel: formatMinutes(item.avgFieldMinutes),
+          detail: `${item.trips} viagem${item.trips === 1 ? "" : "s"} · ${item.trucksCount} caminhão${item.trucksCount === 1 ? "" : "ões"}`,
+          extra: `Máx. ${formatMinutes(item.maxFieldMinutes)}`,
+          tone: item.avgFieldMinutes > 90 ? "over" : ""
+        }));
+      els.patioFrontChartWrap.innerHTML = patioBarList(items, { limit: 12 });
+    }
+
+    function renderPatioTruckRanking(rows) {
+      const items = aggregatePatioBy(rows, (record) => record.truck)
+        .sort((a, b) => b.avgFieldMinutes - a.avgFieldMinutes || b.trips - a.trips)
+        .map((item) => ({
+          label: `Caminhão ${item.name}`,
+          value: item.avgFieldMinutes,
+          valueLabel: formatMinutes(item.avgFieldMinutes),
+          detail: `${item.trips} viagem${item.trips === 1 ? "" : "s"} · ${item.alerts} alerta${item.alerts === 1 ? "" : "s"}`,
+          extra: `Ciclo ${formatMinutes(item.avgCycleMinutes)}`,
+          tone: item.avgFieldMinutes > 90 ? "over" : ""
+        }));
+      els.patioTruckRankingWrap.innerHTML = patioBarList(items, { limit: 12 });
+    }
+
+    function renderPatioDaily(rows) {
+      const items = aggregatePatioBy(rows, (record) => record.date)
+        .sort((a, b) => a.name.localeCompare(b.name));
+      if (!items.length) {
+        els.patioDailyWrap.innerHTML = '<div class="empty-state">Sem viagens no período filtrado.</div>';
+        return;
+      }
+
+      els.patioDailyWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Viagens</th>
+              <th>Caminhões</th>
+              <th>Média frente</th>
+              <th>Máximo frente</th>
+              <th>Ciclo médio</th>
+              <th>Alertas</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map((item) => `
+              <tr>
+                <td>${formatDate(item.name)}</td>
+                <td>${item.trips}</td>
+                <td>${item.trucksCount}</td>
+                <td>${formatMinutes(item.avgFieldMinutes)}</td>
+                <td>${formatMinutes(item.maxFieldMinutes)}</td>
+                <td>${formatMinutes(item.avgCycleMinutes)}</td>
+                <td>${item.alerts}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderPatioInsights(rows) {
+      if (!rows.length) {
+        els.patioInsightsWrap.innerHTML = '<div class="empty-state">Lance uma viagem ou ajuste os filtros para gerar leitura operacional.</div>';
+        return;
+      }
+
+      const fronts = aggregatePatioBy(rows, (record) => record.front).sort((a, b) => b.avgFieldMinutes - a.avgFieldMinutes);
+      const trucks = aggregatePatioBy(rows, (record) => record.truck).sort((a, b) => b.avgFieldMinutes - a.avgFieldMinutes);
+      const criticalRows = rows.filter((record) => patioStatusFor(record).key === "alert");
+      const missingRows = rows.filter((record) => !record.weighingEnd);
+      const bestFront = [...fronts].sort((a, b) => a.avgFieldMinutes - b.avgFieldMinutes)[0] || null;
+      const worstFront = fronts[0] || null;
+      const worstTruck = trucks[0] || null;
+
+      els.patioInsightsWrap.innerHTML = `
+        <div class="alert-grid">
+          <div class="alert-item ${criticalRows.length ? "alert" : "good"}">
+            <strong>${criticalRows.length ? `${criticalRows.length} viagem${criticalRows.length === 1 ? "" : "s"} acima de 90 min` : "Tempo na frente controlado"}</strong>
+            <span>${criticalRows.length ? "Priorize as frentes/caminhões com maior tempo médio na frente." : "Nenhuma viagem filtrada passou de 90 minutos na frente."}</span>
+          </div>
+          <div class="alert-item ${missingRows.length ? "alert" : "good"}">
+            <strong>${missingRows.length ? `${missingRows.length} sem saída de pesagem` : "Pesagem completa"}</strong>
+            <span>${missingRows.length ? "Essas viagens entram no sistema, mas o ciclo total fica em aberto." : "Todas as viagens filtradas possuem saída de pesagem."}</span>
+          </div>
+          <div class="alert-item">
+            <strong>${worstFront ? `Frente mais lenta: ${worstFront.name}` : "Sem frente crítica"}</strong>
+            <span>${worstFront ? `${formatMinutes(worstFront.avgFieldMinutes)} de média na frente, máximo ${formatMinutes(worstFront.maxFieldMinutes)}.` : "Sem dados suficientes."}</span>
+          </div>
+          <div class="alert-item good">
+            <strong>${bestFront ? `Melhor frente: ${bestFront.name}` : "Sem melhor frente"}</strong>
+            <span>${bestFront ? `${formatMinutes(bestFront.avgFieldMinutes)} de média na frente em ${bestFront.trips} viagem${bestFront.trips === 1 ? "" : "s"}.` : "Sem dados suficientes."}</span>
+          </div>
+          <div class="alert-item ${worstTruck && worstTruck.avgFieldMinutes > 90 ? "alert" : ""}">
+            <strong>${worstTruck ? `Caminhão atenção: ${worstTruck.name}` : "Sem caminhão crítico"}</strong>
+            <span>${worstTruck ? `${formatMinutes(worstTruck.avgFieldMinutes)} de média na frente e ciclo médio de ${formatMinutes(worstTruck.avgCycleMinutes)}.` : "Sem dados suficientes."}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderPatioRows(rows) {
+      if (!rows.length) {
+        els.patioRowsWrap.innerHTML = '<div class="empty-state">Nenhuma viagem encontrada com os filtros atuais.</div>';
+        return;
+      }
+
+      els.patioRowsWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Caminhão</th>
+              <th>Frente</th>
+              <th>Saída tráfego</th>
+              <th>Chegada frente</th>
+              <th>Saída frente</th>
+              <th>Tempo frente</th>
+              <th>Retorno usina</th>
+              <th>Pesagem</th>
+              <th>Ciclo total</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((record) => {
+              const status = patioStatusFor(record);
+              return `
+                <tr>
+                  <td>${formatDate(record.date)}</td>
+                  <td>${escapeHtml(record.truck)}</td>
+                  <td>${escapeHtml(record.front)}</td>
+                  <td>${formatDateTime(record.departureTraffic)}</td>
+                  <td>${formatDateTime(record.arrivalField)}</td>
+                  <td>${formatDateTime(record.departureField)}</td>
+                  <td>${formatMinutes(record.fieldMinutes)}</td>
+                  <td>${formatMinutes(record.loadedReturnMinutes)}</td>
+                  <td>${formatMinutes(record.weighingMinutes)}</td>
+                  <td>${record.cycleMinutes ? formatMinutes(record.cycleMinutes) : "-"}</td>
+                  <td><span class="status-pill ${status.className}">${escapeHtml(status.label)}</span></td>
+                  <td>
+                    <div class="row-buttons">
+                      <button class="btn-secondary" type="button" data-patio-action="edit" data-id="${escapeHtml(record.id)}">Editar</button>
+                      <button class="btn-secondary btn-danger" type="button" data-patio-action="delete" data-id="${escapeHtml(record.id)}">Excluir</button>
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderPatio() {
+      renderPatioFrontOptions();
+      const range = patioRange();
+      const rows = patioFilteredRecords();
+      const total = getCleanPatioRecords(patioRecords).length;
+      els.patioSource.textContent = total
+        ? `${formatDate(range.start)} a ${formatDate(range.end)} · ${rows.length} de ${total} viagem${total === 1 ? "" : "s"}`
+        : "Lance as viagens no sistema para iniciar a análise.";
+      renderPatioKpis(rows);
+      renderPatioFrontChart(rows);
+      renderPatioTruckRanking(rows);
+      renderPatioDaily(rows);
+      renderPatioInsights(rows);
+      renderPatioRows(rows);
+    }
+
     function firstRecord() {
       return getCleanRecords(records)[0] || null;
     }
@@ -3854,6 +4817,7 @@
       const views = {
         dashboard: els.dashboardView,
         reports: els.reportsView,
+        patio: els.patioView,
         entry: els.entryView,
         targets: els.targetsView,
         history: els.historyView
@@ -3866,6 +4830,7 @@
 
       if (name === "dashboard") renderDashboard();
       if (name === "reports") renderManagementReports();
+      if (name === "patio") renderPatio();
       if (name === "entry") renderEntry();
       if (name === "targets") renderTargets();
       if (name === "history") renderHistory();
@@ -5238,11 +6203,13 @@
       const rangeLabel = range.start === range.end
         ? formatDate(range.start)
         : `${formatDate(range.start)} a ${formatDate(range.end)}`;
+      const patioCount = patioRowsForRange(range).length;
       const chips = [
         `Período: ${rangeLabel}`,
         `Meta: ${targetContext.targetDays} dia${targetContext.targetDays === 1 ? "" : "s"} (${targetContext.label})`,
         `Dias exibidos: ${filteredRecords.length}`,
-        `Registros filtrados: ${rows.length}/${baseRows.length}`
+        `Registros filtrados: ${rows.length}/${baseRows.length}`,
+        `Tempo de pátio: ${patioCount} viagem${patioCount === 1 ? "" : "s"}`
       ];
 
       if (filters.type !== "all") chips.push(`Operação: ${reportTypeLabel(filters.type)}`);
@@ -5254,7 +6221,7 @@
       els.reportsFilterSummaryWrap.innerHTML = chips.map((chip) => `<span class="report-chip">${escapeHtml(chip)}</span>`).join("");
     }
 
-    function renderReportsKpis(baseSummary, summary, info, filteredRecords, rows, targetContext) {
+    function renderReportsKpis(baseSummary, summary, info, filteredRecords, rows, targetContext, range = managementRange()) {
       const difference = baseSummary.total - baseSummary.targetTotal;
       const hasTarget = baseSummary.targetTotal > 0;
       const gapLabel = hasTarget ? (difference >= 0 ? "Sobra" : "Falta") : "Sem meta";
@@ -5264,6 +6231,7 @@
       const filteredDays = new Set(rows.map((row) => row.date).filter(Boolean)).size;
       const externalCane = baseSummary.florestaCane + baseSummary.valeCane;
       const averagePerDay = launchedDays ? baseSummary.total / launchedDays : 0;
+      const patioSummary = patioTimeSummary(patioRowsForRange(range));
       const kpis = [
         { label: "Moagem do período", value: formatNumber(baseSummary.total), detail: "Base sem somar transporte" },
         { label: "Meta analisada", value: formatNumber(baseSummary.targetTotal), detail: `${targetContext.targetDays} dia${targetContext.targetDays === 1 ? "" : "s"} de meta` },
@@ -5277,6 +6245,8 @@
         { label: "Transp. próprio", value: formatPercent(baseSummary.ownTransportPercent), detail: `${formatNumber(baseSummary.ownTransport)} entregue` },
         { label: "Transp. terceiro", value: formatPercent(baseSummary.thirdTransportPercent), detail: `${formatNumber(baseSummary.thirdTransport)} entregue` },
         { label: "Transporte total", value: formatNumber(baseSummary.transportTotal), detail: `${formatPercent(baseSummary.transportPercent)} sobre moagem` },
+        { label: "Tempo palha", value: formatMinutes(patioSummary.avgPalha), detail: `${patioSummary.trips} viagem${patioSummary.trips === 1 ? "" : "s"} no período` },
+        { label: "Tempo usina", value: formatMinutes(patioSummary.avgUsina), detail: "Chegada usina até saída pesagem" },
         { label: "Dias lançados", value: `${launchedDays}/${info.targetDays || 0}`, detail: `${info.selectedDays} dia${info.selectedDays === 1 ? "" : "s"} no período` },
         { label: "Média diária", value: formatNumber(averagePerDay), detail: "Moagem média nos dias exibidos" }
       ];
@@ -5514,6 +6484,109 @@
         shareRow({ label: "Transporte terceiro", value: summary.thirdTransport, total: summary.total, detail: "% entregue por terceiros" }),
         shareRow({ label: "Total transportado", value: summary.transportTotal, total: summary.total, detail: "% transportado sobre a moagem" })
       ].join("");
+    }
+
+    function patioRowsForRange(range) {
+      const normalized = normalizeDateRange(range.start, range.end);
+      return getCleanPatioRecords(patioRecords)
+        .filter((record) => record.date >= normalized.start && record.date <= normalized.end);
+    }
+
+    function patioTimeSummary(rows) {
+      const cleanRows = rows || [];
+      const maxPalha = [...cleanRows].sort((a, b) => b.fieldMinutes - a.fieldMinutes)[0] || null;
+      const maxUsina = [...cleanRows].sort((a, b) => patioMillMinutes(b) - patioMillMinutes(a))[0] || null;
+      const palhaAlerts = cleanRows.filter((record) => record.fieldMinutes > 90).length;
+      const missingWeighing = cleanRows.filter((record) => !record.weighingEnd).length;
+      return {
+        rows: cleanRows,
+        trips: cleanRows.length,
+        trucks: new Set(cleanRows.map((record) => record.truck)).size,
+        fronts: new Set(cleanRows.map((record) => record.front)).size,
+        avgPalha: average(cleanRows.map((record) => record.fieldMinutes)),
+        avgUsina: average(cleanRows.map((record) => patioMillMinutes(record))),
+        maxPalha,
+        maxUsina,
+        palhaAlerts,
+        missingWeighing
+      };
+    }
+
+    function renderReportsPatioTimes(range) {
+      const patioRows = patioRowsForRange(range);
+      const summary = patioTimeSummary(patioRows);
+      if (!summary.trips) {
+        els.reportsPatioTimesWrap.innerHTML = '<div class="empty-state">Sem lançamentos de tempo de pátio no período do relatório.</div>';
+        return;
+      }
+
+      const frontRows = aggregatePatioBy(patioRows, (record) => record.front)
+        .sort((a, b) => b.avgFieldMinutes - a.avgFieldMinutes || b.avgMillMinutes - a.avgMillMinutes);
+
+      els.reportsPatioTimesWrap.innerHTML = `
+        <div class="transport-summary">
+          <div class="goal-metric">
+            <span>Viagens</span>
+            <strong>${summary.trips}</strong>
+            <small>${summary.trucks} caminhão${summary.trucks === 1 ? "" : "ões"} · ${summary.fronts} frente${summary.fronts === 1 ? "" : "s"}</small>
+          </div>
+          <div class="goal-metric">
+            <span>Média palha</span>
+            <strong>${formatMinutes(summary.avgPalha)}</strong>
+            <small>Chegada frente até saída frente</small>
+          </div>
+          <div class="goal-metric">
+            <span>Média usina</span>
+            <strong>${formatMinutes(summary.avgUsina)}</strong>
+            <small>Chegada usina até saída pesagem</small>
+          </div>
+          <div class="goal-metric">
+            <span>Maior palha</span>
+            <strong>${summary.maxPalha ? formatMinutes(summary.maxPalha.fieldMinutes) : "0 min"}</strong>
+            <small>${summary.maxPalha ? `${summary.maxPalha.truck} · ${summary.maxPalha.front}` : "Sem registro"}</small>
+          </div>
+          <div class="goal-metric">
+            <span>Maior usina</span>
+            <strong>${summary.maxUsina ? formatMinutes(patioMillMinutes(summary.maxUsina)) : "0 min"}</strong>
+            <small>${summary.maxUsina ? `${summary.maxUsina.truck} · ${summary.maxUsina.front}` : "Sem registro"}</small>
+          </div>
+          <div class="goal-metric">
+            <span>Alertas</span>
+            <strong>${summary.palhaAlerts + summary.missingWeighing}</strong>
+            <small>${summary.palhaAlerts} palha > 90 min · ${summary.missingWeighing} sem saída</small>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Frente</th>
+              <th>Viagens</th>
+              <th>Caminhões</th>
+              <th>Média palha</th>
+              <th>Máx. palha</th>
+              <th>Média usina</th>
+              <th>Máx. usina</th>
+              <th>Ciclo médio</th>
+              <th>Alertas</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${frontRows.map((item) => `
+              <tr>
+                <td>${escapeHtml(item.name)}</td>
+                <td>${item.trips}</td>
+                <td>${item.trucksCount}</td>
+                <td>${formatMinutes(item.avgFieldMinutes)}</td>
+                <td>${formatMinutes(item.maxFieldMinutes)}</td>
+                <td>${formatMinutes(item.avgMillMinutes)}</td>
+                <td>${formatMinutes(item.maxMillMinutes)}</td>
+                <td>${formatMinutes(item.avgCycleMinutes)}</td>
+                <td>${item.alerts}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
     }
 
     function renderReportsFront(rows, baseSummary) {
@@ -6017,11 +7090,12 @@
 
       renderReportFilterSummary(data);
       updateReportsPrintSubtitle(data);
-      renderReportsKpis(baseSummary, summary, info, filteredRecords, rows, targetContext);
+      renderReportsKpis(baseSummary, summary, info, filteredRecords, rows, targetContext, range);
       renderReportsExecutive(filteredRecords, rows, baseSummary, summary, info, filters);
       renderReportsInsights(filteredRecords, rows, baseSummary, filters);
       renderReportsParticipation(baseSummary);
       renderReportsTransport(baseSummary);
+      renderReportsPatioTimes(range);
       renderReportsFront(rows, baseSummary);
       renderReportsType(rows, baseSummary, targetContext.targetDays);
       renderReportsRanking(rows, baseSummary);
@@ -7191,6 +8265,10 @@
       let accumulatedTarget = 0;
       let accumulatedFiltered = 0;
       const filteredVolume = rowProductionTotal(rows);
+      const patioRows = patioRowsForRange(range);
+      const patioSummary = patioTimeSummary(patioRows);
+      const patioFrontRows = aggregatePatioBy(patioRows, (record) => record.front)
+        .sort((a, b) => b.avgFieldMinutes - a.avgFieldMinutes || b.avgMillMinutes - a.avgMillMinutes);
       const lines = [
         ["Relatório Gerencial - Produção Diária da Cambuí"],
         ["Período", `${formatDate(range.start)} a ${formatDate(range.end)}`],
@@ -7211,6 +8289,31 @@
         ["Transporte próprio", formatNumber(baseSummary.ownTransport), formatPercent(baseSummary.ownTransportPercent)],
         ["Transporte terceiro", formatNumber(baseSummary.thirdTransport), formatPercent(baseSummary.thirdTransportPercent)],
         ["Transporte total", formatNumber(baseSummary.transportTotal), formatPercent(baseSummary.transportPercent)],
+        [],
+        ["Tempos de palha e usina"],
+        ["Viagens", patioSummary.trips],
+        ["Caminhões", patioSummary.trucks],
+        ["Frentes", patioSummary.fronts],
+        ["Média palha", formatMinutes(patioSummary.avgPalha)],
+        ["Média usina", formatMinutes(patioSummary.avgUsina)],
+        ["Maior palha", patioSummary.maxPalha ? `${formatMinutes(patioSummary.maxPalha.fieldMinutes)} - ${patioSummary.maxPalha.truck} - ${patioSummary.maxPalha.front}` : ""],
+        ["Maior usina", patioSummary.maxUsina ? `${formatMinutes(patioMillMinutes(patioSummary.maxUsina))} - ${patioSummary.maxUsina.truck} - ${patioSummary.maxUsina.front}` : ""],
+        ["Alertas palha > 90 min", patioSummary.palhaAlerts],
+        ["Sem saída de pesagem", patioSummary.missingWeighing],
+        [],
+        ["Tempos por frente"],
+        ["Frente", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Máx. usina", "Ciclo médio", "Alertas"],
+        ...patioFrontRows.map((item) => [
+          item.name,
+          item.trips,
+          item.trucksCount,
+          formatMinutes(item.avgFieldMinutes),
+          formatMinutes(item.maxFieldMinutes),
+          formatMinutes(item.avgMillMinutes),
+          formatMinutes(item.maxMillMinutes),
+          formatMinutes(item.avgCycleMinutes),
+          item.alerts
+        ]),
         [],
         ["Diário"],
         ["Data", "Moagem", "Volume filtrado", "Meta", "% meta", "% própria", "% terceira", "% transp. próprio", "% transp. terceiro", "% transp. total", "Falta", "Registros filtrados"],
@@ -7417,6 +8520,56 @@
       `;
     }
 
+    function pdfMonthlyPlanChart(items) {
+      if (!items.length) return '<div class="pdf-empty">Sem dados mensais para o gráfico.</div>';
+      const width = 940;
+      const height = 270;
+      const left = 52;
+      const right = 18;
+      const top = 24;
+      const bottom = 44;
+      const chartWidth = width - left - right;
+      const chartHeight = height - top - bottom;
+      const maxValue = Math.max(...items.flatMap((item) => [
+        item.targetContext.targetTotal,
+        item.baseSummary.total,
+        item.filteredVolume
+      ]), 1);
+      const step = chartWidth / items.length;
+      const barWidth = Math.max(10, Math.min(24, step * 0.2));
+
+      const bars = items.map((item, index) => {
+        const center = left + index * step + step / 2;
+        const plannedHeight = (item.targetContext.targetTotal / maxValue) * chartHeight;
+        const realHeight = (item.baseSummary.total / maxValue) * chartHeight;
+        const filteredHeight = (item.filteredVolume / maxValue) * chartHeight;
+        const plannedY = top + chartHeight - plannedHeight;
+        const realY = top + chartHeight - realHeight;
+        const filteredY = top + chartHeight - filteredHeight;
+        return `
+          <rect x="${center - barWidth * 1.55}" y="${plannedY}" width="${barWidth}" height="${plannedHeight}" rx="3" class="bar-target"></rect>
+          <rect x="${center - barWidth / 2}" y="${realY}" width="${barWidth}" height="${realHeight}" rx="3" class="bar-real"></rect>
+          <rect x="${center + barWidth * 0.55}" y="${filteredY}" width="${barWidth}" height="${filteredHeight}" rx="3" class="bar-filter"></rect>
+          <text x="${center}" y="${height - 16}" text-anchor="middle" class="axis-label">${escapeHtml(item.label)}</text>
+        `;
+      }).join("");
+
+      return `
+        <svg class="pdf-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Planejamento mensal">
+          <line x1="${left}" y1="${top + chartHeight}" x2="${width - right}" y2="${top + chartHeight}" class="axis"></line>
+          <line x1="${left}" y1="${top}" x2="${left}" y2="${top + chartHeight}" class="axis"></line>
+          <text x="8" y="${top + 6}" class="axis-label">${formatNumber(maxValue)}</text>
+          <text x="8" y="${top + chartHeight}" class="axis-label">0</text>
+          ${bars}
+          <g transform="translate(${left}, 8)">
+            <rect width="10" height="10" rx="2" class="bar-target"></rect><text x="16" y="10" class="legend">Previsto</text>
+            <rect x="92" width="10" height="10" rx="2" class="bar-real"></rect><text x="108" y="10" class="legend">Real moagem</text>
+            <rect x="204" width="10" height="10" rx="2" class="bar-filter"></rect><text x="220" y="10" class="legend">Filtro</text>
+          </g>
+        </svg>
+      `;
+    }
+
     function pdfHorizontalBars(items, options = {}) {
       const visible = items.slice(0, options.limit || 8);
       if (!visible.length) return '<div class="pdf-empty">Sem dados para gráfico.</div>';
@@ -7454,16 +8607,60 @@
       `;
     }
 
+    function pdfProgressTone(percent) {
+      const value = Number(percent) || 0;
+      if (value >= 100) return "good";
+      if (value >= 85) return "warn";
+      return "alert";
+    }
+
+    function pdfSignedNumber(value) {
+      const number = Number(value) || 0;
+      return `${number > 0 ? "+" : ""}${formatNumber(number)}`;
+    }
+
+    function pdfInsightCards(items) {
+      return `
+        <div class="pdf-insights">
+          ${items.map((item) => `
+            <div class="pdf-insight ${escapeHtml(item.tone || "")}">
+              <span>${escapeHtml(item.label)}</span>
+              <strong>${escapeHtml(item.value)}</strong>
+              <small>${escapeHtml(item.detail)}</small>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
     function buildManagementPdfHtml() {
       const data = managementDataForRange();
       const { range, filteredRecords, rows, baseSummary, summary, targetContext, filters } = data;
       const dailyItems = chronologicalDailyReportItems(filteredRecords, rows, filters);
       const originItems = reportOriginItems(rows, baseSummary);
       const typeItems = reportTypeItems(rows, baseSummary, targetContext.targetDays);
+      const monthItems = monthlyReportRows(filters);
+      const patioRows = patioRowsForRange(range);
+      const patioSummary = patioTimeSummary(patioRows);
+      const patioFrontRows = aggregatePatioBy(patioRows, (record) => record.front)
+        .sort((a, b) => b.avgFieldMinutes - a.avgFieldMinutes || b.avgMillMinutes - a.avgMillMinutes);
+      const trendStats = reportEvolutionStats(dailyItems);
       const externalCane = baseSummary.florestaCane + baseSummary.valeCane;
       const filteredVolume = rowProductionTotal(rows);
       const rangeLabel = range.start === range.end ? formatDate(range.start) : `${formatDate(range.start)} a ${formatDate(range.end)}`;
       const generatedAt = formatDateTime(new Date().toISOString());
+      const status = statusForProgress(baseSummary.targetPercent);
+      const targetTone = baseSummary.targetTotal > 0 ? pdfProgressTone(baseSummary.targetPercent) : "warn";
+      const targetLabel = baseSummary.targetTotal > 0 ? status.label : "Sem meta cadastrada";
+      const targetDifference = baseSummary.total - baseSummary.targetTotal;
+      const transportDifference = baseSummary.transportTotal - baseSummary.total;
+      const bestDay = dailyItems.length ? [...dailyItems].sort((a, b) => b.total - a.total)[0] : null;
+      const weakestDay = dailyItems.length ? [...dailyItems].sort((a, b) => a.total - b.total)[0] : null;
+      const lastDay = dailyItems[dailyItems.length - 1] || null;
+      const trendLabel = trendStats.lastDelta > 0 ? "Alta no último lançamento" : trendStats.lastDelta < 0 ? "Queda no último lançamento" : "Estável";
+      const executiveText = baseSummary.targetTotal > 0
+        ? `No período ${rangeLabel}, a moagem foi ${formatNumber(baseSummary.total)} t contra ${formatNumber(baseSummary.targetTotal)} t previstas, atingindo ${formatPercent(baseSummary.targetPercent)} da meta. O transporte informado somou ${formatNumber(baseSummary.transportTotal)} t, equivalente a ${formatPercent(baseSummary.transportPercent)} da moagem.`
+        : `No período ${rangeLabel}, a moagem foi ${formatNumber(baseSummary.total)} t. Não existe meta cadastrada para a base analisada, então o relatório mantém a comparação operacional por origem, transporte e lançamentos.`;
       const filterChips = [
         `Operação: ${reportTypeLabel(filters.type)}`,
         `Origem: ${filters.origin === "all" ? "Todas" : filters.origin}`,
@@ -7472,18 +8669,58 @@
         `Busca: ${els.reportsSearch.value || "Sem busca"}`
       ];
       const kpis = [
-        ["Moagem", formatNumber(baseSummary.total), "Sem somar transporte"],
-        ["Meta", formatNumber(baseSummary.targetTotal), `${targetContext.targetDays} dia${targetContext.targetDays === 1 ? "" : "s"}`],
-        ["% meta", formatPercent(baseSummary.targetPercent), baseSummary.targetTotal > 0 ? "Real / previsto" : "Sem meta"],
-        ["Falta/Sobra", formatNumber(Math.abs(baseSummary.total - baseSummary.targetTotal)), baseSummary.total >= baseSummary.targetTotal ? "Acima da meta" : "Para meta"],
-        ["Volume filtrado", formatNumber(filteredVolume), `${rows.length} registro${rows.length === 1 ? "" : "s"}`],
-        ["Própria", formatPercent(baseSummary.ownHarvestPercent), formatNumber(baseSummary.ownHarvest)],
-        ["Terceira", formatPercent(baseSummary.thirdHarvestPercent), formatNumber(baseSummary.thirdHarvest)],
-        ["Outras unidades", formatNumber(externalCane), formatPercent(progressFor(externalCane, baseSummary.total))],
-        ["Transp. próprio", formatPercent(baseSummary.ownTransportPercent), formatNumber(baseSummary.ownTransport)],
-        ["Transp. terceiro", formatPercent(baseSummary.thirdTransportPercent), formatNumber(baseSummary.thirdTransport)],
-        ["Transporte total", formatNumber(baseSummary.transportTotal), formatPercent(baseSummary.transportPercent)],
-        ["Dias exibidos", `${filteredRecords.length}`, `${dailyItems.length} no gráfico`]
+        ["Moagem", formatNumber(baseSummary.total), "Sem somar transporte", ""],
+        ["Meta", formatNumber(baseSummary.targetTotal), `${targetContext.targetDays} dia${targetContext.targetDays === 1 ? "" : "s"}`, targetTone],
+        ["% meta", formatPercent(baseSummary.targetPercent), baseSummary.targetTotal > 0 ? "Real / previsto" : "Sem meta", targetTone],
+        ["Falta/Sobra", baseSummary.targetTotal > 0 ? formatNumber(Math.abs(targetDifference)) : "-", baseSummary.targetTotal > 0 ? (targetDifference >= 0 ? "Acima da meta" : "Para meta") : "Sem meta", baseSummary.targetTotal > 0 ? (targetDifference >= 0 ? "good" : "alert") : "warn"],
+        ["Volume filtrado", formatNumber(filteredVolume), `${rows.length} registro${rows.length === 1 ? "" : "s"}`, ""],
+        ["Própria", formatPercent(baseSummary.ownHarvestPercent), formatNumber(baseSummary.ownHarvest), ""],
+        ["Terceira", formatPercent(baseSummary.thirdHarvestPercent), formatNumber(baseSummary.thirdHarvest), ""],
+        ["Outras unidades", formatNumber(externalCane), formatPercent(progressFor(externalCane, baseSummary.total)), ""],
+        ["Transp. próprio", formatPercent(baseSummary.ownTransportPercent), formatNumber(baseSummary.ownTransport), ""],
+        ["Transp. terceiro", formatPercent(baseSummary.thirdTransportPercent), formatNumber(baseSummary.thirdTransport), ""],
+        ["Transporte total", formatNumber(baseSummary.transportTotal), formatPercent(baseSummary.transportPercent), transportDifference >= 0 ? "good" : "warn"],
+        ["Média palha", formatMinutes(patioSummary.avgPalha), `${patioSummary.trips} viagem${patioSummary.trips === 1 ? "" : "s"}`, patioSummary.palhaAlerts ? "warn" : ""],
+        ["Média usina", formatMinutes(patioSummary.avgUsina), "Chegada usina até saída pesagem", patioSummary.missingWeighing ? "warn" : ""],
+        ["Dias exibidos", `${filteredRecords.length}`, `${dailyItems.length} no gráfico`, ""]
+      ];
+      const insightCards = [
+        {
+          label: "Situação da meta",
+          value: targetLabel,
+          detail: baseSummary.targetTotal > 0 ? `${pdfSignedNumber(targetDifference)} t no período` : "Meta não localizada",
+          tone: targetTone
+        },
+        {
+          label: "Melhor dia",
+          value: bestDay ? formatDate(bestDay.date) : "Sem dados",
+          detail: bestDay ? `${formatNumber(bestDay.total)} t moídas` : "Sem lançamento diário",
+          tone: bestDay && bestDay.targetPercent >= 100 ? "good" : ""
+        },
+        {
+          label: "Menor moagem",
+          value: weakestDay ? formatDate(weakestDay.date) : "Sem dados",
+          detail: weakestDay ? `${formatNumber(weakestDay.total)} t moídas` : "Sem lançamento diário",
+          tone: weakestDay && weakestDay.targetPercent < 85 ? "alert" : ""
+        },
+        {
+          label: "Tendência",
+          value: trendLabel,
+          detail: dailyItems.length > 1 ? `${pdfSignedNumber(trendStats.lastDelta)} t contra o dia anterior` : "Precisa de mais de um dia",
+          tone: trendStats.lastDelta > 0 ? "good" : trendStats.lastDelta < 0 ? "alert" : "warn"
+        },
+        {
+          label: "Média 3 dias",
+          value: formatNumber(trendStats.averageThree),
+          detail: lastDay ? `Até ${formatDate(lastDay.date)}` : "Sem base recente",
+          tone: ""
+        },
+        {
+          label: "Transporte x moagem",
+          value: formatPercent(baseSummary.transportPercent),
+          detail: `${pdfSignedNumber(transportDifference)} t frente à moagem`,
+          tone: transportDifference >= 0 ? "good" : "warn"
+        }
       ];
       const mixItems = [
         { label: "Colheita própria", value: baseSummary.ownHarvest },
@@ -7521,6 +8758,67 @@
         formatPercent(item.targetPercent),
         String(item.records)
       ]);
+      const patioSummaryRows = [
+        ["Viagens", String(patioSummary.trips), `${patioSummary.trucks} caminhão${patioSummary.trucks === 1 ? "" : "ões"} · ${patioSummary.fronts} frente${patioSummary.fronts === 1 ? "" : "s"}`],
+        ["Média palha", formatMinutes(patioSummary.avgPalha), "Chegada frente até saída frente"],
+        ["Média usina", formatMinutes(patioSummary.avgUsina), "Chegada usina até saída pesagem"],
+        ["Maior palha", patioSummary.maxPalha ? formatMinutes(patioSummary.maxPalha.fieldMinutes) : "0 min", patioSummary.maxPalha ? `${patioSummary.maxPalha.truck} · ${patioSummary.maxPalha.front}` : "Sem registro"],
+        ["Maior usina", patioSummary.maxUsina ? formatMinutes(patioMillMinutes(patioSummary.maxUsina)) : "0 min", patioSummary.maxUsina ? `${patioSummary.maxUsina.truck} · ${patioSummary.maxUsina.front}` : "Sem registro"],
+        ["Alertas", String(patioSummary.palhaAlerts + patioSummary.missingWeighing), `${patioSummary.palhaAlerts} palha > 90 min · ${patioSummary.missingWeighing} sem saída`]
+      ];
+      const patioFrontTableRows = patioFrontRows.map((item) => [
+        item.name,
+        String(item.trips),
+        String(item.trucksCount),
+        formatMinutes(item.avgFieldMinutes),
+        formatMinutes(item.maxFieldMinutes),
+        formatMinutes(item.avgMillMinutes),
+        formatMinutes(item.maxMillMinutes),
+        formatMinutes(item.avgCycleMinutes),
+        String(item.alerts)
+      ]);
+      const monthTotals = monthItems.reduce((acc, item) => {
+        acc.days += item.targetContext.targetDays;
+        acc.records += item.records;
+        acc.planned += item.targetContext.targetTotal;
+        acc.total += item.baseSummary.total;
+        acc.filteredVolume += item.filteredVolume;
+        acc.ownHarvest += item.baseSummary.ownHarvest;
+        acc.thirdHarvest += item.baseSummary.thirdHarvest;
+        acc.transportTotal += item.baseSummary.transportTotal;
+        return acc;
+      }, { days: 0, records: 0, planned: 0, total: 0, filteredVolume: 0, ownHarvest: 0, thirdHarvest: 0, transportTotal: 0 });
+      const monthRows = monthItems.map((item) => {
+        const difference = item.baseSummary.total - item.targetContext.targetTotal;
+        return [
+          `${item.label}/${item.key.slice(2, 4)}`,
+          String(item.targetContext.targetDays),
+          formatNumber(item.targetContext.targetTotal),
+          formatNumber(item.baseSummary.total),
+          formatNumber(item.filteredVolume),
+          pdfSignedNumber(difference),
+          formatPercent(progressFor(item.baseSummary.total, item.targetContext.targetTotal)),
+          formatPercent(item.baseSummary.ownHarvestPercent),
+          formatPercent(item.baseSummary.thirdHarvestPercent),
+          formatNumber(item.baseSummary.transportTotal),
+          formatPercent(item.baseSummary.transportPercent),
+          String(item.records)
+        ];
+      });
+      monthRows.push([
+        "Total",
+        String(monthTotals.days),
+        formatNumber(monthTotals.planned),
+        formatNumber(monthTotals.total),
+        formatNumber(monthTotals.filteredVolume),
+        pdfSignedNumber(monthTotals.total - monthTotals.planned),
+        formatPercent(progressFor(monthTotals.total, monthTotals.planned)),
+        formatPercent(progressFor(monthTotals.ownHarvest, monthTotals.total)),
+        formatPercent(progressFor(monthTotals.thirdHarvest, monthTotals.total)),
+        formatNumber(monthTotals.transportTotal),
+        formatPercent(progressFor(monthTotals.transportTotal, monthTotals.total)),
+        String(monthTotals.records)
+      ]);
 
       return `<!doctype html>
         <html lang="pt-BR">
@@ -7541,14 +8839,39 @@
             .pdf-meta { text-align: right; display: grid; gap: 4px; color: #475569; font-weight: 700; }
             .pdf-chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
             .pdf-chip { border: 1px solid #cbd5e1; border-radius: 999px; padding: 4px 8px; background: #f8fafc; color: #334155; font-weight: 700; }
+            .pdf-executive { display: grid; grid-template-columns: 1.35fr .65fr; gap: 10px; align-items: stretch; }
+            .pdf-narrative { border: 1px solid #d8e4d4; border-radius: 10px; padding: 12px; background: linear-gradient(180deg, #f9fcf8, #ffffff); display: grid; gap: 8px; }
+            .pdf-narrative p { color: #334155; line-height: 1.45; font-size: 12px; }
+            .pdf-status { border-radius: 10px; padding: 12px; display: grid; gap: 7px; color: #fff; background: #475569; box-shadow: inset 0 -18px 30px rgba(15, 23, 42, .18); }
+            .pdf-status.good { background: #1f6f3a; }
+            .pdf-status.warn { background: #8a6d1d; }
+            .pdf-status.alert { background: #9f2f2f; }
+            .pdf-status span { font-size: 9px; font-weight: 900; letter-spacing: .4px; text-transform: uppercase; opacity: .9; }
+            .pdf-status strong { font-size: 22px; line-height: 1; }
+            .pdf-status small { font-weight: 800; opacity: .9; }
+            .pdf-progress-line { height: 10px; border-radius: 999px; overflow: hidden; background: rgba(255, 255, 255, .32); }
+            .pdf-progress-fill { height: 100%; border-radius: inherit; background: #ffffff; }
+            .pdf-insights { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+            .pdf-insight { border: 1px solid #d8e4d4; border-left: 4px solid #94a3b8; border-radius: 8px; padding: 8px; background: #fff; display: grid; gap: 3px; min-height: 66px; }
+            .pdf-insight.good { border-left-color: #2f6f3a; background: #f3fbf4; }
+            .pdf-insight.warn { border-left-color: #b7791f; background: #fffaf0; }
+            .pdf-insight.alert { border-left-color: #b42318; background: #fff5f5; }
+            .pdf-insight span { color: #64748b; font-size: 8.5px; font-weight: 900; text-transform: uppercase; }
+            .pdf-insight strong { color: #111827; font-size: 12px; }
+            .pdf-insight small { color: #64748b; font-weight: 700; line-height: 1.25; }
             .pdf-kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
             .pdf-kpi { border: 1px solid #d8e4d4; border-radius: 8px; padding: 8px; background: #f8fbf7; min-height: 58px; display: grid; gap: 4px; align-content: start; }
+            .pdf-kpi.good { border-color: #8fc89f; background: #f1faf2; }
+            .pdf-kpi.warn { border-color: #ddb66a; background: #fffaf0; }
+            .pdf-kpi.alert { border-color: #e5a2a2; background: #fff5f5; }
             .pdf-kpi span { color: #64748b; font-size: 9px; font-weight: 900; text-transform: uppercase; }
             .pdf-kpi strong { font-size: 15px; color: #111827; }
             .pdf-kpi small { color: #64748b; font-weight: 700; }
             .pdf-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
             .pdf-section { border: 1px solid #d9e5d4; border-radius: 8px; padding: 10px; break-inside: avoid; background: #fff; }
             .pdf-section.full { grid-column: 1 / -1; }
+            .pdf-section.soft { background: #fbfdfb; }
+            .pdf-page-break { break-before: page; }
             .pdf-title { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; margin-bottom: 8px; }
             .pdf-chart { width: 100%; height: auto; display: block; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; }
             .axis { stroke: #94a3b8; stroke-width: 1; }
@@ -7567,6 +8890,7 @@
             .pdf-table th { text-align: left; background: #eaf3e8; color: #18361f; border: 1px solid #cbd5c7; padding: 5px; }
             .pdf-table td { border: 1px solid #e2e8f0; padding: 4px 5px; }
             .pdf-table tr:nth-child(even) td { background: #f8fafc; }
+            .pdf-table thead { display: table-header-group; }
             .pdf-note, .pdf-empty { color: #64748b; font-weight: 700; margin-top: 6px; }
             .pdf-footer { margin-top: 4px; padding-top: 8px; border-top: 1px solid #cbd5e1; color: #64748b; display: flex; justify-content: space-between; font-weight: 700; }
             @media print { .pdf-section { break-inside: avoid; } .pdf-page { gap: 10px; } }
@@ -7587,9 +8911,25 @@
             <section class="pdf-chip-row">
               ${filterChips.map((chip) => `<span class="pdf-chip">${escapeHtml(chip)}</span>`).join("")}
             </section>
+            <section class="pdf-executive">
+              <div class="pdf-narrative">
+                <h2>Resumo executivo</h2>
+                <p>${escapeHtml(executiveText)}</p>
+                <p>O volume filtrado representa ${formatPercent(progressFor(filteredVolume, baseSummary.total))} da moagem do período e a moagem filtrada soma ${formatNumber(summary.total)} t nos critérios selecionados.</p>
+              </div>
+              <div class="pdf-status ${escapeHtml(targetTone)}">
+                <span>Status do período</span>
+                <strong>${escapeHtml(targetLabel)}</strong>
+                <small>${baseSummary.targetTotal > 0 ? `${formatPercent(baseSummary.targetPercent)} realizado · ${pdfSignedNumber(targetDifference)} t` : "Sem comparação de meta"}</small>
+                <div class="pdf-progress-line">
+                  <div class="pdf-progress-fill" style="width:${clampPercent(baseSummary.targetPercent)}%"></div>
+                </div>
+              </div>
+            </section>
+            ${pdfInsightCards(insightCards)}
             <section class="pdf-kpis">
-              ${kpis.map(([label, value, detail]) => `
-                <div class="pdf-kpi">
+              ${kpis.map(([label, value, detail, tone]) => `
+                <div class="pdf-kpi ${escapeHtml(tone)}">
                   <span>${escapeHtml(label)}</span>
                   <strong>${escapeHtml(value)}</strong>
                   <small>${escapeHtml(detail)}</small>
@@ -7605,6 +8945,10 @@
                 <div class="pdf-title"><h2>Evolução acumulada</h2><span class="muted">Real x previsto</span></div>
                 ${pdfAccumulatedLineChart(dailyItems)}
               </div>
+              <div class="pdf-section full soft">
+                <div class="pdf-title"><h2>Planejamento mensal</h2><span class="muted">Previsto x real x volume filtrado</span></div>
+                ${pdfMonthlyPlanChart(monthItems)}
+              </div>
               <div class="pdf-section">
                 <div class="pdf-title"><h2>Mix da moagem</h2><span class="muted">% sobre moagem</span></div>
                 ${pdfHorizontalBars(mixItems, { total: baseSummary.total })}
@@ -7613,6 +8957,13 @@
                 <div class="pdf-title"><h2>Transporte sobre moagem</h2><span class="muted">Próprio e terceiro</span></div>
                 ${pdfHorizontalBars(transportItems, { total: baseSummary.total })}
               </div>
+              <div class="pdf-section full soft">
+                <div class="pdf-title"><h2>Tempos de palha e usina</h2><span class="muted">Base do tempo de pátio no período</span></div>
+                ${patioSummary.trips ? `
+                  ${pdfTable(["Indicador", "Valor", "Detalhe"], patioSummaryRows)}
+                  ${pdfTable(["Frente", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Máx. usina", "Ciclo médio", "Alertas"], patioFrontTableRows, { limit: 12 })}
+                ` : '<div class="pdf-empty">Sem lançamentos de tempo de pátio no período do relatório.</div>'}
+              </div>
               <div class="pdf-section">
                 <div class="pdf-title"><h2>Ranking de origens</h2><span class="muted">Top por volume</span></div>
                 ${pdfHorizontalBars(originItems.map((item) => ({ label: item.origin, value: item.production })), { total: Math.max(baseSummary.total, 1), limit: 10 })}
@@ -7620,6 +8971,10 @@
               <div class="pdf-section">
                 <div class="pdf-title"><h2>Detalhamento por operação</h2><span class="muted">Volume e meta cadastrada</span></div>
                 ${pdfTable(["Operação", "Volume", "% moagem", "Meta", "% meta", "Reg."], typeRows, { limit: 8 })}
+              </div>
+              <div class="pdf-section full pdf-page-break">
+                <div class="pdf-title"><h2>Planejamento x real mensal</h2><span class="muted">Safra completa com filtros aplicados</span></div>
+                ${pdfTable(["Mês", "Dias", "Previsto", "Real moagem", "Volume filtrado", "Diferença", "% meta", "% própria", "% terceira", "Transp. total", "% transp.", "Dias lançados"], monthRows)}
               </div>
               <div class="pdf-section full">
                 <div class="pdf-title"><h2>Relatório diário</h2><span class="muted">Base completa do período filtrado</span></div>
@@ -7703,6 +9058,133 @@
       }
     }
 
+    async function rowsFromPatioFile(file) {
+      const name = file.name || "";
+      const isExcel = /\.(xlsx|xls)$/i.test(name);
+      const textLike = /\.csv$/i.test(name) || /^text\//i.test(file.type);
+
+      if (isExcel) {
+        const XLSX = await loadExternalScript("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js", "XLSX");
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+        return workbook.SheetNames.flatMap((sheetName) => {
+          const sheet = workbook.Sheets[sheetName];
+          return XLSX.utils.sheet_to_json(sheet, { defval: "", raw: true }).map((row) => ({
+            ...row,
+            source: sheetName
+          }));
+        });
+      }
+
+      const text = await file.text();
+      if (/\.json$/i.test(name) || file.type === "application/json" || text.trim().startsWith("{") || text.trim().startsWith("[")) {
+        return rowsFromJson(JSON.parse(text));
+      }
+
+      if (textLike || text.trim()) return parseDelimited(text);
+      return [];
+    }
+
+    async function importPatioFile(file) {
+      if (!file) return;
+
+      try {
+        showToast("Lendo planilha de tempo de pátio...");
+        const rawRows = await rowsFromPatioFile(file);
+        const imported = rawRows.map(normalizePatioRecord).filter(Boolean);
+
+        if (!imported.length) {
+          showToast("Nenhuma viagem válida foi encontrada na planilha.");
+          return;
+        }
+
+        createAutoBackup("Antes de importar tempo de pátio", { skipAudit: true });
+        patioRecords = getCleanPatioRecords([...patioRecords, ...imported]);
+        persistPatioRecords();
+
+        const latest = imported.sort((a, b) => b.date.localeCompare(a.date))[0];
+        if (latest) {
+          const range = monthRangeFor(latest.date);
+          setPatioRange(range.start, latest.date);
+        }
+
+        addAuditEntry("importacao", `${imported.length} viagem${imported.length === 1 ? "" : "s"} de tempo de pátio importada${imported.length === 1 ? "" : "s"}.`);
+        renderPatio();
+
+        await syncOrQueue("upload-all", { source: "patio-import" }, () => uploadAllDataToFirebase({
+          silent: true,
+          pendingMessage: "Enviando tempo de pátio para o Firebase...",
+          successStatus: "Tempo de pátio sincronizado com o Firebase.",
+          errorStatus: "Tempo de pátio salvo localmente, mas a sincronizacao falhou."
+        }));
+
+        showToast(`${imported.length} viagem${imported.length === 1 ? "" : "s"} importada${imported.length === 1 ? "" : "s"} no tempo de pátio.`);
+      } catch {
+        showToast("Não foi possível importar a planilha de tempo de pátio.");
+      } finally {
+        els.patioImportFile.value = "";
+      }
+    }
+
+    function exportPatioCsv() {
+      const rows = patioFilteredRecords();
+      const header = [
+        "data",
+        "usina",
+        "caminhao",
+        "frente",
+        "saida_trafego",
+        "chegada_frente",
+        "saida_frente",
+        "tempo_frente_min",
+        "chegada_usina",
+        "inicio_pesagem",
+        "saida_pesagem",
+        "retorno_usina_min",
+        "pesagem_min",
+        "ciclo_total_min",
+        "status"
+      ];
+      const lines = rows.map((record) => {
+        const status = patioStatusFor(record);
+        return [
+          record.date,
+          record.plant,
+          record.truck,
+          record.front,
+          record.departureTraffic,
+          record.arrivalField,
+          record.departureField,
+          record.fieldMinutes,
+          record.arrivalMill,
+          record.weighingStart,
+          record.weighingEnd,
+          record.loadedReturnMinutes,
+          record.weighingMinutes,
+          record.cycleMinutes,
+          status.label
+        ].map(csvCell).join(";");
+      });
+
+      downloadFile(`tempo-patio-cambui-${todayInputValue()}.csv`, [header.join(";"), ...lines].join("\n"), "text/csv;charset=utf-8");
+      showToast("CSV de tempo de pátio exportado.");
+    }
+
+    function clearPatioRecords() {
+      if (!patioRecords.length) {
+        showToast("Não há dados de tempo de pátio para limpar.");
+        return;
+      }
+
+      if (!window.confirm("Deseja limpar todos os lançamentos de tempo de pátio?")) return;
+      createAutoBackup("Antes de limpar tempo de pátio", { skipAudit: true });
+      patioRecords = [];
+      persistPatioRecords();
+      renderPatio();
+      addAuditEntry("exclusao", "Dados de tempo de pátio removidos localmente.");
+      showToast("Dados de tempo de pátio limpos.");
+    }
+
     function csvCell(value) {
       return `"${String(value ?? "").replace(/"/g, '""')}"`;
     }
@@ -7755,6 +9237,31 @@
       els.reportsMinProduction.value = value > 0 ? formatNumber(value) : "";
       renderManagementReports();
     });
+    els.patioStartDate.addEventListener("change", renderPatio);
+    els.patioEndDate.addEventListener("change", renderPatio);
+    [els.patioFrontFilter, els.patioStatusFilter, els.patioSort].forEach((field) => {
+      field.addEventListener("change", renderPatio);
+    });
+    els.patioSearch.addEventListener("input", renderPatio);
+    [
+      els.patioEntryDate,
+      els.patioEntryTruck,
+      els.patioEntryFront,
+      els.patioEntryDepartureTraffic,
+      els.patioEntryArrivalField,
+      els.patioEntryDepartureField,
+      els.patioEntryArrivalMill,
+      els.patioEntryWeighingStart,
+      els.patioEntryWeighingEnd
+    ].forEach((field) => {
+      field.addEventListener("input", renderPatioEntryPreview);
+      field.addEventListener("change", () => {
+        if (!els.patioEntryDate.value && field.value && /^\d{4}-\d{2}-\d{2}/.test(field.value)) {
+          els.patioEntryDate.value = field.value.slice(0, 10);
+        }
+        renderPatioEntryPreview();
+      });
+    });
     els.historySearch.addEventListener("input", renderHistory);
 
     document.querySelector("#reportsTodayBtn").addEventListener("click", () => {
@@ -7804,6 +9311,42 @@
 
     document.querySelector("#exportReportsCsvBtn").addEventListener("click", exportManagementReportCsv);
     document.querySelector("#printReportsBtn").addEventListener("click", printManagementReportPdf);
+    document.querySelector("#patioTodayBtn").addEventListener("click", () => {
+      const today = todayInputValue();
+      setPatioRange(today, today);
+      renderPatio();
+    });
+    document.querySelector("#patioMonthBtn").addEventListener("click", () => {
+      const latest = latestPatioRecord();
+      const baseDate = latest ? latest.date : todayInputValue();
+      const range = monthRangeFor(baseDate);
+      setPatioRange(range.start, baseDate);
+      renderPatio();
+    });
+    document.querySelector("#patioAllBtn").addEventListener("click", () => {
+      const first = firstPatioRecord();
+      const latest = latestPatioRecord();
+      if (!first || !latest) {
+        const today = todayInputValue();
+        setPatioRange(today, today);
+        showToast("Ainda não há dados de tempo de pátio.");
+      } else {
+        setPatioRange(first.date, latest.date);
+      }
+      renderPatio();
+    });
+    document.querySelector("#importPatioBtn").addEventListener("click", () => els.patioImportFile.click());
+    document.querySelector("#exportPatioCsvBtn").addEventListener("click", exportPatioCsv);
+    document.querySelector("#clearPatioBtn").addEventListener("click", clearPatioRecords);
+    document.querySelector("#savePatioEntryBtn").addEventListener("click", savePatioEntry);
+    document.querySelector("#resetPatioEntryBtn").addEventListener("click", () => resetPatioEntryForm({ date: els.patioEntryDate.value || todayInputValue() }));
+    els.patioImportFile.addEventListener("change", (event) => importPatioFile(event.target.files[0]));
+    els.patioRowsWrap.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-patio-action]");
+      if (!button) return;
+      if (button.dataset.patioAction === "edit") editPatioRecord(button.dataset.id);
+      if (button.dataset.patioAction === "delete") deletePatioRecord(button.dataset.id);
+    });
 
     els.frontCards.forEach((card) => {
       card.addEventListener("click", () => openFrontWorkspace(card.dataset.front, card.dataset.type));
@@ -7997,13 +9540,19 @@
     const initialDashboardRecord = recordForDate(initialDate) || latestRecord();
     const initialDashboardDate = initialDashboardRecord ? initialDashboardRecord.date : initialDate;
     const initialReportRange = monthRangeFor(initialDate);
+    const initialPatioRecord = latestPatioRecord();
+    const initialPatioDate = initialPatioRecord ? initialPatioRecord.date : initialDate;
+    const initialPatioRange = monthRangeFor(initialPatioDate);
     setDashboardRange(initialDashboardDate, initialDashboardDate);
     setManagementRange(initialReportRange.start, initialDate);
+    setPatioRange(initialPatioRange.start, initialPatioDate);
+    resetPatioEntryForm({ date: initialPatioDate });
     els.entryDate.value = initialDate;
     renderTargets();
     refreshEntryFromSelectedDate({ clearWhenMissing: true, silent: true });
     renderDashboard();
     renderManagementReports();
+    renderPatio();
     renderHistory();
 
     ensureFirebaseReady({ silent: true }).then((ready) => {
