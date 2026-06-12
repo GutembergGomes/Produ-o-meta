@@ -707,6 +707,23 @@
       background: var(--surface-3);
     }
 
+    .rank-item-action {
+      width: 100%;
+      color: var(--ink);
+      text-align: left;
+    }
+
+    .rank-item-action:hover,
+    .rank-item-action.is-selected {
+      background: var(--card-hover-bg);
+      border-color: var(--card-hover-border);
+    }
+
+    .rank-item-action.is-selected .rank-position {
+      background: var(--green);
+      color: white;
+    }
+
     .rank-position {
       width: 34px;
       height: 34px;
@@ -716,6 +733,30 @@
       background: var(--card-hover-bg);
       color: var(--green-dark);
       font-weight: 950;
+    }
+
+    .front-detail-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .front-detail-section {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .front-detail-section h3 {
+      margin: 0;
+      color: var(--muted);
+      font-size: .82rem;
+      text-transform: uppercase;
+    }
+
+    .front-detail-section.full {
+      grid-column: 1 / -1;
     }
 
     .rank-main {
@@ -1148,6 +1189,7 @@
       }
 
       .transport-ranking-grid,
+      .front-detail-grid,
       .transport-summary {
         grid-template-columns: 1fr;
       }
@@ -1824,7 +1866,7 @@
           <select id="patioSort">
             <option value="date-desc">Mais recente</option>
             <option value="date-asc">Mais antigo</option>
-            <option value="field-desc">Maior tempo na frente</option>
+            <option value="field-desc">Maior tempo de palha</option>
             <option value="cycle-desc">Maior ciclo</option>
             <option value="truck-asc">Caminhão</option>
           </select>
@@ -1832,6 +1874,16 @@
         <div class="field">
           <label for="patioSearch">Buscar caminhão</label>
           <input id="patioSearch" type="search" placeholder="Ex.: 6998 ou 4002">
+        </div>
+        <div class="field">
+          <label for="patioPrintTransport">Relatório</label>
+          <select id="patioPrintTransport">
+            <option value="own">Caminhões próprios</option>
+            <option value="third">Caminhões terceiros</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button class="btn-primary" id="printPatioReportBtn" type="button">Imprimir pátio</button>
         </div>
       </div>
 
@@ -1851,6 +1903,14 @@
           </div>
           <div class="panel-body" id="patioTruckRankingWrap"></div>
         </section>
+      </section>
+
+      <section class="panel" id="patioFrontDetailPanel" hidden>
+        <div class="panel-head">
+          <h2 id="patioFrontDetailTitle">Detalhe da frente selecionada</h2>
+          <span class="status-pill" id="patioFrontDetailBadge">Clique em uma frente</span>
+        </div>
+        <div class="panel-body" id="patioFrontDetailWrap"></div>
       </section>
 
       <section class="dashboard-grid">
@@ -2401,6 +2461,7 @@
       patioStatusFilter: document.querySelector("#patioStatusFilter"),
       patioSort: document.querySelector("#patioSort"),
       patioSearch: document.querySelector("#patioSearch"),
+      patioPrintTransport: document.querySelector("#patioPrintTransport"),
       patioImportFile: document.querySelector("#patioImportFile"),
       patioEntryMode: document.querySelector("#patioEntryMode"),
       patioEntryId: document.querySelector("#patioEntryId"),
@@ -2420,6 +2481,10 @@
       patioKpiWrap: document.querySelector("#patioKpiWrap"),
       patioFrontChartWrap: document.querySelector("#patioFrontChartWrap"),
       patioTruckRankingWrap: document.querySelector("#patioTruckRankingWrap"),
+      patioFrontDetailPanel: document.querySelector("#patioFrontDetailPanel"),
+      patioFrontDetailTitle: document.querySelector("#patioFrontDetailTitle"),
+      patioFrontDetailBadge: document.querySelector("#patioFrontDetailBadge"),
+      patioFrontDetailWrap: document.querySelector("#patioFrontDetailWrap"),
       patioDailyWrap: document.querySelector("#patioDailyWrap"),
       patioInsightsWrap: document.querySelector("#patioInsightsWrap"),
       patioRowsWrap: document.querySelector("#patioRowsWrap"),
@@ -2517,6 +2582,7 @@
     let pendingSyncQueue = loadPendingSyncQueue();
     let currentTheme = loadTheme();
     let transportRankingPeriod = "week";
+    let selectedPatioFront = "";
     let entries = cloneEntries(defaultEntries);
     let activeFront = null;
     const firebaseState = {
@@ -4303,6 +4369,7 @@
 
     function getCleanPatioRecords(source = patioRecords) {
       const grouped = new Map();
+      const groupedMeta = new Map();
       const mergeDistinctText = (current, incoming) => {
         const values = [
           ...String(current || "").split(" / "),
@@ -4318,15 +4385,18 @@
       (source || []).forEach((row) => {
         const normalized = normalizePatioRecord(row);
         if (!normalized) return;
-        const key = [
+        const baseKey = [
           normalized.date,
           normalizeKey(normalized.truck),
           normalizeKey(normalized.front),
           normalized.departureTraffic || normalized.arrivalField || normalized.loadStart || normalized.departureField
         ].join("|");
+        const classKey = normalizeKey(patioTransportGroup(normalized));
+        const key = `${baseKey}|${classKey}`;
         const current = grouped.get(key);
         if (!current) {
           grouped.set(key, normalized);
+          groupedMeta.set(key, { baseKey, classKey });
           return;
         }
 
@@ -4348,7 +4418,21 @@
         refreshPatioDerivedTimes(current);
       });
 
-      return [...grouped.values()].sort((a, b) => {
+      const classesByBase = new Map();
+      groupedMeta.forEach(({ baseKey, classKey }) => {
+        if (!classesByBase.has(baseKey)) classesByBase.set(baseKey, new Set());
+        classesByBase.get(baseKey).add(classKey);
+      });
+
+      return [...grouped.entries()]
+        .filter(([key]) => {
+          const meta = groupedMeta.get(key);
+          if (!meta || meta.classKey !== "proprio / terceiro") return true;
+          const classes = classesByBase.get(meta.baseKey) || new Set();
+          return !(classes.has("proprio") || classes.has("terceiro"));
+        })
+        .map(([, record]) => record)
+        .sort((a, b) => {
         const dateCompare = a.date.localeCompare(b.date);
         if (dateCompare) return dateCompare;
         return String(a.departureTraffic || "").localeCompare(String(b.departureTraffic || ""));
@@ -4662,8 +4746,14 @@
       const max = Math.max(...visible.map((item) => item.value), 1);
       return `
         <div class="rank-list">
-          ${visible.map((item, index) => `
-            <div class="rank-item">
+          ${visible.map((item, index) => {
+            const interactive = item.action === "front-detail";
+            const tag = interactive ? "button" : "div";
+            const attrs = interactive
+              ? `type="button" data-patio-front-select="${escapeHtml(item.label)}" aria-pressed="${item.selected ? "true" : "false"}"`
+              : "";
+            return `
+            <${tag} class="rank-item ${interactive ? "rank-item-action" : ""} ${item.selected ? "is-selected" : ""}" ${attrs}>
               <div class="rank-position">${index + 1}</div>
               <div class="rank-main">
                 <div class="rank-headline">
@@ -4678,8 +4768,197 @@
                   <span>${escapeHtml(item.extra || "")}</span>
                 </div>
               </div>
-            </div>
-          `).join("")}
+            </${tag}>
+          `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function patioTransportGroup(record) {
+      const text = normalizeKey(`${record.transportClass || ""} ${record.source || ""}`);
+      const hasOwn = text.includes("proprio");
+      const hasThird = text.includes("terceir");
+      if (hasOwn && hasThird) return "Próprio / Terceiro";
+      if (hasOwn) return "Próprio";
+      if (hasThird) return "Terceiro";
+      return "Não informado";
+    }
+
+    function patioTransportGroups(record) {
+      const group = patioTransportGroup(record);
+      if (group === "Próprio / Terceiro") return ["Próprio", "Terceiro"];
+      return [group];
+    }
+
+    function patioShiftBaseTime(record) {
+      return record.loadStart || record.arrivalField || record.departureTraffic || record.departureField || record.arrivalMill || "";
+    }
+
+    function patioShiftFor(record) {
+      const value = patioShiftBaseTime(record);
+      const date = value ? new Date(value) : null;
+      if (!date || Number.isNaN(date.getTime())) {
+        return { key: "N", label: "Sem turno", detail: "Sem horário" };
+      }
+
+      const minutes = date.getHours() * 60 + date.getMinutes();
+      if (minutes >= 7 * 60 && minutes < 15 * 60) {
+        return { key: "A", label: "Turno A", detail: "07:00 às 15:00" };
+      }
+      if (minutes >= 15 * 60 && minutes < 23 * 60) {
+        return { key: "B", label: "Turno B", detail: "15:00 às 23:00" };
+      }
+      return { key: "C", label: "Turno C", detail: "23:00 às 07:00" };
+    }
+
+    function patioGroupSummary(rows) {
+      const cleanRows = rows || [];
+      const maxPalha = [...cleanRows].sort((a, b) => b.fieldMinutes - a.fieldMinutes)[0] || null;
+      const maxUsina = [...cleanRows].sort((a, b) => patioMillMinutes(b) - patioMillMinutes(a))[0] || null;
+      return {
+        trips: cleanRows.length,
+        trucks: new Set(cleanRows.map((record) => record.truck)).size,
+        avgPalha: average(cleanRows.map((record) => record.fieldMinutes)),
+        maxPalha: maxPalha ? maxPalha.fieldMinutes : 0,
+        avgUsina: average(cleanRows.map((record) => patioMillMinutes(record))),
+        maxUsina: maxUsina ? patioMillMinutes(maxUsina) : 0,
+        alerts: cleanRows.filter((record) => patioStatusFor(record).key === "alert").length,
+        missing: cleanRows.filter((record) => !record.weighingEnd).length
+      };
+    }
+
+    function patioSummaryTable(headers, rows, emptyMessage) {
+      if (!rows.length) return `<div class="empty-state">${escapeHtml(emptyMessage || "Sem dados para este detalhe.")}</div>`;
+      return `
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>
+            </thead>
+            <tbody>
+              ${rows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function patioDetailRowsByGroup(rows, groupGetter, order = []) {
+      const grouped = new Map();
+      rows.forEach((record) => {
+        const result = groupGetter(record);
+        const groups = Array.isArray(result) ? result : [result];
+        groups.forEach((group) => {
+          const key = typeof group === "string" ? group : group.label;
+          const detail = typeof group === "string" ? "" : group.detail;
+          if (!grouped.has(key)) grouped.set(key, { label: key, detail, rows: [] });
+          grouped.get(key).rows.push(record);
+        });
+      });
+
+      return [...grouped.values()]
+        .sort((a, b) => {
+          const orderA = order.indexOf(a.label);
+          const orderB = order.indexOf(b.label);
+          if (orderA !== -1 || orderB !== -1) return (orderA === -1 ? 999 : orderA) - (orderB === -1 ? 999 : orderB);
+          return a.label.localeCompare(b.label, "pt-BR", { numeric: true });
+        })
+        .map((item) => {
+          const summary = patioGroupSummary(item.rows);
+          return [
+            item.label,
+            item.detail || String(summary.trips),
+            String(summary.trips),
+            String(summary.trucks),
+            formatMinutes(summary.avgPalha),
+            formatMinutes(summary.maxPalha),
+            formatMinutes(summary.avgUsina),
+            String(summary.alerts + summary.missing)
+          ];
+        });
+    }
+
+    function patioShiftTransportMatrixRows(rows) {
+      const transportGroups = ["Próprio", "Terceiro", "Não informado"]
+        .filter((group) => rows.some((record) => patioTransportGroups(record).includes(group)));
+      const shifts = [
+        { label: "Turno A", detail: "07:00 às 15:00" },
+        { label: "Turno B", detail: "15:00 às 23:00" },
+        { label: "Turno C", detail: "23:00 às 07:00" }
+      ];
+
+      const tableRows = shifts.map((shift) => [
+        shift.label,
+        shift.detail,
+        ...transportGroups.map((group) => {
+          const groupRows = rows.filter((record) => patioShiftFor(record).label === shift.label && patioTransportGroups(record).includes(group));
+          const summary = patioGroupSummary(groupRows);
+          return summary.trips ? `${formatMinutes(summary.avgPalha)} / ${summary.trips} viagem${summary.trips === 1 ? "" : "s"}` : "-";
+        })
+      ]);
+
+      return {
+        headers: ["Turno", "Horário", ...transportGroups],
+        rows: tableRows
+      };
+    }
+
+    function renderPatioFrontDetail(rows) {
+      const fronts = [...new Set(rows.map((record) => record.front).filter(Boolean))];
+      if (selectedPatioFront && !fronts.includes(selectedPatioFront)) selectedPatioFront = "";
+
+      if (!selectedPatioFront) {
+        els.patioFrontDetailPanel.hidden = true;
+        els.patioFrontDetailWrap.innerHTML = "";
+        return;
+      }
+
+      const frontRows = rows.filter((record) => record.front === selectedPatioFront);
+      const summary = patioGroupSummary(frontRows);
+      const transportRows = patioDetailRowsByGroup(frontRows, patioTransportGroups, ["Próprio", "Terceiro", "Não informado"]);
+      const shiftRows = patioDetailRowsByGroup(frontRows, patioShiftFor, ["Turno A", "Turno B", "Turno C", "Sem turno"]);
+      const matrix = patioShiftTransportMatrixRows(frontRows);
+
+      els.patioFrontDetailPanel.hidden = false;
+      els.patioFrontDetailTitle.textContent = `Detalhe ${selectedPatioFront}`;
+      els.patioFrontDetailBadge.textContent = `${summary.trips} viagem${summary.trips === 1 ? "" : "s"} filtrada${summary.trips === 1 ? "" : "s"}`;
+      els.patioFrontDetailWrap.innerHTML = `
+        <div class="transport-summary">
+          <div class="goal-metric">
+            <span>Viagens</span>
+            <strong>${summary.trips}</strong>
+            <small>${summary.trucks} caminhão${summary.trucks === 1 ? "" : "ões"}</small>
+          </div>
+          <div class="goal-metric">
+            <span>Média palha</span>
+            <strong>${formatMinutes(summary.avgPalha)}</strong>
+            <small>Início carga até fim carga</small>
+          </div>
+          <div class="goal-metric">
+            <span>Maior palha</span>
+            <strong>${formatMinutes(summary.maxPalha)}</strong>
+            <small>Maior tempo filtrado</small>
+          </div>
+          <div class="goal-metric">
+            <span>Alertas</span>
+            <strong>${summary.alerts + summary.missing}</strong>
+            <small>${summary.alerts} acima de 90 min · ${summary.missing} sem saída</small>
+          </div>
+        </div>
+        <div class="front-detail-grid">
+          <div class="front-detail-section">
+            <h3>Separado por transporte</h3>
+            ${patioSummaryTable(["Transporte", "Base", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Alertas"], transportRows, "Sem classe de transporte nesta frente.")}
+          </div>
+          <div class="front-detail-section">
+            <h3>Separado por turno</h3>
+            ${patioSummaryTable(["Turno", "Horário", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Alertas"], shiftRows, "Sem horário para separar por turno.")}
+          </div>
+          <div class="front-detail-section full">
+            <h3>Turno x transporte</h3>
+            ${patioSummaryTable(matrix.headers, matrix.rows, "Sem dados para cruzar turno e transporte.")}
+          </div>
         </div>
       `;
     }
@@ -4691,9 +4970,11 @@
           label: item.name,
           value: item.avgFieldMinutes,
           valueLabel: formatMinutes(item.avgFieldMinutes),
-          detail: `${item.trips} viagem${item.trips === 1 ? "" : "s"} · ${item.trucksCount} caminhão${item.trucksCount === 1 ? "" : "ões"}`,
+          detail: `${item.trips} viagem${item.trips === 1 ? "" : "s"} · ${item.trucksCount} caminhão${item.trucksCount === 1 ? "" : "ões"} · clique para detalhar`,
           extra: `Máx. ${formatMinutes(item.maxFieldMinutes)}`,
-          tone: item.avgFieldMinutes > 90 ? "over" : ""
+          tone: item.avgFieldMinutes > 90 ? "over" : "",
+          action: "front-detail",
+          selected: item.name === selectedPatioFront
         }));
       els.patioFrontChartWrap.innerHTML = patioBarList(items, { limit: 12 });
     }
@@ -4727,8 +5008,8 @@
               <th>Data</th>
               <th>Viagens</th>
               <th>Caminhões</th>
-              <th>Média frente</th>
-              <th>Máximo frente</th>
+              <th>Média palha</th>
+              <th>Máximo palha</th>
               <th>Ciclo médio</th>
               <th>Alertas</th>
             </tr>
@@ -4776,15 +5057,15 @@
           </div>
           <div class="alert-item">
             <strong>${worstFront ? `Frente mais lenta: ${worstFront.name}` : "Sem frente crítica"}</strong>
-            <span>${worstFront ? `${formatMinutes(worstFront.avgFieldMinutes)} de média na frente, máximo ${formatMinutes(worstFront.maxFieldMinutes)}.` : "Sem dados suficientes."}</span>
+            <span>${worstFront ? `${formatMinutes(worstFront.avgFieldMinutes)} de média de palha, máximo ${formatMinutes(worstFront.maxFieldMinutes)}.` : "Sem dados suficientes."}</span>
           </div>
           <div class="alert-item good">
             <strong>${bestFront ? `Melhor frente: ${bestFront.name}` : "Sem melhor frente"}</strong>
-            <span>${bestFront ? `${formatMinutes(bestFront.avgFieldMinutes)} de média na frente em ${bestFront.trips} viagem${bestFront.trips === 1 ? "" : "s"}.` : "Sem dados suficientes."}</span>
+            <span>${bestFront ? `${formatMinutes(bestFront.avgFieldMinutes)} de média de palha em ${bestFront.trips} viagem${bestFront.trips === 1 ? "" : "s"}.` : "Sem dados suficientes."}</span>
           </div>
           <div class="alert-item ${worstTruck && worstTruck.avgFieldMinutes > 90 ? "alert" : ""}">
             <strong>${worstTruck ? `Caminhão atenção: ${worstTruck.name}` : "Sem caminhão crítico"}</strong>
-            <span>${worstTruck ? `${formatMinutes(worstTruck.avgFieldMinutes)} de média na frente e ciclo médio de ${formatMinutes(worstTruck.avgCycleMinutes)}.` : "Sem dados suficientes."}</span>
+            <span>${worstTruck ? `${formatMinutes(worstTruck.avgFieldMinutes)} de média de palha e ciclo médio de ${formatMinutes(worstTruck.avgCycleMinutes)}.` : "Sem dados suficientes."}</span>
           </div>
         </div>
       `;
@@ -4861,6 +5142,7 @@
       renderPatioKpis(rows);
       renderPatioFrontChart(rows);
       renderPatioTruckRanking(rows);
+      renderPatioFrontDetail(rows);
       renderPatioDaily(rows);
       renderPatioInsights(rows);
       renderPatioRows(rows);
@@ -9123,6 +9405,241 @@
       setTimeout(() => frame.remove(), 2500);
     }
 
+    function patioPrintTransportInfo() {
+      const value = els.patioPrintTransport ? els.patioPrintTransport.value : "own";
+      if (value === "third") {
+        return { value, group: "Terceiro", label: "Caminhões Terceiros" };
+      }
+      return { value: "own", group: "Próprio", label: "Caminhões Próprios" };
+    }
+
+    function patioPrintMinuteLabel(value, options = {}) {
+      const minutes = Math.round(Number(value) || 0);
+      if (options.zeroDash && !minutes) return "-";
+      return String(minutes);
+    }
+
+    function patioPrintChartSvg(fronts, shifts, valuesByFrontShift) {
+      const width = 960;
+      const height = 360;
+      const left = 58;
+      const right = 24;
+      const top = 56;
+      const bottom = 78;
+      const chartWidth = width - left - right;
+      const chartHeight = height - top - bottom;
+      const allValues = fronts.flatMap((front) => shifts.map((shift) => valuesByFrontShift[front][shift.key] || 0));
+      const yMax = Math.max(40, Math.ceil(Math.max(...allValues, 1) / 5) * 5);
+      const groupWidth = chartWidth / fronts.length;
+      const barWidth = 24;
+      const barGap = 6;
+      const colors = { A: "#70ad47", B: "#5b9bd5", C: "#ffc000" };
+      const yFor = (value) => top + chartHeight - ((Number(value) || 0) / yMax) * chartHeight;
+      const gridLines = Array.from({ length: 9 }, (_, index) => {
+        const value = Math.round((yMax / 8) * index);
+        const y = yFor(value);
+        return `
+          <line x1="${left}" y1="${y}" x2="${width - right}" y2="${y}" class="grid"></line>
+          <text x="${left - 10}" y="${y + 4}" text-anchor="end" class="axis-label">${value}</text>
+        `;
+      }).join("");
+      const bars = fronts.map((front, frontIndex) => {
+        const center = left + frontIndex * groupWidth + groupWidth / 2;
+        const groupStart = center - ((barWidth * shifts.length) + (barGap * (shifts.length - 1))) / 2;
+        const frontCode = front.replace("Frente ", "");
+        const frontBars = shifts.map((shift, shiftIndex) => {
+          const value = valuesByFrontShift[front][shift.key] || 0;
+          const x = groupStart + shiftIndex * (barWidth + barGap);
+          const y = yFor(value);
+          const barHeight = Math.max(0, top + chartHeight - y);
+          const label = value ? `<text x="${x + barWidth / 2}" y="${Math.max(top + 14, y - 7)}" text-anchor="middle" class="value-label">${patioPrintMinuteLabel(value)}</text>` : "";
+          return `
+            <rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" rx="2" fill="${colors[shift.key]}"></rect>
+            ${label}
+          `;
+        }).join("");
+        return `
+          ${frontBars}
+          <text x="${center}" y="${height - 48}" text-anchor="middle" class="x-label">Temp. Palha ${frontCode}</text>
+        `;
+      }).join("");
+      const legend = shifts.map((shift, index) => `
+        <rect x="${width / 2 - 120 + index * 82}" y="${height - 30}" width="10" height="10" fill="${colors[shift.key]}"></rect>
+        <text x="${width / 2 - 106 + index * 82}" y="${height - 21}" class="legend">${escapeHtml(shift.label)}</text>
+      `).join("");
+
+      return `
+        <svg class="patio-print-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Temp. Palha Frente 4001, 4002 e 4003">
+          <defs>
+            <linearGradient id="patioPrintBg" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0%" stop-color="#2a2a2a"></stop>
+              <stop offset="100%" stop-color="#555555"></stop>
+            </linearGradient>
+          </defs>
+          <rect width="${width}" height="${height}" fill="url(#patioPrintBg)"></rect>
+          <text x="${width / 2}" y="34" text-anchor="middle" class="chart-title">Temp. Palha Frente 4001, 4002 e 4003</text>
+          ${gridLines}
+          <line x1="${left}" y1="${top + chartHeight}" x2="${width - right}" y2="${top + chartHeight}" class="axis"></line>
+          ${bars}
+          ${legend}
+        </svg>
+      `;
+    }
+
+    function patioPrintObservation(frontRows) {
+      const zeroValues = frontRows.filter((record) => (Number(record.fieldMinutes) || 0) <= 0).length;
+      const missingEnd = frontRows.filter((record) => !record.loadEnd && !record.departureField).length;
+      const considered = frontRows.filter((record) => (Number(record.fieldMinutes) || 0) > 0 && (record.loadEnd || record.departureField)).length;
+      return {
+        zeroValues,
+        missingEnd,
+        considered,
+        total: frontRows.length
+      };
+    }
+
+    function buildPatioPrintHtml() {
+      const range = patioRange();
+      const transport = patioPrintTransportInfo();
+      const fronts = ["Frente 4001", "Frente 4002", "Frente 4003"];
+      const shifts = [
+        { key: "A", label: "Turno A", rowLabel: "turno A", detail: "07:00 às 15:00" },
+        { key: "B", label: "Turno B", rowLabel: "turno B", detail: "15:00 às 23:00" },
+        { key: "C", label: "Turno C", rowLabel: "turno C", detail: "23:00 às 07:00" }
+      ];
+      const dateLabel = range.start === range.end ? formatDate(range.start) : `${formatDate(range.start)} a ${formatDate(range.end)}`;
+      const rows = patioRowsForRange(range)
+        .filter((record) => fronts.includes(record.front))
+        .filter((record) => patioTransportGroups(record).includes(transport.group));
+      const overall = patioGroupSummary(rows);
+      const mediaLabel = `Média ${transport.label} ${formatMinutes(overall.avgPalha)}.`;
+      const valuesByFrontShift = fronts.reduce((acc, front) => {
+        acc[front] = shifts.reduce((shiftAcc, shift) => {
+          const shiftRows = rows.filter((record) => record.front === front && patioShiftFor(record).key === shift.key);
+          shiftAcc[shift.key] = average(shiftRows.map((record) => record.fieldMinutes));
+          return shiftAcc;
+        }, {});
+        return acc;
+      }, {});
+
+      const mainRows = shifts.map((shift) => `
+        <tr>
+          <th>${escapeHtml(shift.rowLabel)}</th>
+          ${fronts.map((front) => `<td>${patioPrintMinuteLabel(valuesByFrontShift[front][shift.key])}</td>`).join("")}
+        </tr>
+      `).join("");
+      const observationTables = fronts.map((front) => {
+        const frontCode = front.replace("Frente ", "");
+        const frontRows = rows.filter((record) => record.front === front);
+        const observation = patioPrintObservation(frontRows);
+        return `
+          <table class="patio-report-table observation-table">
+            <tbody>
+              <tr>
+                <th class="media-cell" rowspan="5">${escapeHtml(mediaLabel)}</th>
+                <th class="blue-head" colspan="2">Observação valores desconsiderados temp. de palhada Frente ${escapeHtml(frontCode)}</th>
+              </tr>
+              <tr><td>Valores igual a 0</td><td>${observation.zeroValues}</td></tr>
+              <tr><td>Valores sem hora final de fechamento de carga</td><td>${observation.missingEnd}</td></tr>
+              <tr><td>Viagens Consideradas</td><td>${observation.considered}</td></tr>
+              <tr><td>Total de Viagens</td><td>${observation.total}</td></tr>
+            </tbody>
+          </table>
+        `;
+      }).join("");
+
+      return `<!doctype html>
+        <html lang="pt-BR">
+        <head>
+          <meta charset="utf-8">
+          <title>Tempo de pátio - ${escapeHtml(transport.label)} - ${escapeHtml(dateLabel)}</title>
+          <style>
+            @page { size: A4 portrait; margin: 5mm; }
+            * { box-sizing: border-box; }
+            body { margin: 0; background: #fff; color: #000; font-family: Arial, Helvetica, sans-serif; font-size: 13px; }
+            .sheet { width: 100%; display: grid; gap: 14px; }
+            .patio-print-chart { width: 100%; height: auto; display: block; border: 1px solid #888; }
+            .patio-print-chart .chart-title { fill: #f2f2f2; font-size: 25px; font-weight: 800; letter-spacing: 2px; }
+            .patio-print-chart .grid { stroke: rgba(255,255,255,.16); stroke-width: 1; }
+            .patio-print-chart .axis { stroke: rgba(255,255,255,.65); stroke-width: 1; }
+            .patio-print-chart .axis-label,
+            .patio-print-chart .x-label,
+            .patio-print-chart .legend,
+            .patio-print-chart .value-label { fill: #f5f5f5; font-size: 13px; }
+            .patio-print-chart .value-label { font-weight: 800; }
+            .patio-report-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+            .patio-report-table th,
+            .patio-report-table td { border: 1px solid #000; padding: 4px 7px; line-height: 1.25; }
+            .patio-report-table td,
+            .patio-report-table th:not(.media-cell):not(.blue-head) { background: #f4b183; }
+            .patio-report-table .media-cell { width: 180px; background: #ffff00; text-align: center; font-weight: 800; }
+            .patio-report-table .blue-head { background: #5b9bd5; text-align: center; font-weight: 800; }
+            .patio-report-table .date-head { background: #5b9bd5; text-align: center; font-weight: 800; }
+            .patio-report-table .front-head { text-align: center; font-weight: 800; }
+            .patio-report-table td:not(:first-child) { text-align: center; }
+            .observation-table { max-width: 790px; }
+            .observation-table td:first-of-type { text-align: left; }
+            .report-meta { display: flex; justify-content: space-between; gap: 12px; font-weight: 800; color: #333; }
+            @media print { .sheet { gap: 12px; } }
+          </style>
+        </head>
+        <body>
+          <main class="sheet">
+            <div class="report-meta">
+              <span>${escapeHtml(transport.label)}</span>
+              <span>${escapeHtml(dateLabel)}</span>
+            </div>
+            ${patioPrintChartSvg(fronts, shifts, valuesByFrontShift)}
+            <table class="patio-report-table">
+              <tbody>
+                <tr>
+                  <th class="media-cell" rowspan="5">${escapeHtml(mediaLabel)}</th>
+                  <th class="date-head" colspan="4">${escapeHtml(dateLabel)}</th>
+                </tr>
+                <tr>
+                  <th></th>
+                  ${fronts.map((front) => `<th class="front-head">Temp. Palha ${escapeHtml(front.replace("Frente ", ""))}</th>`).join("")}
+                </tr>
+                ${mainRows}
+              </tbody>
+            </table>
+            ${observationTables}
+          </main>
+        </body>
+        </html>`;
+    }
+
+    function printPatioReport() {
+      const html = buildPatioPrintHtml();
+      const frame = document.createElement("iframe");
+      frame.style.position = "fixed";
+      frame.style.right = "0";
+      frame.style.bottom = "0";
+      frame.style.width = "0";
+      frame.style.height = "0";
+      frame.style.border = "0";
+      frame.setAttribute("aria-hidden", "true");
+      document.body.appendChild(frame);
+      const frameWindow = frame.contentWindow;
+      const frameDocument = frame.contentDocument || (frameWindow ? frameWindow.document : null);
+
+      if (!frameWindow || !frameDocument) {
+        frame.remove();
+        showToast("Não foi possível gerar a impressão do tempo de pátio.");
+        return;
+      }
+
+      frameDocument.open();
+      frameDocument.write(html);
+      frameDocument.close();
+      showToast("Relatório de tempo de pátio gerado. Escolha salvar como PDF.");
+      setTimeout(() => {
+        frameWindow.focus();
+        frameWindow.print();
+      }, 250);
+      setTimeout(() => frame.remove(), 2500);
+    }
+
     async function importJson(file) {
       if (!file) return;
 
@@ -9215,7 +9732,7 @@
           setPatioRange(range.start, latest.date);
         }
 
-        addAuditEntry("importacao", `${imported.length} linha${imported.length === 1 ? "" : "s"} de tempo de pátio lida${imported.length === 1 ? "" : "s"}; ${consolidatedTotal} viagem${consolidatedTotal === 1 ? "" : "s"} consolidada${consolidatedTotal === 1 ? "" : "s"}.`);
+        addAuditEntry("importacao", `${imported.length} linha${imported.length === 1 ? "" : "s"} de tempo de pátio lida${imported.length === 1 ? "" : "s"}; ${consolidatedTotal} viagem${consolidatedTotal === 1 ? "" : "s"} registrada${consolidatedTotal === 1 ? "" : "s"} por classe.`);
         renderPatio();
 
         await syncOrQueue("upload-all", { source: "patio-import" }, () => uploadAllDataToFirebase({
@@ -9225,7 +9742,7 @@
           errorStatus: "Tempo de pátio salvo localmente, mas a sincronizacao falhou."
         }));
 
-        showToast(`${imported.length} linha${imported.length === 1 ? "" : "s"} lida${imported.length === 1 ? "" : "s"}; ${consolidatedTotal} viagem${consolidatedTotal === 1 ? "" : "s"} consolidada${consolidatedTotal === 1 ? "" : "s"}.`);
+        showToast(`${imported.length} linha${imported.length === 1 ? "" : "s"} lida${imported.length === 1 ? "" : "s"}; ${consolidatedTotal} viagem${consolidatedTotal === 1 ? "" : "s"} registrada${consolidatedTotal === 1 ? "" : "s"} por classe.`);
       } catch {
         showToast("Não foi possível importar a planilha de tempo de pátio.");
       } finally {
@@ -9460,10 +9977,18 @@
     });
     document.querySelector("#importPatioBtn").addEventListener("click", () => els.patioImportFile.click());
     document.querySelector("#exportPatioCsvBtn").addEventListener("click", exportPatioCsv);
+    document.querySelector("#printPatioReportBtn").addEventListener("click", printPatioReport);
     document.querySelector("#clearPatioBtn").addEventListener("click", clearPatioRecords);
     document.querySelector("#savePatioEntryBtn").addEventListener("click", savePatioEntry);
     document.querySelector("#resetPatioEntryBtn").addEventListener("click", () => resetPatioEntryForm({ date: els.patioEntryDate.value || todayInputValue() }));
     els.patioImportFile.addEventListener("change", (event) => importPatioFile(event.target.files[0]));
+    els.patioFrontChartWrap.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-patio-front-select]");
+      if (!button) return;
+      selectedPatioFront = button.dataset.patioFrontSelect || "";
+      renderPatio();
+      els.patioFrontDetailPanel.scrollIntoView({ block: "nearest" });
+    });
     els.patioRowsWrap.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-patio-action]");
       if (!button) return;
