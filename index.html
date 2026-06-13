@@ -1484,7 +1484,7 @@
       <section class="dashboard-grid">
         <section class="panel">
           <div class="panel-head">
-            <h2>Evolução diária</h2>
+            <h2>Lançamentos diários já registrados</h2>
           </div>
           <div class="panel-body" id="dailyTrendWrap"></div>
         </section>
@@ -1759,7 +1759,7 @@
           <label for="patioEndDate">Fim do período</label>
           <input id="patioEndDate" type="date">
         </div>
-        <div class="filter-note" id="patioSource">Lance as viagens no sistema para iniciar a análise.</div>
+        <div class="filter-note" id="patioSource">Adicione a planilha diária para iniciar a análise.</div>
         <div class="actions">
           <button class="btn-secondary" id="patioTodayBtn" type="button">Hoje</button>
           <button class="btn-secondary" id="patioMonthBtn" type="button">Mês atual</button>
@@ -1769,6 +1769,7 @@
           <button class="btn-secondary" id="importPatioBtn" type="button">Planilha com abas</button>
           <button class="btn-secondary" id="exportPatioCsvBtn" type="button">CSV</button>
           <button class="btn-secondary" id="savePatioDatabaseBtn" type="button">Salvar no banco</button>
+          <button class="btn-secondary" id="refreshPatioDatabaseBtn" type="button">Atualizar do banco</button>
           <button class="btn-secondary btn-danger" id="deletePatioRangeBtn" type="button">Excluir período</button>
           <button class="btn-secondary btn-danger" id="clearPatioBtn" type="button">Limpar dados</button>
           <input class="file-input" id="patioImportFile" type="file" accept=".csv,.json,.xls,.xlsx,application/json,text/csv">
@@ -1778,6 +1779,22 @@
       </div>
 
       <section class="panel">
+        <div class="panel-head">
+          <h2>Lançamento diário por planilha</h2>
+          <span class="status-pill" id="patioLaunchStatus">Planilha</span>
+        </div>
+        <div class="panel-body">
+          <div class="transport-summary" id="patioLaunchSummary"></div>
+          <div class="actions">
+            <button class="btn-primary" id="patioDailyOwnBtn" type="button">Novo próprios</button>
+            <button class="btn-primary" id="patioDailyThirdBtn" type="button">Novo terceiros</button>
+            <button class="btn-secondary" id="patioDailyTabsBtn" type="button">Planilha com abas</button>
+            <button class="btn-secondary" id="refreshPatioDatabasePanelBtn" type="button">Atualizar do banco</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" hidden>
         <div class="panel-head">
           <h2>Novo lançamento de tempo de pátio</h2>
           <span class="status-pill" id="patioEntryMode">Novo</span>
@@ -1937,7 +1954,7 @@
 
       <section class="panel">
         <div class="panel-head">
-          <h2>Viagens lançadas</h2>
+          <h2>Viagens da planilha lançada</h2>
         </div>
         <div class="table-wrap" id="patioRowsWrap"></div>
       </section>
@@ -2353,6 +2370,7 @@
     const STORAGE_KEY = "cambui.daily.production.flow.v5";
     const TARGETS_KEY = "cambui.daily.production.targets.v1";
     const PATIO_STORAGE_KEY = "cambui.daily.production.patio.v1";
+    const PATIO_SYNC_KEY = "cambui.daily.production.patio.sync.v1";
     const FIREBASE_CONFIG_KEY = "cambui.daily.production.firebase.config.v1";
     const THEME_KEY = "cambui.daily.production.theme.v1";
     const FIREBASE_APP_NAME = "cambui-production-app";
@@ -2471,6 +2489,8 @@
       patioImportFile: document.querySelector("#patioImportFile"),
       patioImportOwnFile: document.querySelector("#patioImportOwnFile"),
       patioImportThirdFile: document.querySelector("#patioImportThirdFile"),
+      patioLaunchStatus: document.querySelector("#patioLaunchStatus"),
+      patioLaunchSummary: document.querySelector("#patioLaunchSummary"),
       patioEntryMode: document.querySelector("#patioEntryMode"),
       patioEntryId: document.querySelector("#patioEntryId"),
       patioEntryDate: document.querySelector("#patioEntryDate"),
@@ -2584,6 +2604,7 @@
     let records = loadRecords();
     let targets = loadTargets();
     let patioRecords = loadPatioRecords();
+    let patioLocalUpdatedAt = loadPatioUpdatedAt();
     let firebaseConfig = loadFirebaseConfig();
     let autoBackups = loadAutoBackups();
     let auditLog = loadAuditLog();
@@ -3407,18 +3428,21 @@
 
     async function uploadAllDataToFirebase(options = {}) {
       const cleanRecords = getCleanRecords(records);
+      const cleanPatioRecords = getCleanPatioRecords(patioRecords);
       const localDates = new Set(cleanRecords.map((record) => record.date));
       const lastRecord = cleanRecords[cleanRecords.length - 1] || null;
+      const now = new Date().toISOString();
 
       return runFirebaseTask(async (root) => {
         await root.set({
           plant: PLANT,
           version: APP_VERSION,
-          updatedAt: new Date().toISOString(),
+          updatedAt: now,
           targets: getCleanTargets(),
           recordCount: cleanRecords.length,
-          patioRecordCount: getCleanPatioRecords(patioRecords).length,
-          patioRecords: getCleanPatioRecords(patioRecords),
+          patioUpdatedAt: now,
+          patioRecordCount: cleanPatioRecords.length,
+          patioRecords: cleanPatioRecords,
           lastRecordDate: lastRecord ? lastRecord.date : ""
         }, { merge: true });
 
@@ -3441,19 +3465,23 @@
         }, { merge: true }));
 
         await Promise.all([...deletes, ...writes]);
+        persistPatioUpdatedAt(now);
       }, options);
     }
 
     async function syncPatioRecordsToFirebase(options = {}) {
       const cleanPatioRecords = getCleanPatioRecords(patioRecords);
+      const now = new Date().toISOString();
       return runFirebaseTask(async (root) => {
         await root.set({
           plant: PLANT,
           version: APP_VERSION,
-          updatedAt: new Date().toISOString(),
+          updatedAt: now,
+          patioUpdatedAt: now,
           patioRecordCount: cleanPatioRecords.length,
           patioRecords: cleanPatioRecords
         }, { merge: true });
+        persistPatioUpdatedAt(now);
       }, options);
     }
 
@@ -3479,8 +3507,10 @@
       const remotePatioRecords = downloaded.meta && Array.isArray(downloaded.meta.patioRecords)
         ? getCleanPatioRecords(downloaded.meta.patioRecords)
         : [];
+      const remotePatioUpdatedAt = String((downloaded.meta && (downloaded.meta.patioUpdatedAt || downloaded.meta.updatedAt)) || "");
+      const hasRemotePatioPayload = downloaded.meta && Array.isArray(downloaded.meta.patioRecords);
 
-      if (!remoteTargets && !remoteRecords.length && !remotePatioRecords.length) {
+      if (!remoteTargets && !remoteRecords.length && !hasRemotePatioPayload) {
         if (!options.silent) showToast("Nenhum dado encontrado no Firebase.");
         return false;
       }
@@ -3495,11 +3525,14 @@
         persistRecords();
       }
 
-      const hasRemotePatioPayload = downloaded.meta && Array.isArray(downloaded.meta.patioRecords);
       const shouldSkipPatioDownload = options.skipPatioIfLocalExists && getCleanPatioRecords(patioRecords).length;
-      if (hasRemotePatioPayload && !shouldSkipPatioDownload) {
+      const remotePatioTime = Date.parse(remotePatioUpdatedAt || "");
+      const localPatioTime = Date.parse(patioLocalUpdatedAt || "");
+      const remotePatioIsNewer = Number.isNaN(localPatioTime)
+        || (!Number.isNaN(remotePatioTime) && remotePatioTime >= localPatioTime);
+      if (hasRemotePatioPayload && !shouldSkipPatioDownload && (options.forcePatioReplace || remotePatioIsNewer)) {
         patioRecords = getCleanPatioRecords(remotePatioRecords);
-        persistPatioRecords();
+        persistPatioRecords({ updatedAt: remotePatioUpdatedAt || new Date().toISOString() });
       }
 
       renderOptions();
@@ -3536,6 +3569,7 @@
         exportedAt,
         targets: getCleanTargets(),
         records: getCleanRecords(records),
+        patioUpdatedAt: patioLocalUpdatedAt,
         patioRecords: getCleanPatioRecords(patioRecords)
       };
     }
@@ -3567,7 +3601,7 @@
         patioRecords = mergeRecords
           ? getCleanPatioRecords([...patioRecords, ...normalizedPatio])
           : normalizedPatio;
-        persistPatioRecords();
+        persistPatioRecords({ updatedAt: payload.patioUpdatedAt || payload.exportedAt || new Date().toISOString() });
       }
 
       persistRecords();
@@ -4516,9 +4550,24 @@
       }
     }
 
-    function persistPatioRecords() {
+    function loadPatioUpdatedAt() {
+      try {
+        return String(localStorage.getItem(PATIO_SYNC_KEY) || "");
+      } catch {
+        return "";
+      }
+    }
+
+    function persistPatioUpdatedAt(value = new Date().toISOString()) {
+      patioLocalUpdatedAt = value;
+      localStorage.setItem(PATIO_SYNC_KEY, value);
+      return value;
+    }
+
+    function persistPatioRecords(options = {}) {
       patioRecords = getCleanPatioRecords(patioRecords);
       localStorage.setItem(PATIO_STORAGE_KEY, JSON.stringify(patioRecords));
+      persistPatioUpdatedAt(options.updatedAt || new Date().toISOString());
     }
 
     function firstPatioRecord() {
@@ -5185,7 +5234,6 @@
               <th>Pesagem</th>
               <th>Ciclo total</th>
               <th>Status</th>
-              <th>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -5207,17 +5255,44 @@
                   <td>${formatMinutes(record.weighingMinutes)}</td>
                   <td>${record.cycleMinutes ? formatMinutes(record.cycleMinutes) : "-"}</td>
                   <td><span class="status-pill ${status.className}">${escapeHtml(status.label)}</span></td>
-                  <td>
-                    <div class="row-buttons">
-                      <button class="btn-secondary" type="button" data-patio-action="edit" data-id="${escapeHtml(record.id)}">Editar</button>
-                      <button class="btn-secondary btn-danger" type="button" data-patio-action="delete" data-id="${escapeHtml(record.id)}">Excluir</button>
-                    </div>
-                  </td>
                 </tr>
               `;
             }).join("")}
           </tbody>
         </table>
+      `;
+    }
+
+    function renderPatioLaunchSummary() {
+      if (!els.patioLaunchSummary) return;
+      const cleanRecords = getCleanPatioRecords(patioRecords);
+      const dates = [...new Set(cleanRecords.map((record) => record.date).filter(Boolean))].sort();
+      const ownRows = cleanRecords.filter((record) => patioTransportGroup(record) === "Próprio");
+      const thirdRows = cleanRecords.filter((record) => patioTransportGroup(record) === "Terceiro");
+      const latestDate = dates[dates.length - 1] || "";
+      const latestLabel = latestDate ? formatDate(latestDate) : "-";
+      els.patioLaunchStatus.textContent = cleanRecords.length ? `${dates.length} dia${dates.length === 1 ? "" : "s"}` : "Sem lançamento";
+      els.patioLaunchSummary.innerHTML = `
+        <div class="goal-metric">
+          <span>Dias lançados</span>
+          <strong>${dates.length}</strong>
+          <small>Último: ${latestLabel}</small>
+        </div>
+        <div class="goal-metric">
+          <span>Caminhões próprios</span>
+          <strong>${ownRows.length}</strong>
+          <small>${new Set(ownRows.map((record) => record.truck)).size} caminhão${new Set(ownRows.map((record) => record.truck)).size === 1 ? "" : "ões"}</small>
+        </div>
+        <div class="goal-metric">
+          <span>Caminhões terceiros</span>
+          <strong>${thirdRows.length}</strong>
+          <small>${new Set(thirdRows.map((record) => record.truck)).size} caminhão${new Set(thirdRows.map((record) => record.truck)).size === 1 ? "" : "ões"}</small>
+        </div>
+        <div class="goal-metric">
+          <span>Banco de dados</span>
+          <strong>${patioLocalUpdatedAt ? "Atualizado" : "-"}</strong>
+          <small>${patioLocalUpdatedAt ? formatDateTime(patioLocalUpdatedAt) : "Sem sincronização local"}</small>
+        </div>
       `;
     }
 
@@ -5228,7 +5303,8 @@
       const total = getCleanPatioRecords(patioRecords).length;
       els.patioSource.textContent = total
         ? `${formatDate(range.start)} a ${formatDate(range.end)} · ${rows.length} de ${total} viagem${total === 1 ? "" : "s"}`
-        : "Lance as viagens no sistema para iniciar a análise.";
+        : "Adicione a planilha diária para iniciar a análise.";
+      renderPatioLaunchSummary();
       renderPatioKpis(rows);
       renderPatioFrontChart(rows);
       renderPatioTruckRanking(rows);
@@ -9918,7 +9994,7 @@
         addAuditEntry("importacao", `Tempo de pátio importado${classSummary}: ${importSummary}${importWarning ? ` Atenção: ${importWarning}` : ""}`);
         renderPatio();
 
-        await syncOrQueue("upload-all", { source: "patio-import" }, () => uploadAllDataToFirebase({
+        await syncOrQueue("patio-sync", { source: "patio-import" }, () => syncPatioRecordsToFirebase({
           silent: true,
           pendingMessage: "Enviando tempo de pátio para o Firebase...",
           successStatus: "Tempo de pátio sincronizado com o Firebase.",
@@ -9995,7 +10071,7 @@
 
     async function savePatioDatabase() {
       const total = getCleanPatioRecords(patioRecords).length;
-      const syncState = await syncOrQueue("upload-all", { source: "patio-manual-save" }, () => uploadAllDataToFirebase({
+      const syncState = await syncOrQueue("patio-sync", { source: "patio-manual-save" }, () => syncPatioRecordsToFirebase({
         silent: true,
         pendingMessage: "Salvando tempo de pátio no banco de dados...",
         successStatus: "Tempo de pátio salvo no banco de dados.",
@@ -10014,6 +10090,16 @@
       }
 
       showToast("Não foi possível salvar o tempo de pátio no banco.");
+    }
+
+    async function refreshPatioFromDatabase() {
+      const loaded = await downloadAllDataFromFirebase({
+        silent: true,
+        forcePatioReplace: true,
+        pendingMessage: "Atualizando tempo de pátio pelo banco...",
+        successStatus: "Tempo de pátio atualizado pelo banco."
+      });
+      showToast(loaded ? "Tempo de pátio atualizado pelo banco." : "Nenhum tempo de pátio foi carregado do banco.");
     }
 
     async function deletePatioRangeRecords() {
@@ -10244,6 +10330,11 @@
     document.querySelector("#importPatioBtn").addEventListener("click", () => els.patioImportFile.click());
     document.querySelector("#exportPatioCsvBtn").addEventListener("click", exportPatioCsv);
     document.querySelector("#savePatioDatabaseBtn").addEventListener("click", savePatioDatabase);
+    document.querySelector("#refreshPatioDatabaseBtn").addEventListener("click", refreshPatioFromDatabase);
+    document.querySelector("#refreshPatioDatabasePanelBtn").addEventListener("click", refreshPatioFromDatabase);
+    document.querySelector("#patioDailyOwnBtn").addEventListener("click", () => els.patioImportOwnFile.click());
+    document.querySelector("#patioDailyThirdBtn").addEventListener("click", () => els.patioImportThirdFile.click());
+    document.querySelector("#patioDailyTabsBtn").addEventListener("click", () => els.patioImportFile.click());
     document.querySelector("#deletePatioRangeBtn").addEventListener("click", deletePatioRangeRecords);
     document.querySelector("#printPatioReportBtn").addEventListener("click", printPatioReport);
     document.querySelector("#clearPatioBtn").addEventListener("click", clearPatioRecords);
@@ -10474,10 +10565,9 @@
     renderHistory();
 
     ensureFirebaseReady({ silent: true }).then((ready) => {
-      if (!ready || records.length || getCleanPatioRecords(patioRecords).length) return;
+      if (!ready) return;
       return downloadAllDataFromFirebase({
         silent: true,
-        skipPatioIfLocalExists: true,
         pendingMessage: "Baixando dados salvos no Firebase...",
         successStatus: "Dados do Firebase restaurados no sistema."
       }).then((loaded) => {
