@@ -1764,10 +1764,16 @@
           <button class="btn-secondary" id="patioTodayBtn" type="button">Hoje</button>
           <button class="btn-secondary" id="patioMonthBtn" type="button">Mês atual</button>
           <button class="btn-secondary" id="patioAllBtn" type="button">Todo período</button>
-          <button class="btn-secondary" id="importPatioBtn" type="button">Importar planilha antiga</button>
+          <button class="btn-secondary" id="importPatioOwnBtn" type="button">Planilha próprios</button>
+          <button class="btn-secondary" id="importPatioThirdBtn" type="button">Planilha terceiros</button>
+          <button class="btn-secondary" id="importPatioBtn" type="button">Planilha com abas</button>
           <button class="btn-secondary" id="exportPatioCsvBtn" type="button">CSV</button>
+          <button class="btn-secondary" id="savePatioDatabaseBtn" type="button">Salvar no banco</button>
+          <button class="btn-secondary btn-danger" id="deletePatioRangeBtn" type="button">Excluir período</button>
           <button class="btn-secondary btn-danger" id="clearPatioBtn" type="button">Limpar dados</button>
           <input class="file-input" id="patioImportFile" type="file" accept=".csv,.json,.xls,.xlsx,application/json,text/csv">
+          <input class="file-input" id="patioImportOwnFile" type="file" accept=".csv,.json,.xls,.xlsx,application/json,text/csv">
+          <input class="file-input" id="patioImportThirdFile" type="file" accept=".csv,.json,.xls,.xlsx,application/json,text/csv">
         </div>
       </div>
 
@@ -2463,6 +2469,8 @@
       patioSearch: document.querySelector("#patioSearch"),
       patioPrintTransport: document.querySelector("#patioPrintTransport"),
       patioImportFile: document.querySelector("#patioImportFile"),
+      patioImportOwnFile: document.querySelector("#patioImportOwnFile"),
+      patioImportThirdFile: document.querySelector("#patioImportThirdFile"),
       patioEntryMode: document.querySelector("#patioEntryMode"),
       patioEntryId: document.querySelector("#patioEntryId"),
       patioEntryDate: document.querySelector("#patioEntryDate"),
@@ -2583,6 +2591,8 @@
     let currentTheme = loadTheme();
     let transportRankingPeriod = "week";
     let selectedPatioFront = "";
+    let patioImportWarnings = [];
+    let patioSeparatedImportSession = null;
     let entries = cloneEntries(defaultEntries);
     let activeFront = null;
     const firebaseState = {
@@ -3434,6 +3444,19 @@
       }, options);
     }
 
+    async function syncPatioRecordsToFirebase(options = {}) {
+      const cleanPatioRecords = getCleanPatioRecords(patioRecords);
+      return runFirebaseTask(async (root) => {
+        await root.set({
+          plant: PLANT,
+          version: APP_VERSION,
+          updatedAt: new Date().toISOString(),
+          patioRecordCount: cleanPatioRecords.length,
+          patioRecords: cleanPatioRecords
+        }, { merge: true });
+      }, options);
+    }
+
     async function downloadAllDataFromFirebase(options = {}) {
       const downloaded = await runFirebaseTask(async (root) => {
         const [metaSnapshot, recordSnapshots] = await Promise.all([
@@ -3472,8 +3495,10 @@
         persistRecords();
       }
 
-      if (remotePatioRecords.length) {
-        patioRecords = getCleanPatioRecords([...patioRecords, ...remotePatioRecords]);
+      const hasRemotePatioPayload = downloaded.meta && Array.isArray(downloaded.meta.patioRecords);
+      const shouldSkipPatioDownload = options.skipPatioIfLocalExists && getCleanPatioRecords(patioRecords).length;
+      if (hasRemotePatioPayload && !shouldSkipPatioDownload) {
+        patioRecords = getCleanPatioRecords(remotePatioRecords);
         persistPatioRecords();
       }
 
@@ -3631,6 +3656,7 @@
       if (type === "record-upsert") return `Lançamento ${formatDate(payload.date)} aguardando envio`;
       if (type === "record-delete") return `Exclusão de ${formatDate(payload.date)} aguardando envio`;
       if (type === "targets-save") return "Metas aguardando envio";
+      if (type === "patio-sync") return "Tempo de pátio aguardando sincronização";
       if (type === "upload-all") return "Base completa aguardando sincronização";
       return "Sincronização pendente";
     }
@@ -3728,6 +3754,15 @@
           pendingMessage: "Enviando pendencia de metas...",
           successStatus: "Pendencia de metas sincronizada.",
           errorStatus: "Nao foi possivel sincronizar as metas pendentes."
+        });
+      }
+
+      if (item.type === "patio-sync") {
+        return syncPatioRecordsToFirebase({
+          silent: true,
+          pendingMessage: "Enviando pendencia do tempo de pátio...",
+          successStatus: "Pendencia do tempo de pátio sincronizada.",
+          errorStatus: "Nao foi possivel sincronizar o tempo de pátio pendente."
         });
       }
 
@@ -4237,6 +4272,16 @@
       return String(record.departureTraffic || record.arrivalField || record.loadStart || record.loadEnd || record.departureField || record.arrivalMill || "").slice(0, 10);
     }
 
+    function patioTransportClassFromText(value) {
+      const text = normalizeKey(value || "");
+      const hasOwn = text.includes("proprio");
+      const hasThird = text.includes("terceir");
+      if (hasOwn && hasThird) return "Dados misturados";
+      if (hasOwn) return "Próprio";
+      if (hasThird) return "Terceiro";
+      return "";
+    }
+
     function refreshPatioDerivedTimes(record) {
       record.toFieldMinutes = patioMinutesBetween(record.departureTraffic, record.arrivalField);
       record.waitLoadMinutes = patioMinutesBetween(record.arrivalField, record.loadStart);
@@ -4338,12 +4383,9 @@
       if (!truck || !front || !date) return null;
 
       const source = String(row.source || row.origem || "Sistema").trim();
-      const sourceKey = normalizeKey(source);
-      const transportClass = sourceKey.includes("terceir")
-        ? "Terceiro"
-        : sourceKey.includes("proprio") || sourceKey.includes("proprios")
-          ? "Próprio"
-          : String(row.transportClass || row.transportType || "").trim();
+      const transportClass = patioTransportClassFromText(row.transportClass || row.transportType)
+        || patioTransportClassFromText(source)
+        || String(row.transportClass || row.transportType || "").trim();
 
       const record = {
         id: row.id || makeId(),
@@ -4367,6 +4409,37 @@
       return refreshPatioDerivedTimes(record);
     }
 
+    function patioRecordBaseKey(record) {
+      return [
+        record.date,
+        normalizeKey(record.truck),
+        normalizeKey(record.front),
+        record.departureTraffic || record.arrivalField || record.loadStart || record.departureField
+      ].join("|");
+    }
+
+    function patioRecordImportSignature(record) {
+      const normalized = normalizePatioRecord(record);
+      if (!normalized) return "";
+      return [
+        patioRecordBaseKey(normalized),
+        normalized.loadEnd || "",
+        normalized.departureField || "",
+        normalized.arrivalMill || "",
+        normalized.weighingStart || "",
+        normalized.weighingEnd || "",
+        String(normalized.fieldMinutes || 0)
+      ].join("|");
+    }
+
+    function patioRecordsImportSignature(rows) {
+      return (rows || [])
+        .map(patioRecordImportSignature)
+        .filter(Boolean)
+        .sort()
+        .join("\n");
+    }
+
     function getCleanPatioRecords(source = patioRecords) {
       const grouped = new Map();
       const groupedMeta = new Map();
@@ -4385,12 +4458,7 @@
       (source || []).forEach((row) => {
         const normalized = normalizePatioRecord(row);
         if (!normalized) return;
-        const baseKey = [
-          normalized.date,
-          normalizeKey(normalized.truck),
-          normalizeKey(normalized.front),
-          normalized.departureTraffic || normalized.arrivalField || normalized.loadStart || normalized.departureField
-        ].join("|");
+        const baseKey = patioRecordBaseKey(normalized);
         const classKey = normalizeKey(patioTransportGroup(normalized));
         const key = `${baseKey}|${classKey}`;
         const current = grouped.get(key);
@@ -4427,7 +4495,7 @@
       return [...grouped.entries()]
         .filter(([key]) => {
           const meta = groupedMeta.get(key);
-          if (!meta || meta.classKey !== "proprio / terceiro") return true;
+          if (!meta || meta.classKey !== "dados misturados") return true;
           const classes = classesByBase.get(meta.baseKey) || new Set();
           return !(classes.has("proprio") || classes.has("terceiro"));
         })
@@ -4776,18 +4844,13 @@
     }
 
     function patioTransportGroup(record) {
-      const text = normalizeKey(`${record.transportClass || ""} ${record.source || ""}`);
-      const hasOwn = text.includes("proprio");
-      const hasThird = text.includes("terceir");
-      if (hasOwn && hasThird) return "Próprio / Terceiro";
-      if (hasOwn) return "Próprio";
-      if (hasThird) return "Terceiro";
-      return "Não informado";
+      return patioTransportClassFromText(record.transportClass)
+        || patioTransportClassFromText(record.source)
+        || "Não informado";
     }
 
     function patioTransportGroups(record) {
       const group = patioTransportGroup(record);
-      if (group === "Próprio / Terceiro") return ["Próprio", "Terceiro"];
       return [group];
     }
 
@@ -4879,9 +4942,29 @@
         });
     }
 
+    function patioTransportDetailRows(rows) {
+      const groups = ["Próprio", "Terceiro", "Dados misturados", "Não informado"];
+      return groups
+        .filter((group) => group === "Próprio" || group === "Terceiro" || rows.some((record) => patioTransportGroup(record) === group))
+        .map((group) => {
+          const groupRows = rows.filter((record) => patioTransportGroup(record) === group);
+          const summary = patioGroupSummary(groupRows);
+          return [
+            group,
+            String(summary.trips),
+            String(summary.trips),
+            String(summary.trucks),
+            formatMinutes(summary.avgPalha),
+            formatMinutes(summary.maxPalha),
+            formatMinutes(summary.avgUsina),
+            String(summary.alerts + summary.missing)
+          ];
+        });
+    }
+
     function patioShiftTransportMatrixRows(rows) {
-      const transportGroups = ["Próprio", "Terceiro", "Não informado"]
-        .filter((group) => rows.some((record) => patioTransportGroups(record).includes(group)));
+      const transportGroups = ["Próprio", "Terceiro", "Dados misturados", "Não informado"]
+        .filter((group) => group === "Próprio" || group === "Terceiro" || rows.some((record) => patioTransportGroup(record) === group));
       const shifts = [
         { label: "Turno A", detail: "07:00 às 15:00" },
         { label: "Turno B", detail: "15:00 às 23:00" },
@@ -4892,7 +4975,7 @@
         shift.label,
         shift.detail,
         ...transportGroups.map((group) => {
-          const groupRows = rows.filter((record) => patioShiftFor(record).label === shift.label && patioTransportGroups(record).includes(group));
+          const groupRows = rows.filter((record) => patioShiftFor(record).label === shift.label && patioTransportGroup(record) === group);
           const summary = patioGroupSummary(groupRows);
           return summary.trips ? `${formatMinutes(summary.avgPalha)} / ${summary.trips} viagem${summary.trips === 1 ? "" : "s"}` : "-";
         })
@@ -4916,7 +4999,8 @@
 
       const frontRows = rows.filter((record) => record.front === selectedPatioFront);
       const summary = patioGroupSummary(frontRows);
-      const transportRows = patioDetailRowsByGroup(frontRows, patioTransportGroups, ["Próprio", "Terceiro", "Não informado"]);
+      const mixedRows = frontRows.filter((record) => patioTransportGroup(record) === "Dados misturados");
+      const transportRows = patioTransportDetailRows(frontRows);
       const shiftRows = patioDetailRowsByGroup(frontRows, patioShiftFor, ["Turno A", "Turno B", "Turno C", "Sem turno"]);
       const matrix = patioShiftTransportMatrixRows(frontRows);
 
@@ -4946,6 +5030,12 @@
             <small>${summary.alerts} acima de 90 min · ${summary.missing} sem saída</small>
           </div>
         </div>
+        ${mixedRows.length ? `
+          <div class="alert-item alert">
+            <strong>${mixedRows.length} viagem${mixedRows.length === 1 ? "" : "s"} com origem misturada</strong>
+            <span>Esses registros antigos vieram como próprio e terceiro ao mesmo tempo. Eles não entram em Próprio nem em Terceiro para não repetir valores. Limpe e reimporte a planilha correta para recuperar a separação real.</span>
+          </div>
+        ` : ""}
         <div class="front-detail-grid">
           <div class="front-detail-section">
             <h3>Separado por transporte</h3>
@@ -9672,46 +9762,86 @@
       }
     }
 
-    async function rowsFromPatioFile(file) {
+    function applyForcedPatioTransportClass(rows, forcedClass, sourceLabel = "") {
+      if (!forcedClass) return rows;
+      return (rows || []).map((row) => ({
+        ...row,
+        source: sourceLabel || row.source || `Planilha ${forcedClass}`,
+        transportClass: forcedClass
+      }));
+    }
+
+    async function rowsFromPatioFile(file, forcedTransportClass = "") {
       const name = file.name || "";
       const isExcel = /\.(xlsx|xls)$/i.test(name);
       const textLike = /\.csv$/i.test(name) || /^text\//i.test(file.type);
+      const forcedClass = patioTransportClassFromText(forcedTransportClass);
+      patioImportWarnings = [];
 
       if (isExcel) {
         const XLSX = await loadExternalScript("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js", "XLSX");
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
-        return workbook.SheetNames.flatMap((sheetName) => {
+        const matchingSheetNames = forcedClass
+          ? workbook.SheetNames.filter((sheetName) => patioTransportClassFromText(sheetName) === forcedClass)
+          : workbook.SheetNames;
+        const sheetNames = matchingSheetNames.length ? matchingSheetNames : workbook.SheetNames;
+        const sheetPayloads = sheetNames.map((sheetName) => {
           const sheet = workbook.Sheets[sheetName];
           const sheetKey = normalizeKey(sheetName);
-          const transportClass = sheetKey.includes("terceir")
+          const transportClass = forcedClass || (sheetKey.includes("terceir")
             ? "Terceiro"
             : sheetKey.includes("proprio")
               ? "Próprio"
-              : "";
-          return XLSX.utils.sheet_to_json(sheet, { defval: "", raw: true }).map((row) => ({
+              : "");
+          const rows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: true }).map((row) => ({
             ...row,
-            source: sheetName,
+            source: forcedClass ? `Planilha ${forcedClass} - ${sheetName}` : sheetName,
             transportClass
           }));
+          const signature = rows.map((row) => JSON.stringify(
+            Object.keys(row)
+              .filter((key) => key !== "source" && key !== "transportClass")
+              .sort()
+              .map((key) => [key, row[key] instanceof Date ? row[key].toISOString() : row[key]])
+          )).join("\n");
+          return { rows, sheetName, signature, transportClass };
         });
+
+        const seenSignatures = new Map();
+        const duplicateSheets = new Set();
+        sheetPayloads.forEach(({ sheetName, signature, rows }) => {
+          if (!signature) return;
+          const previous = seenSignatures.get(signature);
+          if (previous) {
+            duplicateSheets.add(sheetName);
+            patioImportWarnings.push(`A aba "${sheetName}" está igual à aba "${previous.sheetName}" e foi ignorada para não duplicar Próprio/Terceiro. Confira a planilha original.`);
+          } else {
+            seenSignatures.set(signature, { sheetName, rows });
+          }
+        });
+
+        return sheetPayloads
+          .filter((item) => !duplicateSheets.has(item.sheetName))
+          .flatMap((item) => item.rows);
       }
 
       const text = await file.text();
       if (/\.json$/i.test(name) || file.type === "application/json" || text.trim().startsWith("{") || text.trim().startsWith("[")) {
-        return rowsFromJson(JSON.parse(text));
+        return applyForcedPatioTransportClass(rowsFromJson(JSON.parse(text)), forcedClass);
       }
 
-      if (textLike || text.trim()) return parseDelimited(text);
+      if (textLike || text.trim()) return applyForcedPatioTransportClass(parseDelimited(text), forcedClass);
       return [];
     }
 
-    async function importPatioFile(file) {
+    async function importPatioFile(file, forcedTransportClass = "") {
       if (!file) return;
 
       try {
-        showToast("Lendo planilha de tempo de pátio...");
-        const rawRows = await rowsFromPatioFile(file);
+        const forcedClass = patioTransportClassFromText(forcedTransportClass);
+        showToast(forcedClass ? `Lendo planilha de caminhões ${forcedClass.toLowerCase()}...` : "Lendo planilha de tempo de pátio...");
+        const rawRows = await rowsFromPatioFile(file, forcedClass);
         const imported = rawRows.map(normalizePatioRecord).filter(Boolean);
 
         if (!imported.length) {
@@ -9719,9 +9849,55 @@
           return;
         }
 
+        const cleanBeforeImport = getCleanPatioRecords(patioRecords);
+        const importedDates = imported.map((record) => record.date).filter(Boolean).sort();
+        const importStart = importedDates[0] || "";
+        const importEnd = importedDates[importedDates.length - 1] || importStart;
+        const importRangeKey = `${importStart}|${importEnd}`;
+        let fullRangeReplace = !forcedClass;
+        if (forcedClass) {
+          const isNewSeparatedImport = !patioSeparatedImportSession
+            || patioSeparatedImportSession.rangeKey !== importRangeKey
+            || patioSeparatedImportSession.classes.has(forcedClass);
+          if (isNewSeparatedImport) {
+            patioSeparatedImportSession = {
+              rangeKey: importRangeKey,
+              classes: new Set()
+            };
+            fullRangeReplace = true;
+          }
+          patioSeparatedImportSession.classes.add(forcedClass);
+        } else {
+          patioSeparatedImportSession = null;
+        }
+        const importedGroups = new Set(imported.map((record) => patioTransportGroup(record)).filter((group) => group && group !== "Não informado"));
+        const replaceGroups = new Set(importedGroups);
+        if (importedGroups.has("Próprio") || importedGroups.has("Terceiro")) replaceGroups.add("Dados misturados");
+        if (forcedClass && !fullRangeReplace) {
+          const oppositeGroup = forcedClass === "Próprio" ? "Terceiro" : "Próprio";
+          const oppositeRows = cleanBeforeImport.filter((record) => (
+            record.date >= importStart
+            && record.date <= importEnd
+            && patioTransportGroup(record) === oppositeGroup
+          ));
+          if (oppositeRows.length && patioRecordsImportSignature(oppositeRows) === patioRecordsImportSignature(imported)) {
+            const message = `A planilha de ${forcedClass.toLowerCase()} está igual à planilha de ${oppositeGroup.toLowerCase()} já importada. Ela não foi registrada para não duplicar informação incorreta.`;
+            patioImportWarnings.push(message);
+            showToast(message);
+            return;
+          }
+        }
+
         createAutoBackup("Antes de importar tempo de pátio", { skipAudit: true });
-        const beforeTotal = getCleanPatioRecords(patioRecords).length;
-        const mergedRecords = getCleanPatioRecords([...patioRecords, ...imported]);
+        const recordsOutsideImportRange = cleanBeforeImport.filter((record) => {
+          if (fullRangeReplace) return false;
+          if (!importStart || !importEnd) return true;
+          if (!replaceGroups.size) return false;
+          return !replaceGroups.has(patioTransportGroup(record));
+        });
+        const replacedTotal = cleanBeforeImport.length - recordsOutsideImportRange.length;
+        const beforeTotal = recordsOutsideImportRange.length;
+        const mergedRecords = getCleanPatioRecords([...recordsOutsideImportRange, ...imported]);
         const consolidatedTotal = Math.max(mergedRecords.length - beforeTotal, 0);
         patioRecords = mergedRecords;
         persistPatioRecords();
@@ -9732,7 +9908,14 @@
           setPatioRange(range.start, latest.date);
         }
 
-        addAuditEntry("importacao", `${imported.length} linha${imported.length === 1 ? "" : "s"} de tempo de pátio lida${imported.length === 1 ? "" : "s"}; ${consolidatedTotal} viagem${consolidatedTotal === 1 ? "" : "s"} registrada${consolidatedTotal === 1 ? "" : "s"} por classe.`);
+        const replaceSummary = replacedTotal
+          ? ` ${replacedTotal} registro${replacedTotal === 1 ? "" : "s"} antigo${replacedTotal === 1 ? "" : "s"} do período substituído${replacedTotal === 1 ? "" : "s"}.`
+          : "";
+        const resetSummary = fullRangeReplace ? " Base de tempo de pátio reiniciada antes da importação." : "";
+        const importSummary = `${imported.length} linha${imported.length === 1 ? "" : "s"} lida${imported.length === 1 ? "" : "s"}; ${consolidatedTotal} viagem${consolidatedTotal === 1 ? "" : "s"} registrada${consolidatedTotal === 1 ? "" : "s"} por classe.${replaceSummary}${resetSummary}`;
+        const importWarning = patioImportWarnings[0] || "";
+        const classSummary = forcedClass ? ` (${forcedClass})` : "";
+        addAuditEntry("importacao", `Tempo de pátio importado${classSummary}: ${importSummary}${importWarning ? ` Atenção: ${importWarning}` : ""}`);
         renderPatio();
 
         await syncOrQueue("upload-all", { source: "patio-import" }, () => uploadAllDataToFirebase({
@@ -9742,11 +9925,13 @@
           errorStatus: "Tempo de pátio salvo localmente, mas a sincronizacao falhou."
         }));
 
-        showToast(`${imported.length} linha${imported.length === 1 ? "" : "s"} lida${imported.length === 1 ? "" : "s"}; ${consolidatedTotal} viagem${consolidatedTotal === 1 ? "" : "s"} registrada${consolidatedTotal === 1 ? "" : "s"} por classe.`);
+        showToast(importWarning ? `${importSummary} ${importWarning}` : importSummary);
       } catch {
         showToast("Não foi possível importar a planilha de tempo de pátio.");
       } finally {
         els.patioImportFile.value = "";
+        els.patioImportOwnFile.value = "";
+        els.patioImportThirdFile.value = "";
       }
     }
 
@@ -9808,19 +9993,98 @@
       showToast("CSV de tempo de pátio exportado.");
     }
 
-    function clearPatioRecords() {
-      if (!patioRecords.length) {
+    async function savePatioDatabase() {
+      const total = getCleanPatioRecords(patioRecords).length;
+      const syncState = await syncOrQueue("upload-all", { source: "patio-manual-save" }, () => uploadAllDataToFirebase({
+        silent: true,
+        pendingMessage: "Salvando tempo de pátio no banco de dados...",
+        successStatus: "Tempo de pátio salvo no banco de dados.",
+        errorStatus: "Não foi possível salvar o tempo de pátio no banco de dados."
+      }));
+
+      if (syncState === "synced") {
+        addAuditEntry("firebase", `${total} registro${total === 1 ? "" : "s"} de tempo de pátio enviado${total === 1 ? "" : "s"} ao banco.`);
+        showToast("Tempo de pátio salvo no banco de dados.");
+        return;
+      }
+
+      if (syncState === "queued-offline" || syncState === "queued-error") {
+        showToast("Tempo de pátio ficou na fila para salvar no banco.");
+        return;
+      }
+
+      showToast("Não foi possível salvar o tempo de pátio no banco.");
+    }
+
+    async function deletePatioRangeRecords() {
+      const range = patioRange();
+      const rangeLabel = range.start === range.end ? formatDate(range.start) : `${formatDate(range.start)} a ${formatDate(range.end)}`;
+      const cleanRecords = getCleanPatioRecords(patioRecords);
+      const selectedRows = cleanRecords.filter((record) => record.date >= range.start && record.date <= range.end);
+
+      if (!selectedRows.length) {
+        showToast(`Não há dados de tempo de pátio no período ${rangeLabel}.`);
+        return;
+      }
+
+      const message = `Excluir ${selectedRows.length} registro${selectedRows.length === 1 ? "" : "s"} de tempo de pátio do período ${rangeLabel}?`;
+      if (!window.confirm(message)) return;
+
+      createAutoBackup(`Antes de excluir tempo de pátio de ${rangeLabel}`, { skipAudit: true });
+      patioRecords = getCleanPatioRecords(cleanRecords.filter((record) => record.date < range.start || record.date > range.end));
+      patioSeparatedImportSession = null;
+      persistPatioRecords();
+      renderPatio();
+      addAuditEntry("exclusao", `${selectedRows.length} registro${selectedRows.length === 1 ? "" : "s"} de tempo de pátio removido${selectedRows.length === 1 ? "" : "s"} do período ${rangeLabel}.`);
+
+      const syncState = await syncOrQueue("patio-sync", { source: "patio-range-delete", start: range.start, end: range.end }, () => syncPatioRecordsToFirebase({
+        silent: true,
+        pendingMessage: "Salvando exclusão do tempo de pátio no banco...",
+        successStatus: "Exclusão do tempo de pátio salva no banco.",
+        errorStatus: "Tempo de pátio removido localmente, mas a sincronização com o banco falhou."
+      }));
+
+      if (syncState === "synced") {
+        showToast(`${selectedRows.length} registro${selectedRows.length === 1 ? "" : "s"} excluído${selectedRows.length === 1 ? "" : "s"} e banco atualizado.`);
+      } else if (syncState === "queued-offline" || syncState === "queued-error") {
+        showToast(`${selectedRows.length} registro${selectedRows.length === 1 ? "" : "s"} excluído${selectedRows.length === 1 ? "" : "s"}. Banco ficou na fila de sincronização.`);
+      } else {
+        showToast(`${selectedRows.length} registro${selectedRows.length === 1 ? "" : "s"} excluído${selectedRows.length === 1 ? "" : "s"} localmente.`);
+      }
+    }
+
+    async function clearPatioRecords() {
+      const total = getCleanPatioRecords(patioRecords).length;
+      if (!total && !hasFirebaseConfig()) {
         showToast("Não há dados de tempo de pátio para limpar.");
         return;
       }
 
-      if (!window.confirm("Deseja limpar todos os lançamentos de tempo de pátio?")) return;
+      const message = total
+        ? `Deseja limpar todos os ${total} lançamento${total === 1 ? "" : "s"} de tempo de pátio do sistema e do banco de dados?`
+        : "Não há dados locais de tempo de pátio. Deseja zerar o tempo de pátio no banco de dados mesmo assim?";
+      if (!window.confirm(message)) return;
       createAutoBackup("Antes de limpar tempo de pátio", { skipAudit: true });
       patioRecords = [];
+      patioSeparatedImportSession = null;
       persistPatioRecords();
       renderPatio();
-      addAuditEntry("exclusao", "Dados de tempo de pátio removidos localmente.");
-      showToast("Dados de tempo de pátio limpos.");
+      addAuditEntry("exclusao", "Dados de tempo de pátio removidos localmente e enviados para exclusão no banco.");
+
+      const syncState = await syncOrQueue("patio-sync", { source: "patio-clear" }, () => syncPatioRecordsToFirebase({
+        silent: true,
+        pendingMessage: "Apagando tempo de pátio no banco de dados...",
+        successStatus: "Tempo de pátio apagado no banco de dados.",
+        errorStatus: "Tempo de pátio apagado localmente, mas a exclusão no banco falhou."
+      }));
+
+      if (syncState === "synced") {
+        showToast("Tempo de pátio apagado localmente e no banco de dados.");
+      } else if (syncState === "queued-offline" || syncState === "queued-error") {
+        showToast("Tempo de pátio apagado localmente. Banco ficou na fila para zerar.");
+      } else {
+        showToast("Tempo de pátio apagado localmente. Configure o banco para apagar remoto.");
+      }
     }
 
     function csvCell(value) {
@@ -9975,13 +10239,19 @@
       }
       renderPatio();
     });
+    document.querySelector("#importPatioOwnBtn").addEventListener("click", () => els.patioImportOwnFile.click());
+    document.querySelector("#importPatioThirdBtn").addEventListener("click", () => els.patioImportThirdFile.click());
     document.querySelector("#importPatioBtn").addEventListener("click", () => els.patioImportFile.click());
     document.querySelector("#exportPatioCsvBtn").addEventListener("click", exportPatioCsv);
+    document.querySelector("#savePatioDatabaseBtn").addEventListener("click", savePatioDatabase);
+    document.querySelector("#deletePatioRangeBtn").addEventListener("click", deletePatioRangeRecords);
     document.querySelector("#printPatioReportBtn").addEventListener("click", printPatioReport);
     document.querySelector("#clearPatioBtn").addEventListener("click", clearPatioRecords);
     document.querySelector("#savePatioEntryBtn").addEventListener("click", savePatioEntry);
     document.querySelector("#resetPatioEntryBtn").addEventListener("click", () => resetPatioEntryForm({ date: els.patioEntryDate.value || todayInputValue() }));
     els.patioImportFile.addEventListener("change", (event) => importPatioFile(event.target.files[0]));
+    els.patioImportOwnFile.addEventListener("change", (event) => importPatioFile(event.target.files[0], "Próprio"));
+    els.patioImportThirdFile.addEventListener("change", (event) => importPatioFile(event.target.files[0], "Terceiro"));
     els.patioFrontChartWrap.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-patio-front-select]");
       if (!button) return;
@@ -10204,9 +10474,10 @@
     renderHistory();
 
     ensureFirebaseReady({ silent: true }).then((ready) => {
-      if (!ready || records.length) return;
+      if (!ready || records.length || getCleanPatioRecords(patioRecords).length) return;
       return downloadAllDataFromFirebase({
         silent: true,
+        skipPatioIfLocalExists: true,
         pendingMessage: "Baixando dados salvos no Firebase...",
         successStatus: "Dados do Firebase restaurados no sistema."
       }).then((loaded) => {
