@@ -3575,16 +3575,25 @@
       return consolidateRecords(source);
     }
 
-    function currentDataPayload(exportedAt = new Date().toISOString()) {
-      return {
+    function currentDataPayload(exportedAt = new Date().toISOString(), options = {}) {
+      const payload = {
         plant: PLANT,
         version: APP_VERSION,
         exportedAt,
         targets: getCleanTargets(),
         records: getCleanRecords(records),
-        patioUpdatedAt: patioLocalUpdatedAt,
-        patioRecords: getCleanPatioRecords(patioRecords)
+        patioUpdatedAt: patioLocalUpdatedAt
       };
+
+      const cleanPatioRecords = getCleanPatioRecords(patioRecords);
+      if (options.includePatioRecords === false) {
+        payload.patioRecordCount = cleanPatioRecords.length;
+        payload.patioRecordsOmitted = true;
+      } else {
+        payload.patioRecords = cleanPatioRecords;
+      }
+
+      return payload;
     }
 
     function normalizePayloadRecords(payload) {
@@ -3638,14 +3647,69 @@
       }
     }
 
+    function isQuotaExceededError(error) {
+      return error && (
+        error.name === "QuotaExceededError"
+        || error.name === "NS_ERROR_DOM_QUOTA_REACHED"
+        || error.code === 22
+        || error.code === 1014
+      );
+    }
+
+    function compactAutoBackupPayload(payload) {
+      if (!payload || typeof payload !== "object") return payload;
+      const compactPayload = { ...payload };
+      if (Array.isArray(compactPayload.patioRecords)) {
+        compactPayload.patioRecordCount = compactPayload.patioRecords.length;
+        compactPayload.patioRecordsOmitted = true;
+        delete compactPayload.patioRecords;
+      }
+      return compactPayload;
+    }
+
+    function compactAutoBackupItem(item) {
+      if (!item || typeof item !== "object") return null;
+      return {
+        ...item,
+        payload: compactAutoBackupPayload(item.payload)
+      };
+    }
+
     function loadAutoBackups() {
       return loadStoredList(AUTO_BACKUPS_KEY)
+        .map(compactAutoBackupItem)
         .filter((item) => item && item.id && item.createdAt && item.payload)
         .slice(0, MAX_AUTO_BACKUPS);
     }
 
-    function persistAutoBackups() {
-      localStorage.setItem(AUTO_BACKUPS_KEY, JSON.stringify(autoBackups.slice(0, MAX_AUTO_BACKUPS)));
+    function persistAutoBackups(options = {}) {
+      let backupsToSave = autoBackups
+        .map(compactAutoBackupItem)
+        .filter(Boolean)
+        .slice(0, MAX_AUTO_BACKUPS);
+
+      while (backupsToSave.length) {
+        try {
+          localStorage.setItem(AUTO_BACKUPS_KEY, JSON.stringify(backupsToSave));
+          autoBackups = backupsToSave;
+          return true;
+        } catch (error) {
+          if (!isQuotaExceededError(error)) {
+            if (!options.silent) showToast("Não foi possível salvar o backup automático.");
+            return false;
+          }
+          backupsToSave = backupsToSave.slice(0, -1);
+        }
+      }
+
+      try {
+        localStorage.removeItem(AUTO_BACKUPS_KEY);
+      } catch {
+        // Ignora falha ao limpar backups antigos.
+      }
+      autoBackups = [];
+      if (!options.silent) showToast("Backups automáticos antigos foram limpos porque o navegador ficou sem espaço.");
+      return false;
     }
 
     function loadAuditLog() {
@@ -3687,11 +3751,11 @@
         id: makeId(),
         reason: String(reason || "Rotina automática").trim(),
         createdAt: new Date().toISOString(),
-        payload: currentDataPayload()
+        payload: currentDataPayload(undefined, { includePatioRecords: false })
       };
 
       autoBackups = [snapshot, ...autoBackups].slice(0, MAX_AUTO_BACKUPS);
-      persistAutoBackups();
+      persistAutoBackups({ silent: options.silent });
       renderAutoBackups();
       if (!options.skipAudit) {
         addAuditEntry("backup", `Backup criado: ${snapshot.reason}.`);
@@ -4652,13 +4716,32 @@
 
     function persistPatioUpdatedAt(value = new Date().toISOString()) {
       patioLocalUpdatedAt = value;
-      localStorage.setItem(PATIO_SYNC_KEY, value);
+      try {
+        localStorage.setItem(PATIO_SYNC_KEY, value);
+      } catch {
+        // Mantém a data em memória mesmo se o navegador estiver sem espaço.
+      }
       return value;
     }
 
     function persistPatioRecords(options = {}) {
       patioRecords = getCleanPatioRecords(patioRecords);
-      localStorage.setItem(PATIO_STORAGE_KEY, JSON.stringify(patioRecords));
+      const serialized = JSON.stringify(patioRecords);
+      try {
+        localStorage.setItem(PATIO_STORAGE_KEY, serialized);
+      } catch (error) {
+        if (!isQuotaExceededError(error)) throw error;
+        autoBackups = [];
+        try {
+          localStorage.removeItem(AUTO_BACKUPS_KEY);
+          localStorage.setItem(PATIO_STORAGE_KEY, serialized);
+          renderAutoBackups();
+        } catch {
+          if (!options.silent) {
+            showToast("O pátio ficou muito grande para o armazenamento local. Salve no banco de dados para manter os dados compartilhados.");
+          }
+        }
+      }
       persistPatioUpdatedAt(options.updatedAt || new Date().toISOString());
     }
 
@@ -10764,6 +10847,7 @@
     renderFirebaseStatus();
     renderOptions();
     renderPendingSyncQueue();
+    persistAutoBackups({ silent: true });
     renderAutoBackups();
     renderAuditLog();
     const initialDate = todayInputValue();
