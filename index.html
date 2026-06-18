@@ -1936,6 +1936,14 @@
         <div class="panel-body" id="patioFrontDetailWrap"></div>
       </section>
 
+      <section class="panel" id="patioTruckDetailPanel" hidden>
+        <div class="panel-head">
+          <h2 id="patioTruckDetailTitle">Detalhe do caminhão selecionado</h2>
+          <span class="status-pill" id="patioTruckDetailBadge">Clique em um caminhão</span>
+        </div>
+        <div class="panel-body" id="patioTruckDetailWrap"></div>
+      </section>
+
       <section class="dashboard-grid">
         <section class="panel">
           <div class="panel-head">
@@ -2513,6 +2521,10 @@
       patioFrontDetailTitle: document.querySelector("#patioFrontDetailTitle"),
       patioFrontDetailBadge: document.querySelector("#patioFrontDetailBadge"),
       patioFrontDetailWrap: document.querySelector("#patioFrontDetailWrap"),
+      patioTruckDetailPanel: document.querySelector("#patioTruckDetailPanel"),
+      patioTruckDetailTitle: document.querySelector("#patioTruckDetailTitle"),
+      patioTruckDetailBadge: document.querySelector("#patioTruckDetailBadge"),
+      patioTruckDetailWrap: document.querySelector("#patioTruckDetailWrap"),
       patioDailyWrap: document.querySelector("#patioDailyWrap"),
       patioInsightsWrap: document.querySelector("#patioInsightsWrap"),
       patioRowsWrap: document.querySelector("#patioRowsWrap"),
@@ -2612,6 +2624,7 @@
     let currentTheme = loadTheme();
     let transportRankingPeriod = "week";
     let selectedPatioFront = "";
+    let selectedPatioTruck = "";
     let patioImportWarnings = [];
     let patioSeparatedImportSession = null;
     let entries = cloneEntries(defaultEntries);
@@ -4316,6 +4329,13 @@
       return "";
     }
 
+    function patioTransportClassFromTruck(truck) {
+      const digits = String(truck || "").replace(/\D/g, "");
+      if (digits.length === 4) return "Próprio";
+      if (digits.length === 5 || digits.length === 6) return "Terceiro";
+      return "";
+    }
+
     function refreshPatioDerivedTimes(record) {
       record.toFieldMinutes = patioMinutesBetween(record.departureTraffic, record.arrivalField);
       record.waitLoadMinutes = patioMinutesBetween(record.arrivalField, record.loadStart);
@@ -4417,7 +4437,8 @@
       if (!truck || !front || !date) return null;
 
       const source = String(row.source || row.origem || "Sistema").trim();
-      const transportClass = patioTransportClassFromText(row.transportClass || row.transportType)
+      const transportClass = patioTransportClassFromTruck(truck)
+        || patioTransportClassFromText(row.transportClass || row.transportType)
         || patioTransportClassFromText(source)
         || String(row.transportClass || row.transportType || "").trim();
 
@@ -4587,7 +4608,7 @@
     }
 
     function patioTransportLabel(record) {
-      return String(record.transportClass || record.source || "Sistema").trim() || "Sistema";
+      return patioTransportGroup(record) || String(record.transportClass || record.source || "Sistema").trim() || "Sistema";
     }
 
     function datetimeLocalInputValue(value) {
@@ -4727,7 +4748,7 @@
       renderPatio();
       addAuditEntry("exclusao", `Tempo de pátio do caminhão ${record.truck} em ${formatDate(record.date)} removido.`);
 
-      await syncOrQueue("upload-all", { source: "patio-delete" }, () => uploadAllDataToFirebase({
+      await syncOrQueue("patio-sync", { source: "patio-delete", id }, () => syncPatioRecordsToFirebase({
         silent: true,
         pendingMessage: "Enviando exclusão de tempo de pátio...",
         successStatus: "Exclusão de tempo de pátio sincronizada.",
@@ -4864,11 +4885,15 @@
       return `
         <div class="rank-list">
           ${visible.map((item, index) => {
-            const interactive = item.action === "front-detail";
+            const interactive = item.action === "front-detail" || item.action === "truck-detail";
             const tag = interactive ? "button" : "div";
-            const attrs = interactive
-              ? `type="button" data-patio-front-select="${escapeHtml(item.label)}" aria-pressed="${item.selected ? "true" : "false"}"`
-              : "";
+            const actionValue = item.actionValue || item.name || item.label;
+            let attrs = "";
+            if (item.action === "front-detail") {
+              attrs = `type="button" data-patio-front-select="${escapeHtml(actionValue)}" aria-pressed="${item.selected ? "true" : "false"}"`;
+            } else if (item.action === "truck-detail") {
+              attrs = `type="button" data-patio-truck-select="${escapeHtml(actionValue)}" aria-pressed="${item.selected ? "true" : "false"}"`;
+            }
             return `
             <${tag} class="rank-item ${interactive ? "rank-item-action" : ""} ${item.selected ? "is-selected" : ""}" ${attrs}>
               <div class="rank-position">${index + 1}</div>
@@ -4893,7 +4918,8 @@
     }
 
     function patioTransportGroup(record) {
-      return patioTransportClassFromText(record.transportClass)
+      return patioTransportClassFromTruck(record.truck)
+        || patioTransportClassFromText(record.transportClass)
         || patioTransportClassFromText(record.source)
         || "Não informado";
     }
@@ -4921,7 +4947,10 @@
       if (minutes >= 15 * 60 && minutes < 23 * 60) {
         return { key: "B", label: "Turno B", detail: "15:00 às 23:00" };
       }
-      return { key: "C", label: "Turno C", detail: "23:00 às 07:00" };
+      if (minutes >= 23 * 60 || minutes < 6 * 60) {
+        return { key: "C", label: "Turno C", detail: "23:00 às 06:00" };
+      }
+      return { key: "N", label: "Sem turno", detail: "Fora dos turnos" };
     }
 
     function patioGroupSummary(rows) {
@@ -5017,7 +5046,7 @@
       const shifts = [
         { label: "Turno A", detail: "07:00 às 15:00" },
         { label: "Turno B", detail: "15:00 às 23:00" },
-        { label: "Turno C", detail: "23:00 às 07:00" }
+        { label: "Turno C", detail: "23:00 às 06:00" }
       ];
 
       const tableRows = shifts.map((shift) => [
@@ -5106,6 +5135,7 @@
       const items = aggregatePatioBy(rows, (record) => record.front)
         .sort((a, b) => b.avgFieldMinutes - a.avgFieldMinutes || b.trips - a.trips)
         .map((item) => ({
+          name: item.name,
           label: item.name,
           value: item.avgFieldMinutes,
           valueLabel: formatMinutes(item.avgFieldMinutes),
@@ -5119,17 +5149,108 @@
     }
 
     function renderPatioTruckRanking(rows) {
+      const trucks = [...new Set(rows.map((record) => record.truck).filter(Boolean))];
+      if (selectedPatioTruck && !trucks.includes(selectedPatioTruck)) selectedPatioTruck = "";
       const items = aggregatePatioBy(rows, (record) => record.truck)
         .sort((a, b) => b.avgFieldMinutes - a.avgFieldMinutes || b.trips - a.trips)
         .map((item) => ({
+          name: item.name,
           label: `Caminhão ${item.name}`,
           value: item.avgFieldMinutes,
           valueLabel: formatMinutes(item.avgFieldMinutes),
-          detail: `${item.trips} viagem${item.trips === 1 ? "" : "s"} · ${item.alerts} alerta${item.alerts === 1 ? "" : "s"}`,
+          detail: `${item.trips} viagem${item.trips === 1 ? "" : "s"} · ${item.alerts} alerta${item.alerts === 1 ? "" : "s"} · clique para detalhar`,
           extra: `Ciclo ${formatMinutes(item.avgCycleMinutes)}`,
-          tone: item.avgFieldMinutes > 90 ? "over" : ""
+          tone: item.avgFieldMinutes > 90 ? "over" : "",
+          action: "truck-detail",
+          actionValue: item.name,
+          selected: item.name === selectedPatioTruck
         }));
       els.patioTruckRankingWrap.innerHTML = patioBarList(items, { limit: 12 });
+    }
+
+    function renderPatioTruckDetail(rows) {
+      const trucks = [...new Set(rows.map((record) => record.truck).filter(Boolean))];
+      if (selectedPatioTruck && !trucks.includes(selectedPatioTruck)) selectedPatioTruck = "";
+
+      if (!selectedPatioTruck) {
+        els.patioTruckDetailPanel.hidden = true;
+        els.patioTruckDetailWrap.innerHTML = "";
+        return;
+      }
+
+      const truckRows = rows
+        .filter((record) => record.truck === selectedPatioTruck)
+        .sort((a, b) => `${a.date}${a.loadStart || a.arrivalField || a.departureTraffic}`.localeCompare(`${b.date}${b.loadStart || b.arrivalField || b.departureTraffic}`));
+      const summary = patioGroupSummary(truckRows);
+      const fronts = aggregatePatioBy(truckRows, (record) => record.front)
+        .sort((a, b) => b.trips - a.trips || b.avgFieldMinutes - a.avgFieldMinutes)
+        .map((item) => {
+          const frontRows = truckRows.filter((record) => record.front === item.name);
+          const shifts = [...new Set(frontRows.map((record) => patioShiftFor(record).label).filter(Boolean))].join(", ");
+          return [
+            item.name,
+            String(item.trips),
+            formatMinutes(item.avgFieldMinutes),
+            formatMinutes(item.maxFieldMinutes),
+            formatMinutes(item.avgMillMinutes),
+            formatMinutes(item.avgCycleMinutes),
+            shifts || "-"
+          ];
+        });
+      const trips = truckRows.map((record) => {
+        const status = patioStatusFor(record);
+        const shift = patioShiftFor(record);
+        return [
+          formatDate(record.date),
+          record.front || "-",
+          shift.label,
+          patioTransportLabel(record),
+          formatDateTime(record.loadStart || record.arrivalField || record.departureTraffic),
+          formatDateTime(record.loadEnd || record.departureField),
+          formatMinutes(record.fieldMinutes),
+          formatMinutes(patioMillMinutes(record)),
+          record.cycleMinutes ? formatMinutes(record.cycleMinutes) : "-",
+          status.label
+        ];
+      });
+
+      els.patioTruckDetailPanel.hidden = false;
+      els.patioTruckDetailTitle.textContent = `Detalhe Caminhão ${selectedPatioTruck}`;
+      els.patioTruckDetailBadge.textContent = `${summary.trips} viagem${summary.trips === 1 ? "" : "s"} · ${new Set(truckRows.map((record) => record.front)).size} frente${new Set(truckRows.map((record) => record.front)).size === 1 ? "" : "s"}`;
+      els.patioTruckDetailWrap.innerHTML = `
+        <div class="transport-summary">
+          <div class="goal-metric">
+            <span>Viagens</span>
+            <strong>${summary.trips}</strong>
+            <small>${new Set(truckRows.map((record) => record.front)).size} frente${new Set(truckRows.map((record) => record.front)).size === 1 ? "" : "s"}</small>
+          </div>
+          <div class="goal-metric">
+            <span>Média palha</span>
+            <strong>${formatMinutes(summary.avgPalha)}</strong>
+            <small>Tempo médio do caminhão</small>
+          </div>
+          <div class="goal-metric">
+            <span>Maior palha</span>
+            <strong>${formatMinutes(summary.maxPalha)}</strong>
+            <small>Maior tempo do caminhão</small>
+          </div>
+          <div class="goal-metric">
+            <span>Média usina</span>
+            <strong>${formatMinutes(summary.avgUsina)}</strong>
+            <small>Chegada usina até saída pesagem</small>
+          </div>
+        </div>
+        <div class="front-detail-grid">
+          <div class="front-detail-section">
+            <h3>Frentes do caminhão</h3>
+            ${patioSummaryTable(["Frente", "Viagens", "Média palha", "Máx. palha", "Média usina", "Ciclo médio", "Turnos"], fronts, "Sem frente para este caminhão.")}
+          </div>
+          <div class="front-detail-section">
+            <h3>Viagens do caminhão</h3>
+            ${patioSummaryTable(["Data", "Frente", "Turno", "Origem", "Início", "Fim", "Tempo palha", "Tempo usina", "Ciclo", "Status"], trips, "Sem viagens para este caminhão.")}
+          </div>
+        </div>
+      `;
     }
 
     function renderPatioDaily(rows) {
@@ -5234,6 +5355,7 @@
               <th>Pesagem</th>
               <th>Ciclo total</th>
               <th>Status</th>
+              <th>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -5255,6 +5377,11 @@
                   <td>${formatMinutes(record.weighingMinutes)}</td>
                   <td>${record.cycleMinutes ? formatMinutes(record.cycleMinutes) : "-"}</td>
                   <td><span class="status-pill ${status.className}">${escapeHtml(status.label)}</span></td>
+                  <td>
+                    <div class="row-buttons">
+                      <button class="btn-secondary btn-danger" type="button" data-patio-action="delete" data-id="${escapeHtml(record.id)}">Excluir</button>
+                    </div>
+                  </td>
                 </tr>
               `;
             }).join("")}
@@ -5309,6 +5436,7 @@
       renderPatioFrontChart(rows);
       renderPatioTruckRanking(rows);
       renderPatioFrontDetail(rows);
+      renderPatioTruckDetail(rows);
       renderPatioDaily(rows);
       renderPatioInsights(rows);
       renderPatioRows(rows);
@@ -9671,7 +9799,7 @@
       const shifts = [
         { key: "A", label: "Turno A", rowLabel: "turno A", detail: "07:00 às 15:00" },
         { key: "B", label: "Turno B", rowLabel: "turno B", detail: "15:00 às 23:00" },
-        { key: "C", label: "Turno C", rowLabel: "turno C", detail: "23:00 às 07:00" }
+        { key: "C", label: "Turno C", rowLabel: "turno C", detail: "23:00 às 06:00" }
       ];
       const dateLabel = range.start === range.end ? formatDate(range.start) : `${formatDate(range.start)} a ${formatDate(range.end)}`;
       const rows = patioRowsForRange(range)
@@ -9918,7 +10046,18 @@
         const forcedClass = patioTransportClassFromText(forcedTransportClass);
         showToast(forcedClass ? `Lendo planilha de caminhões ${forcedClass.toLowerCase()}...` : "Lendo planilha de tempo de pátio...");
         const rawRows = await rowsFromPatioFile(file, forcedClass);
-        const imported = rawRows.map(normalizePatioRecord).filter(Boolean);
+        const imported = rawRows
+          .map((row) => normalizePatioRecord(forcedClass ? {
+            ...row,
+            source: row.source || `Planilha ${forcedClass}`,
+            transportClass: forcedClass
+          } : row))
+          .filter(Boolean)
+          .map((record) => forcedClass ? {
+            ...record,
+            source: record.source || `Planilha ${forcedClass}`,
+            transportClass: forcedClass
+          } : record);
 
         if (!imported.length) {
           showToast("Nenhuma viagem válida foi encontrada na planilha.");
@@ -9957,10 +10096,8 @@
             && patioTransportGroup(record) === oppositeGroup
           ));
           if (oppositeRows.length && patioRecordsImportSignature(oppositeRows) === patioRecordsImportSignature(imported)) {
-            const message = `A planilha de ${forcedClass.toLowerCase()} está igual à planilha de ${oppositeGroup.toLowerCase()} já importada. Ela não foi registrada para não duplicar informação incorreta.`;
+            const message = `A planilha de ${forcedClass.toLowerCase()} parece igual à de ${oppositeGroup.toLowerCase()} já importada. Ela será registrada como ${forcedClass} porque foi importada pelo botão separado.`;
             patioImportWarnings.push(message);
-            showToast(message);
-            return;
           }
         }
 
@@ -10349,6 +10486,13 @@
       selectedPatioFront = button.dataset.patioFrontSelect || "";
       renderPatio();
       els.patioFrontDetailPanel.scrollIntoView({ block: "nearest" });
+    });
+    els.patioTruckRankingWrap.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-patio-truck-select]");
+      if (!button) return;
+      selectedPatioTruck = button.dataset.patioTruckSelect || "";
+      renderPatio();
+      els.patioTruckDetailPanel.scrollIntoView({ block: "nearest" });
     });
     els.patioRowsWrap.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-patio-action]");
