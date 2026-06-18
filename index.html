@@ -4315,8 +4315,28 @@
       return digits ? `Frente ${digits[0]}` : text;
     }
 
+    function patioRecordBaseDateTime(record) {
+      return String(record.departureTraffic || record.arrivalField || record.loadStart || record.loadEnd || record.departureField || record.arrivalMill || "");
+    }
+
+    function dateInputValueFromDate(date) {
+      if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+      const pad = (number) => String(number).padStart(2, "0");
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    }
+
+    function patioOperationalDate(value) {
+      const text = String(value || "").trim();
+      if (!text) return "";
+      const date = new Date(text);
+      if (Number.isNaN(date.getTime())) return text.slice(0, 10);
+      const minutes = date.getHours() * 60 + date.getMinutes();
+      if (minutes < 6 * 60) date.setDate(date.getDate() - 1);
+      return dateInputValueFromDate(date);
+    }
+
     function patioRecordDate(record) {
-      return String(record.departureTraffic || record.arrivalField || record.loadStart || record.loadEnd || record.departureField || record.arrivalMill || "").slice(0, 10);
+      return patioOperationalDate(patioRecordBaseDateTime(record));
     }
 
     function patioTransportClassFromText(value) {
@@ -4329,11 +4349,41 @@
       return "";
     }
 
+    function patioTransportClassListFromText(value) {
+      const text = normalizeKey(value || "");
+      const classes = [];
+      if (text.includes("proprio")) classes.push("Próprio");
+      if (text.includes("terceir")) classes.push("Terceiro");
+      return classes;
+    }
+
     function patioTransportClassFromTruck(truck) {
       const digits = String(truck || "").replace(/\D/g, "");
       if (digits.length === 4) return "Próprio";
       if (digits.length === 5 || digits.length === 6) return "Terceiro";
       return "";
+    }
+
+    function patioForcedTransportClass(record) {
+      const explicitClass = patioTransportClassFromText(record.importTransportClass || record.forcedTransportClass);
+      if (explicitClass) return explicitClass;
+
+      const source = normalizeKey(record.source || "");
+      if (source.startsWith("planilha proprio") || source.startsWith("planilha terceiro")) {
+        return patioTransportClassFromText(record.source);
+      }
+
+      return "";
+    }
+
+    function patioMergedTransportClasses(record) {
+      const classes = [];
+      [record.importTransportClass, record.transportClass, record.source].forEach((value) => {
+        patioTransportClassListFromText(value).forEach((className) => {
+          if (!classes.includes(className)) classes.push(className);
+        });
+      });
+      return classes.length > 1 ? classes : [];
     }
 
     function refreshPatioDerivedTimes(record) {
@@ -4413,14 +4463,15 @@
         "Dt./Hr. Saida Pesagem",
         "Saida Pesagem"
       ]));
-      const date = String(row.date || patioRecordDate({
+      const operationalDate = patioRecordDate({
         departureTraffic,
         arrivalField,
         loadStart,
         loadEnd,
         departureField,
         arrivalMill
-      }) || "").slice(0, 10);
+      });
+      const date = String(operationalDate || row.date || "").slice(0, 10);
       let fieldMinutes = patioDurationMinutes(valueFromRow(row, [
         "fieldMinutes",
         "minutos",
@@ -4437,7 +4488,13 @@
       if (!truck || !front || !date) return null;
 
       const source = String(row.source || row.origem || "Sistema").trim();
-      const transportClass = patioTransportClassFromTruck(truck)
+      const rawImportTransportClass = String(row.importTransportClass || row.forcedTransportClass || "").trim();
+      const detectedImportTransportClass = patioForcedTransportClass({ ...row, source });
+      const importTransportClass = detectedImportTransportClass === "Dados misturados"
+        ? rawImportTransportClass || detectedImportTransportClass
+        : detectedImportTransportClass;
+      const transportClass = importTransportClass
+        || patioTransportClassFromTruck(truck)
         || patioTransportClassFromText(row.transportClass || row.transportType)
         || patioTransportClassFromText(source)
         || String(row.transportClass || row.transportType || "").trim();
@@ -4458,6 +4515,7 @@
         weighingStart,
         weighingEnd,
         source,
+        importTransportClass,
         transportClass
       };
 
@@ -4513,32 +4571,45 @@
       (source || []).forEach((row) => {
         const normalized = normalizePatioRecord(row);
         if (!normalized) return;
-        const baseKey = patioRecordBaseKey(normalized);
-        const classKey = normalizeKey(patioTransportGroup(normalized));
-        const key = `${baseKey}|${classKey}`;
-        const current = grouped.get(key);
-        if (!current) {
-          grouped.set(key, normalized);
-          groupedMeta.set(key, { baseKey, classKey });
-          return;
-        }
+        const splitClasses = patioMergedTransportClasses(normalized);
+        const normalizedRows = splitClasses.length > 1
+          ? splitClasses.map((className) => ({
+            ...normalized,
+            id: `${normalized.id}-${normalizeKey(className)}`,
+            importTransportClass: className,
+            transportClass: className
+          }))
+          : [normalized];
 
-        current.source = mergeDistinctText(current.source, normalized.source);
-        current.transportClass = mergeDistinctText(current.transportClass, normalized.transportClass);
-        [
-          "departureTraffic",
-          "arrivalField",
-          "loadStart",
-          "loadEnd",
-          "departureField",
-          "arrivalMill",
-          "weighingStart",
-          "weighingEnd"
-        ].forEach((field) => {
-          if (!current[field] && normalized[field]) current[field] = normalized[field];
+        normalizedRows.forEach((item) => {
+          const baseKey = patioRecordBaseKey(item);
+          const classKey = normalizeKey(patioTransportGroup(item));
+          const key = `${baseKey}|${classKey}`;
+          const current = grouped.get(key);
+          if (!current) {
+            grouped.set(key, item);
+            groupedMeta.set(key, { baseKey, classKey });
+            return;
+          }
+
+          current.source = mergeDistinctText(current.source, item.source);
+          current.importTransportClass = mergeDistinctText(current.importTransportClass, item.importTransportClass);
+          current.transportClass = mergeDistinctText(current.transportClass, item.transportClass);
+          [
+            "departureTraffic",
+            "arrivalField",
+            "loadStart",
+            "loadEnd",
+            "departureField",
+            "arrivalMill",
+            "weighingStart",
+            "weighingEnd"
+          ].forEach((field) => {
+            if (!current[field] && item[field]) current[field] = item[field];
+          });
+          if (!current.fieldMinutes && item.fieldMinutes) current.fieldMinutes = item.fieldMinutes;
+          refreshPatioDerivedTimes(current);
         });
-        if (!current.fieldMinutes && normalized.fieldMinutes) current.fieldMinutes = normalized.fieldMinutes;
-        refreshPatioDerivedTimes(current);
       });
 
       const classesByBase = new Map();
@@ -4918,7 +4989,8 @@
     }
 
     function patioTransportGroup(record) {
-      return patioTransportClassFromTruck(record.truck)
+      return patioForcedTransportClass(record)
+        || patioTransportClassFromTruck(record.truck)
         || patioTransportClassFromText(record.transportClass)
         || patioTransportClassFromText(record.source)
         || "Não informado";
@@ -9762,8 +9834,12 @@
         <text x="${width / 2 - 106 + index * 82}" y="${height - 21}" class="legend">${escapeHtml(shift.label)}</text>
       `).join("");
 
+      const title = fronts.length
+        ? `Temp. Palha ${fronts.map((front) => front.replace("Frente ", "")).join(", ")}`
+        : "Temp. Palha por frente";
+
       return `
-        <svg class="patio-print-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Temp. Palha Frente 4001, 4002 e 4003">
+        <svg class="patio-print-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(title)}">
           <defs>
             <linearGradient id="patioPrintBg" x1="0" x2="1" y1="0" y2="1">
               <stop offset="0%" stop-color="#2a2a2a"></stop>
@@ -9771,7 +9847,7 @@
             </linearGradient>
           </defs>
           <rect width="${width}" height="${height}" fill="url(#patioPrintBg)"></rect>
-          <text x="${width / 2}" y="34" text-anchor="middle" class="chart-title">Temp. Palha Frente 4001, 4002 e 4003</text>
+          <text x="${width / 2}" y="34" text-anchor="middle" class="chart-title">${escapeHtml(title)}</text>
           ${gridLines}
           <line x1="${left}" y1="${top + chartHeight}" x2="${width - right}" y2="${top + chartHeight}" class="axis"></line>
           ${bars}
@@ -9795,7 +9871,6 @@
     function buildPatioPrintHtml() {
       const range = patioRange();
       const transport = patioPrintTransportInfo();
-      const fronts = ["Frente 4001", "Frente 4002", "Frente 4003"];
       const shifts = [
         { key: "A", label: "Turno A", rowLabel: "turno A", detail: "07:00 às 15:00" },
         { key: "B", label: "Turno B", rowLabel: "turno B", detail: "15:00 às 23:00" },
@@ -9803,8 +9878,9 @@
       ];
       const dateLabel = range.start === range.end ? formatDate(range.start) : `${formatDate(range.start)} a ${formatDate(range.end)}`;
       const rows = patioRowsForRange(range)
-        .filter((record) => fronts.includes(record.front))
         .filter((record) => patioTransportGroups(record).includes(transport.group));
+      const fronts = [...new Set(rows.map((record) => record.front).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true }));
       const overall = patioGroupSummary(rows);
       const mediaLabel = `Média ${transport.label} ${formatMinutes(overall.avgPalha)}.`;
       const valuesByFrontShift = fronts.reduce((acc, front) => {
@@ -9888,7 +9964,7 @@
               <tbody>
                 <tr>
                   <th class="media-cell" rowspan="5">${escapeHtml(mediaLabel)}</th>
-                  <th class="date-head" colspan="4">${escapeHtml(dateLabel)}</th>
+                  <th class="date-head" colspan="${Math.max(fronts.length + 1, 1)}">${escapeHtml(dateLabel)}</th>
                 </tr>
                 <tr>
                   <th></th>
@@ -9971,6 +10047,7 @@
       return (rows || []).map((row) => ({
         ...row,
         source: sourceLabel || row.source || `Planilha ${forcedClass}`,
+        importTransportClass: forcedClass,
         transportClass: forcedClass
       }));
     }
@@ -10001,11 +10078,12 @@
           const rows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: true }).map((row) => ({
             ...row,
             source: forcedClass ? `Planilha ${forcedClass} - ${sheetName}` : sheetName,
+            importTransportClass: forcedClass || "",
             transportClass
           }));
           const signature = rows.map((row) => JSON.stringify(
             Object.keys(row)
-              .filter((key) => key !== "source" && key !== "transportClass")
+              .filter((key) => !["source", "transportClass", "importTransportClass"].includes(key))
               .sort()
               .map((key) => [key, row[key] instanceof Date ? row[key].toISOString() : row[key]])
           )).join("\n");
@@ -10050,12 +10128,14 @@
           .map((row) => normalizePatioRecord(forcedClass ? {
             ...row,
             source: row.source || `Planilha ${forcedClass}`,
+            importTransportClass: forcedClass,
             transportClass: forcedClass
           } : row))
           .filter(Boolean)
           .map((record) => forcedClass ? {
             ...record,
             source: record.source || `Planilha ${forcedClass}`,
+            importTransportClass: forcedClass,
             transportClass: forcedClass
           } : record);
 
@@ -10071,15 +10151,11 @@
         const importRangeKey = `${importStart}|${importEnd}`;
         let fullRangeReplace = !forcedClass;
         if (forcedClass) {
-          const isNewSeparatedImport = !patioSeparatedImportSession
-            || patioSeparatedImportSession.rangeKey !== importRangeKey
-            || patioSeparatedImportSession.classes.has(forcedClass);
-          if (isNewSeparatedImport) {
+          if (!patioSeparatedImportSession || patioSeparatedImportSession.rangeKey !== importRangeKey) {
             patioSeparatedImportSession = {
               rangeKey: importRangeKey,
               classes: new Set()
             };
-            fullRangeReplace = true;
           }
           patioSeparatedImportSession.classes.add(forcedClass);
         } else {
@@ -10103,8 +10179,9 @@
 
         createAutoBackup("Antes de importar tempo de pátio", { skipAudit: true });
         const recordsOutsideImportRange = cleanBeforeImport.filter((record) => {
-          if (fullRangeReplace) return false;
           if (!importStart || !importEnd) return true;
+          if (record.date < importStart || record.date > importEnd) return true;
+          if (fullRangeReplace) return false;
           if (!replaceGroups.size) return false;
           return !replaceGroups.has(patioTransportGroup(record));
         });
@@ -10181,7 +10258,7 @@
           record.plant,
           record.truck,
           record.source,
-          record.transportClass,
+          patioTransportGroup(record),
           record.front,
           record.departureTraffic,
           record.arrivalField,
