@@ -9558,7 +9558,7 @@
           record.date,
           formatDate(record.date),
           record.plant,
-          ...record.rows.flatMap((row) => [row.type, row.front, row.fleet, row.note])
+          ...record.rows.flatMap((row) => [row.type, row.front, row.fleet, row.averageKm, row.note])
         ].join(" ").toLowerCase();
         return haystack.includes(query);
       });
@@ -9601,6 +9601,7 @@
                 targetDays: 1,
                 targetTotal: plannedTargetForDate(record.date)
               });
+              const hasTransportRows = (record.rows || []).some((row) => isTransport(row.type));
               return `
                 <tr>
                   <td>${formatDate(record.date)}</td>
@@ -9625,6 +9626,7 @@
                     <div class="row-buttons">
                       <button class="btn-link" data-history-action="dashboard" data-id="${record.id}" type="button">Dashboard</button>
                       <button class="btn-link" data-history-action="open" data-id="${record.id}" type="button">Editar</button>
+                      ${hasTransportRows ? `<button class="btn-link" data-history-action="km" data-id="${record.id}" type="button">KM médio</button>` : ""}
                       <button class="btn-link" data-history-action="delete" data-id="${record.id}" type="button">Excluir</button>
                     </div>
                   </td>
@@ -9644,6 +9646,25 @@
       entries = cloneEntries(record.rows);
       switchView("entry");
       showToast(`Lançamento de ${formatDate(date)} aberto para edição.`);
+    }
+
+    function openHistoryKm(id) {
+      const record = records.find((item) => item.id === id);
+      if (!record) return;
+      const date = normalizeRecordDate(record.date);
+      els.entryDate.value = date;
+      entries = cloneEntries(record.rows);
+      switchView("entry");
+      setTimeout(() => {
+        const input = els.entryBody.querySelector('input[data-field="averageKm"]');
+        if (!input) {
+          showToast("Esse lançamento não tem transporte próprio ou terceiro para editar KM.");
+          return;
+        }
+        input.focus();
+        input.scrollIntoView({ block: "center" });
+      }, 0);
+      showToast(`Informe o KM médio dos transportes de ${formatDate(date)} e clique em Salvar dia.`);
     }
 
     function openHistoryDashboard(id) {
@@ -11453,6 +11474,7 @@
       if (!button) return;
       if (button.dataset.historyAction === "dashboard") openHistoryDashboard(button.dataset.id);
       if (button.dataset.historyAction === "open") openHistory(button.dataset.id);
+      if (button.dataset.historyAction === "km") openHistoryKm(button.dataset.id);
       if (button.dataset.historyAction === "delete") deleteHistory(button.dataset.id);
     });
 
