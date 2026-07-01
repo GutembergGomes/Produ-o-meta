@@ -926,6 +926,31 @@
       line-height: 1.35;
     }
 
+    .import-dialog {
+      width: min(720px, calc(100% - 24px));
+      padding: 0;
+      color: var(--text);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .import-dialog::backdrop {
+      background: rgba(0, 0, 0, .56);
+    }
+
+    .import-dialog .manual-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .import-dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 0 14px 14px;
+    }
+
     .panel {
       background: var(--surface);
       border: 1px solid var(--line);
@@ -1163,6 +1188,10 @@
       }
 
       .manual-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .import-dialog .manual-grid {
         grid-template-columns: 1fr;
       }
 
@@ -2122,7 +2151,7 @@
             <select id="machineType">
               <option value="Colhedora">Colhedora</option>
               <option value="Transbordo">Transbordo</option>
-              <option value="Caminhão">Caminhão</option>
+              <option value="Caminhão Próprio">Caminhão Próprio</option>
             </select>
           </div>
           <div class="field">
@@ -2140,7 +2169,45 @@
           <button class="btn-primary" id="saveMachineEntryBtn" type="button">Adicionar produção</button>
           <button class="btn-secondary" id="cancelMachineEditBtn" type="button" hidden>Cancelar edição</button>
         </div>
+        <div class="workspace-actions">
+          <button class="btn-secondary" id="importMachineFileBtn" type="button">Importar foto ou PDF</button>
+          <input class="file-input" id="machineImportFile" type="file" accept="image/*,.pdf,application/pdf">
+          <span class="workspace-hint">Antes de escolher o arquivo, o sistema solicitará o dia, a frente própria e se o relatório é de colhedora, transbordo ou caminhão próprio.</span>
+        </div>
       </section>
+
+      <dialog class="import-dialog" id="machineImportDialog">
+        <div class="panel-head">
+          <h2>Informações do arquivo</h2>
+          <button class="icon-button" id="closeMachineImportDialogBtn" type="button" title="Fechar">×</button>
+        </div>
+        <div class="manual-grid">
+          <div class="field">
+            <label for="machineImportDate">Dia da produção</label>
+            <input id="machineImportDate" type="date">
+          </div>
+          <div class="field">
+            <label for="machineImportFront">Frente própria</label>
+            <select id="machineImportFront">
+              <option value="Frente 4001">Frente 4001</option>
+              <option value="Frente 4002">Frente 4002</option>
+              <option value="Frente 4003">Frente 4003</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="machineImportType">Tipo do arquivo</label>
+            <select id="machineImportType">
+              <option value="Colhedora">Colhedora</option>
+              <option value="Transbordo">Transbordo</option>
+              <option value="Caminhão Próprio">Caminhão Próprio</option>
+            </select>
+          </div>
+        </div>
+        <div class="import-dialog-actions">
+          <button class="btn-secondary" id="cancelMachineImportBtn" type="button">Cancelar</button>
+          <button class="btn-primary" id="chooseMachineImportFileBtn" type="button">Escolher foto ou PDF</button>
+        </div>
+      </dialog>
 
       <section class="dashboard-grid">
         <section class="panel">
@@ -2615,7 +2682,7 @@
 
     const typeOptions = Object.values(TYPES);
     const stoppageCategories = ["Motivo industrial", "Motivo agrícola", "Motivo fatores climáticos"];
-    const machineProductionTypes = ["Colhedora", "Transbordo", "Caminhão"];
+    const machineProductionTypes = ["Colhedora", "Transbordo", "Caminhão Próprio"];
     const ownHarvestFronts = ["Frente 4001", "Frente 4002", "Frente 4003"];
     const thirdHarvestFronts = ["Frente 4007", "Frente 4009"];
     const frontOptions = [...ownHarvestFronts, ...thirdHarvestFronts];
@@ -2764,6 +2831,11 @@
       machineFleet: document.querySelector("#machineFleet"),
       machineProduction: document.querySelector("#machineProduction"),
       machineNote: document.querySelector("#machineNote"),
+      machineImportFile: document.querySelector("#machineImportFile"),
+      machineImportDialog: document.querySelector("#machineImportDialog"),
+      machineImportDate: document.querySelector("#machineImportDate"),
+      machineImportFront: document.querySelector("#machineImportFront"),
+      machineImportType: document.querySelector("#machineImportType"),
       machineTypeWrap: document.querySelector("#machineTypeWrap"),
       machineFrontWrap: document.querySelector("#machineFrontWrap"),
       machineRowsWrap: document.querySelector("#machineRowsWrap"),
@@ -2877,6 +2949,7 @@
     let selectedPatioTruck = "";
     let patioImportWarnings = [];
     let patioSeparatedImportSession = null;
+    let pendingMachineImportContext = null;
     let entries = cloneEntries(defaultEntries);
     let activeFront = null;
     const firebaseState = {
@@ -5477,7 +5550,7 @@
       const key = normalizeKey(value);
       if (key.includes("colhed")) return "Colhedora";
       if (key.includes("transbord")) return "Transbordo";
-      if (key.includes("caminh") || key.includes("camiao") || key.includes("truck")) return "Caminhão";
+      if (key.includes("caminh") || key.includes("camiao") || key.includes("truck")) return "Caminhão Próprio";
       return machineProductionTypes.includes(value) ? value : "Colhedora";
     }
 
@@ -5578,7 +5651,7 @@
         total: rows.reduce((sum, row) => sum + (Number(row.production) || 0), 0),
         harvesters: productionFor("Colhedora"),
         transshipments: productionFor("Transbordo"),
-        trucks: productionFor("Caminhão"),
+        trucks: productionFor("Caminhão Próprio"),
         machines: new Set(rows.map((row) => `${row.machineType}|${normalizeKey(row.fleet)}`)).size,
         days: new Set(rows.map((row) => row.date)).size,
         records: rows.length
@@ -5606,7 +5679,7 @@
         ["Produção lançada", formatNumber(summary.total), `${summary.records} registro${summary.records === 1 ? "" : "s"}`],
         ["Colhedoras", formatNumber(summary.harvesters), `${formatPercent(progressFor(summary.harvesters, summary.total))} do lançado`],
         ["Transbordos", formatNumber(summary.transshipments), `${formatPercent(progressFor(summary.transshipments, summary.total))} do lançado`],
-        ["Caminhões", formatNumber(summary.trucks), `${formatPercent(progressFor(summary.trucks, summary.total))} do lançado`],
+        ["Caminhões próprios", formatNumber(summary.trucks), `${formatPercent(progressFor(summary.trucks, summary.total))} do lançado`],
         ["Máquinas", String(summary.machines), "Equipamentos identificados"],
         ["Dias lançados", String(summary.days), "Dias com produção"]
       ];
@@ -9319,8 +9392,8 @@
         .map((line) => line.replace(/\s+/g, " ").trim())
         .filter(Boolean);
 
-      const hasReportHeader = lines.some((line) => /colhedora\s+e\s+dias\s+trabalhados/i.test(line))
-        || lines.some((line) => /toneladas\s+colhidas/i.test(line));
+      const hasReportHeader = lines.some((line) => /(colhedora|caminh[oõ]es?|transbordos?)\s+e\s+dias\s+trabalhados/i.test(line))
+        || lines.some((line) => /toneladas\s+(colhidas|transp(?:ortadas?)?\.?)/i.test(line));
       if (!hasReportHeader) return [];
 
       return lines.reduce((rows, line) => {
@@ -9408,12 +9481,12 @@
       if (!words.length) return [];
 
       const text = data.text || words.map((word) => word.text).join(" ");
-      const looksLikeReport = /colhedora\s+e\s+dias\s+trabalhados/i.test(text)
-        || /toneladas\s+colhidas/i.test(text)
+      const looksLikeReport = /(colhedora|caminh[oõ]es?|transbordos?)\s+e\s+dias\s+trabalhados/i.test(text)
+        || /toneladas\s+(colhidas|transp(?:ortadas?)?\.?)/i.test(text)
         || words.some((word) => normalizeHeader(word.text).includes("toneladas"));
       if (!looksLikeReport) return [];
 
-      const tonX = reportColumnX(words, ["toneladas", "colhidas"]);
+      const tonX = reportColumnX(words, ["toneladas", "colhidas", "transp", "transportadas"]);
       const lines = groupOcrWordsIntoLines(words);
 
       return lines.reduce((rows, line) => {
@@ -9697,6 +9770,179 @@
       }
 
       return extractRowsFromText(await file.text(), name);
+    }
+
+    function openMachineImportDialog() {
+      els.machineImportDate.value = els.machineDate.value || todayInputValue();
+      els.machineImportFront.value = els.machineFront.value || ownHarvestFronts[0];
+      els.machineImportType.value = normalizeMachineProductionType(els.machineType.value);
+      pendingMachineImportContext = null;
+      els.machineImportDialog.showModal();
+    }
+
+    function closeMachineImportDialog() {
+      pendingMachineImportContext = null;
+      if (els.machineImportDialog.open) els.machineImportDialog.close();
+    }
+
+    function chooseMachineImportFile() {
+      const date = normalizeRecordDate(els.machineImportDate.value);
+      const front = ownHarvestFronts.find((item) => item === els.machineImportFront.value) || "";
+      const machineType = normalizeMachineProductionType(els.machineImportType.value);
+      if (!date || !front || !machineType) {
+        showToast("Informe o dia, a frente e o tipo do arquivo.");
+        return;
+      }
+      pendingMachineImportContext = { date, front, machineType };
+      els.machineDate.value = date;
+      els.machineFront.value = front;
+      els.machineType.value = machineType;
+      els.machineImportDialog.close();
+      els.machineImportFile.click();
+    }
+
+    function machineProductionTypeFromReport(text, fallback = "Colhedora") {
+      const key = normalizeKey(text);
+      if (key.includes("caminhoes e dias trabalhados") || key.includes("caminhao e dias trabalhados")) return "Caminhão Próprio";
+      if (key.includes("transbordo") && key.includes("dias trabalhados")) return "Transbordo";
+      if (key.includes("colhedora") && key.includes("dias trabalhados")) return "Colhedora";
+      return normalizeMachineProductionType(fallback);
+    }
+
+    function machineProductionDateFromReport(text, fallback = todayInputValue()) {
+      const source = String(text || "");
+      const endMatch = source.match(/fim\s*:?\s*(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/i);
+      const startMatch = source.match(/in[ií]cio\s*:?\s*(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/i);
+      return normalizeRecordDate((endMatch && endMatch[1]) || (startMatch && startMatch[1]) || fallback) || fallback;
+    }
+
+    async function machineProductionImportPayload(file) {
+      const name = file.name || "";
+      const isPdf = /\.pdf$/i.test(name) || file.type === "application/pdf";
+      const isImage = /^image\//i.test(file.type);
+
+      if (isPdf) {
+        let text = "";
+        let rows = [];
+        try {
+          text = await textFromPdfFile(file);
+          rows = extractRowsFromText(text, name);
+        } catch {
+          text = "";
+        }
+        if (!rows.length) rows = await rowsFromOcrPdfFile(file);
+        return { rows, text };
+      }
+
+      if (isImage) {
+        const data = await ocrImageData(file);
+        const text = data.text || "";
+        const rows = parseHarvesterOcrData(data);
+        return { rows: rows.length ? rows : extractRowsFromText(text, name), text };
+      }
+
+      const text = await file.text();
+      return { rows: extractRowsFromText(text, name), text };
+    }
+
+    async function importMachineProductionFile(file) {
+      if (!file) return;
+      try {
+        showToast("Lendo foto ou PDF da produção das máquinas...");
+        const payload = await machineProductionImportPayload(file);
+        const importContext = pendingMachineImportContext || {
+          date: els.machineDate.value || todayInputValue(),
+          front: els.machineFront.value || ownHarvestFronts[0],
+          machineType: els.machineType.value || "Colhedora"
+        };
+        const front = importContext.front;
+        const machineType = normalizeMachineProductionType(importContext.machineType);
+        const reportDate = normalizeRecordDate(importContext.date) || todayInputValue();
+        let added = 0;
+        let updated = 0;
+        const nextRecords = [...machineProductionRecords];
+
+        (payload.rows || []).forEach((row) => {
+          const fleet = String(valueFromRow(row, [
+            "codigo",
+            "código",
+            "cod",
+            "frota",
+            "máquina",
+            "maquina",
+            "equipamento",
+            "caminhão",
+            "caminhao"
+          ]) || "").trim();
+          const production = parseNumber(valueFromRow(row, [
+            "produção",
+            "producao",
+            "toneladas colhidas",
+            "toneladas_colhidas",
+            "toneladas transp",
+            "toneladas transportadas",
+            "toneladas",
+            "total"
+          ]));
+          const note = String(valueFromRow(row, ["modelo", "observação", "observacao", "obs", "note"]) || "").trim();
+          if (!fleet || !production || normalizeKey(fleet).startsWith("total")) return;
+
+          const existingIndex = nextRecords.findIndex((item) => (
+            item.date === reportDate
+            && item.front === front
+            && item.machineType === machineType
+            && sameText(item.fleet, fleet)
+          ));
+          const existing = existingIndex >= 0 ? nextRecords[existingIndex] : null;
+          const record = normalizeMachineProductionRecord({
+            id: existing ? existing.id : makeId(),
+            date: reportDate,
+            front,
+            machineType,
+            fleet,
+            production,
+            note,
+            createdAt: existing ? existing.createdAt : new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+          if (!record) return;
+
+          if (existingIndex >= 0) {
+            nextRecords[existingIndex] = record;
+            updated += 1;
+          } else {
+            nextRecords.push(record);
+            added += 1;
+          }
+        });
+
+        if (!added && !updated) {
+          showToast("Nenhuma máquina válida foi encontrada no arquivo.");
+          return;
+        }
+
+        machineProductionRecords = getCleanMachineProductionRecords(nextRecords);
+        persistMachineProductionRecords();
+        els.machineDate.value = reportDate;
+        els.machineType.value = machineType;
+        setMachineProductionRange(reportDate, reportDate);
+        renderMachineProductions();
+        addAuditEntry("importacao", `Produção de ${machineType.toLowerCase()} importada para ${front} em ${formatDate(reportDate)}: ${added} nova${added === 1 ? "" : "s"}, ${updated} atualizada${updated === 1 ? "" : "s"}.`);
+
+        const syncState = await syncOrQueue("machine-production-sync", { source: "machine-file-import", date: reportDate, front, machineType }, () => syncMachineProductionRecordsToFirebase({
+          silent: true,
+          pendingMessage: "Enviando produção importada ao banco...",
+          successStatus: "Produção importada e sincronizada.",
+          errorStatus: "Produção importada localmente, mas a sincronização falhou."
+        }));
+        const summary = `${added} nova${added === 1 ? "" : "s"} e ${updated} atualizada${updated === 1 ? "" : "s"}.`;
+        showToast(syncState === "synced" ? `${summary} Banco atualizado.` : summary);
+      } catch {
+        showToast("Não foi possível ler a foto ou o PDF da produção.");
+      } finally {
+        els.machineImportFile.value = "";
+        pendingMachineImportContext = null;
+      }
     }
 
     async function importFrontProduction(file) {
@@ -11984,6 +12230,11 @@
     });
     document.querySelector("#saveMachineEntryBtn").addEventListener("click", saveMachineProductionEntry);
     document.querySelector("#cancelMachineEditBtn").addEventListener("click", () => resetMachineProductionForm(els.machineDate.value || todayInputValue()));
+    document.querySelector("#importMachineFileBtn").addEventListener("click", openMachineImportDialog);
+    document.querySelector("#closeMachineImportDialogBtn").addEventListener("click", closeMachineImportDialog);
+    document.querySelector("#cancelMachineImportBtn").addEventListener("click", closeMachineImportDialog);
+    document.querySelector("#chooseMachineImportFileBtn").addEventListener("click", chooseMachineImportFile);
+    els.machineImportFile.addEventListener("change", (event) => importMachineProductionFile(event.target.files[0]));
     document.querySelector("#saveMachinesDbBtn").addEventListener("click", saveMachineProductionsDatabase);
     document.querySelector("#pullMachinesDbBtn").addEventListener("click", pullMachineProductionsDatabase);
     document.querySelector("#deleteMachineRangeBtn").addEventListener("click", deleteMachineProductionRange);
