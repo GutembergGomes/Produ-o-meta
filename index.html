@@ -2062,7 +2062,7 @@
           </div>
           <div class="field">
             <label for="stoppageHours">Horas paradas</label>
-            <input id="stoppageHours" class="number-input" inputmode="decimal" type="text" placeholder="0">
+            <input id="stoppageHours" class="number-input" inputmode="decimal" type="text" placeholder="Ex.: 2,15 ou 2:15" title="Aceita horas e minutos: 2,15, 2.15, 2:15, 02:15, 2h15">
           </div>
           <div class="field">
             <label for="stoppageNote">Observação</label>
@@ -3006,6 +3006,81 @@
         .replace(",", ".");
       const number = Number(normalized);
       return Number.isFinite(number) ? number : 0;
+    }
+
+    function parseHoursInput(value) {
+      if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+      const raw = String(value || "").trim().toLowerCase();
+      if (!raw) return 0;
+
+      const compact = raw
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, "");
+
+      const hourMinuteMatch = compact.match(/^(\d{1,4})(?:h|hr|hrs|hora|horas|:)(\d{1,2})(?::(\d{1,2}))?(?:m|min|minuto|minutos)?$/);
+      if (hourMinuteMatch) {
+        const hours = Number(hourMinuteMatch[1]) || 0;
+        const minutes = Math.min(Number(hourMinuteMatch[2]) || 0, 59);
+        const seconds = Math.min(Number(hourMinuteMatch[3]) || 0, 59);
+        return hours + (minutes / 60) + (seconds / 3600);
+      }
+
+      const minuteOnlyMatch = compact.match(/^(\d{1,5})(?:m|min|minuto|minutos)$/);
+      if (minuteOnlyMatch) {
+        return (Number(minuteOnlyMatch[1]) || 0) / 60;
+      }
+
+      const hourOnlyMatch = compact.match(/^(\d{1,5})(?:h|hr|hrs|hora|horas)$/);
+      if (hourOnlyMatch) {
+        return Number(hourOnlyMatch[1]) || 0;
+      }
+
+      const commaClockMatch = compact.match(/^(\d{1,5})[,.](\d+)$/);
+      if (commaClockMatch) {
+        const hours = Number(commaClockMatch[1]) || 0;
+        const decimalPart = commaClockMatch[2];
+        const minutes = Number(decimalPart) || 0;
+        if (decimalPart.length === 2 && minutes <= 59) {
+          return hours + (minutes / 60);
+        }
+        const decimalNumber = Number(`${commaClockMatch[1]}.${decimalPart}`);
+        return Number.isFinite(decimalNumber) ? decimalNumber : 0;
+      }
+
+      const decimalText = compact
+        .replace(/horas?|hrs?|h/g, "")
+        .replace(/minutos?|mins?|m/g, "");
+      if (/^\d+\.\d{1,2}$/.test(decimalText)) {
+        const decimal = Number(decimalText);
+        return Number.isFinite(decimal) ? decimal : 0;
+      }
+      return parseNumber(decimalText);
+    }
+
+    function parseStoppageHours(value, row = {}) {
+      if (typeof value === "number") {
+        if (!Number.isFinite(value)) return 0;
+        if (row.hoursMode === "decimal") return value;
+        const text = String(value);
+        const legacyClockMatch = text.match(/^(\d{1,5})\.(\d{2})$/);
+        if (legacyClockMatch) {
+          const minutes = Number(legacyClockMatch[2]) || 0;
+          if (minutes <= 59) return (Number(legacyClockMatch[1]) || 0) + (minutes / 60);
+        }
+        return value;
+      }
+      return parseHoursInput(value);
+    }
+
+    function formatDurationHours(value) {
+      const totalMinutes = Math.round(Math.max(0, Number(value) || 0) * 60);
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      if (!hours && !minutes) return "0 h";
+      if (!hours) return `${minutes} min`;
+      if (!minutes) return `${hours} h`;
+      return `${hours}h ${String(minutes).padStart(2, "0")}min`;
     }
 
     function formatNumber(value) {
@@ -5234,7 +5309,7 @@
       const date = normalizeRecordDate(row.date || row.data || row.day);
       const category = normalizeStoppageCategory(row.category || row.tipo || row.reasonType || row.motivoTipo || row.motivo);
       const reason = String(row.reason || row.motivo || row.description || row.descricao || "").trim();
-      const hours = Math.max(0, parseNumber(row.hours ?? row.horas ?? row.duration ?? row.duracao ?? row.tempo ?? 0));
+      const hours = Math.max(0, parseStoppageHours(row.hours ?? row.horas ?? row.duration ?? row.duracao ?? row.tempo ?? 0, row));
       const note = String(row.note || row.observacao || row.obs || "").trim();
       if (!date || !category || !hours) return null;
       return {
@@ -5244,6 +5319,7 @@
         category,
         reason,
         hours,
+        hoursMode: "decimal",
         note,
         createdAt: row.createdAt || new Date().toISOString(),
         updatedAt: row.updatedAt || new Date().toISOString()
@@ -5322,7 +5398,7 @@
     }
 
     function formatHours(value) {
-      return `${formatNumber(Number(value) || 0)} h`;
+      return formatDurationHours(value);
     }
 
     function groupedStoppageRows(rows, groupGetter) {
@@ -12211,7 +12287,7 @@
       if (button.dataset.stoppageAction === "delete") deleteStoppage(button.dataset.id);
     });
     els.stoppageHours.addEventListener("change", () => {
-      els.stoppageHours.value = formatNumber(parseNumber(els.stoppageHours.value));
+      els.stoppageHours.value = formatDurationHours(parseHoursInput(els.stoppageHours.value));
     });
 
     els.machineStartDate.addEventListener("change", renderMachineProductions);
