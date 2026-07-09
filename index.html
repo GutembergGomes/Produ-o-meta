@@ -1409,7 +1409,7 @@
         <article class="stat">
           <span>Moagem período</span>
           <strong id="dashTotal">0</strong>
-          <small>Sem somar transporte</small>
+          <small id="dashTotalStatus">Sem somar transporte</small>
         </article>
         <article class="stat">
           <span>Frentes próprias</span>
@@ -1460,11 +1460,13 @@
           <span>Meta período</span>
           <strong id="dashTarget">0</strong>
           <small id="dashTargetStatus">0% atingido</small>
+          <small id="dashTargetBalance">Sem meta calculada</small>
         </article>
         <article class="stat">
           <span>Acumulado mês</span>
           <strong id="dashMonthAccumulated">0</strong>
           <small id="dashMonthAccumulatedLabel">Moagem do mês</small>
+          <small id="dashMonthAccumulatedBalance">Sem meta calculada</small>
         </article>
         <article class="stat">
           <span>Acumulado total</span>
@@ -2901,10 +2903,13 @@
       dashThirdTransportKmLabel: document.querySelector("#dashThirdTransportKmLabel"),
       dashTransportTotal: document.querySelector("#dashTransportTotal"),
       dashTransportPercent: document.querySelector("#dashTransportPercent"),
+      dashTotalStatus: document.querySelector("#dashTotalStatus"),
       dashTarget: document.querySelector("#dashTarget"),
       dashTargetStatus: document.querySelector("#dashTargetStatus"),
+      dashTargetBalance: document.querySelector("#dashTargetBalance"),
       dashMonthAccumulated: document.querySelector("#dashMonthAccumulated"),
       dashMonthAccumulatedLabel: document.querySelector("#dashMonthAccumulatedLabel"),
+      dashMonthAccumulatedBalance: document.querySelector("#dashMonthAccumulatedBalance"),
       dashAllAccumulated: document.querySelector("#dashAllAccumulated"),
       entryTotal: document.querySelector("#entryTotal"),
       entryOwnHarvest: document.querySelector("#entryOwnHarvest"),
@@ -4858,6 +4863,21 @@
       const number = Number(value) || 0;
       if (!number) return "0 km";
       return `${formatNumber(number)} km`;
+    }
+
+    function targetBalanceLabel(total, target, options = {}) {
+      const planned = Number(target) || 0;
+      if (planned <= 0) return "Sem meta calculada";
+      const actual = Number(total) || 0;
+      const diff = actual - planned;
+      const prefix = diff >= 0 ? "Sobra" : "Devendo";
+      const suffix = options.suffix ? ` ${options.suffix}` : "";
+      return `${prefix} ${formatNumber(Math.abs(diff))}${suffix}`;
+    }
+
+    function detailWithTargetBalance(detail, total, target) {
+      if ((Number(target) || 0) <= 0) return detail;
+      return `${detail} · ${targetBalanceLabel(total, target)}`;
     }
 
     function localIsoFromDate(value) {
@@ -6932,16 +6952,25 @@
       const summary = summarizeRows(rows, options);
       const targetDays = options.targetDays ?? targetDaysForRows(rows);
       els[`${prefix}Total`].textContent = formatNumber(summary.total);
+      if (els[`${prefix}TotalStatus`]) {
+        els[`${prefix}TotalStatus`].textContent = summary.targetTotal > 0
+          ? `Sem somar transporte · ${targetBalanceLabel(summary.total, summary.targetTotal)}`
+          : "Sem somar transporte";
+      }
+      const ownHarvestTarget = targetForType(TYPES.OWN_HARVEST) * targetDays;
+      const thirdHarvestTarget = targetForType(TYPES.THIRD_HARVEST) * targetDays;
+      const ownTransportTarget = targetForType(TYPES.OWN_TRANSPORT) * targetDays;
+      const thirdTransportTarget = targetForType(TYPES.THIRD_TRANSPORT) * targetDays;
       els[`${prefix}OwnHarvest`].textContent = formatNumber(summary.ownHarvest);
-      els[`${prefix}OwnHarvestPercent`].textContent = `${formatPercent(summary.ownHarvestPercent)} da moagem`;
+      els[`${prefix}OwnHarvestPercent`].textContent = detailWithTargetBalance(`${formatPercent(summary.ownHarvestPercent)} da moagem`, summary.ownHarvest, ownHarvestTarget);
       els[`${prefix}ThirdHarvest`].textContent = formatNumber(summary.thirdHarvest);
-      els[`${prefix}ThirdHarvestPercent`].textContent = `${formatPercent(summary.thirdHarvestPercent)} da moagem`;
+      els[`${prefix}ThirdHarvestPercent`].textContent = detailWithTargetBalance(`${formatPercent(summary.thirdHarvestPercent)} da moagem`, summary.thirdHarvest, thirdHarvestTarget);
       els[`${prefix}FlorestaCane`].textContent = formatNumber(summary.florestaCane);
       els[`${prefix}ValeCane`].textContent = formatNumber(summary.valeCane);
       els[`${prefix}OwnTransport`].textContent = formatNumber(summary.ownTransport);
-      els[`${prefix}OwnTransportPercent`].textContent = `${formatPercent(summary.ownTransportPercent)} da moagem`;
+      els[`${prefix}OwnTransportPercent`].textContent = detailWithTargetBalance(`${formatPercent(summary.ownTransportPercent)} da moagem`, summary.ownTransport, ownTransportTarget);
       els[`${prefix}ThirdTransport`].textContent = formatNumber(summary.thirdTransport);
-      els[`${prefix}ThirdTransportPercent`].textContent = `${formatPercent(summary.thirdTransportPercent)} da moagem`;
+      els[`${prefix}ThirdTransportPercent`].textContent = detailWithTargetBalance(`${formatPercent(summary.thirdTransportPercent)} da moagem`, summary.thirdTransport, thirdTransportTarget);
       if (els[`${prefix}OwnTransportKm`]) {
         els[`${prefix}OwnTransportKm`].textContent = formatKm(summary.ownTransportKmAvg);
         els[`${prefix}OwnTransportKmLabel`].textContent = summary.ownTransportKmRecords
@@ -6958,6 +6987,9 @@
       els[`${prefix}TransportPercent`].textContent = `${formatPercent(summary.transportPercent)} sobre moagem`;
       els[`${prefix}Target`].textContent = formatNumber(summary.targetTotal);
       els[`${prefix}TargetStatus`].textContent = `${formatPercent(summary.targetPercent)} atingido em ${targetDays} dia${targetDays === 1 ? "" : "s"} de meta`;
+      if (els[`${prefix}TargetBalance`]) {
+        els[`${prefix}TargetBalance`].textContent = targetBalanceLabel(summary.total, summary.targetTotal);
+      }
     }
 
     function clampPercent(value) {
@@ -7953,8 +7985,11 @@
         ? formatDate(range.start)
         : `${formatDate(range.start)} a ${formatDate(range.end)}`;
       const monthRange = monthRangeFor(range.end);
-      const monthRecords = recordsForRange(monthRange.start, monthRange.end);
-      const monthTargetInfo = targetInfoForRange(monthRange.start, monthRange.end);
+      const today = todayInputValue();
+      let monthEnd = [range.end, monthRange.end, today].sort()[0];
+      if (monthEnd < monthRange.start) monthEnd = monthRange.start;
+      const monthRecords = monthRange.start > today ? [] : recordsForRange(monthRange.start, monthEnd);
+      const monthTargetInfo = targetInfoForRange(monthRange.start, monthEnd);
       const monthSummary = summarizeRows(rowsFromRecords(monthRecords), {
         targetDays: monthTargetInfo.targetDays,
         targetTotal: plannedTargetForInfo(monthTargetInfo)
@@ -7975,7 +8010,8 @@
         ? `${selectedRecords.length} lançamento${selectedRecords.length === 1 ? "" : "s"} no período ${rangeLabel}.${targetLabel}`
         : `Nenhum lançamento salvo no período ${rangeLabel}.${targetLabel}`;
       els.dashMonthAccumulated.textContent = formatNumber(monthSummary.total);
-      els.dashMonthAccumulatedLabel.textContent = `Mês ${formatMonth(range.end)}`;
+      els.dashMonthAccumulatedLabel.textContent = `Mês ${formatMonth(range.end)} até ${formatDate(monthEnd)}`;
+      els.dashMonthAccumulatedBalance.textContent = targetBalanceLabel(monthSummary.total, monthSummary.targetTotal);
       els.dashAllAccumulated.textContent = formatNumber(allSummary.total);
 
       setStats("dash", rows, { targetDays, targetTotal });
