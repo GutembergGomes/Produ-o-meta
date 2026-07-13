@@ -5445,6 +5445,8 @@
       const effectiveHours = Math.max(plannedHours - stoppedHours, 0);
       const lossTons = stoppedHours * EFFECTIVE_MILLING_TONS_PER_HOUR;
       const effectiveTons = effectiveDays * EFFECTIVE_MILLING_TONS_PER_HOUR * 24;
+      const effectiveAveragePerDay = days ? effectiveTons / days : 0;
+      const lossAveragePerDay = days ? lossTons / days : 0;
       return {
         days,
         plannedHours,
@@ -5454,6 +5456,8 @@
         effectiveHours,
         lossTons,
         effectiveTons,
+        effectiveAveragePerDay,
+        lossAveragePerDay,
         percent: progressFor(effectiveHours, plannedHours)
       };
     }
@@ -5464,7 +5468,7 @@
       const kpis = [
         ["Total parado", formatHours(summary.totalHours), `${summary.records} lançamento${summary.records === 1 ? "" : "s"}`],
         ["Dias efetivos", formatNumber(effective.effectiveDays), effective.days ? `Previsto ${formatNumber(effective.days)} - parada ${formatNumber(effective.stoppedDays)} dia` : "Sem dias de safra no período"],
-        ["Moagem efetiva", formatNumber(effective.effectiveTons), effective.days ? `${formatNumber(effective.effectiveDays)} dias efetivos x 12.000 t/dia` : "Sem dias de safra no período"],
+        ["Moagem efetiva média/dia", formatNumber(effective.effectiveAveragePerDay), effective.days ? `Desconto médio ${formatNumber(effective.lossAveragePerDay)} t/dia pelas paradas` : "Sem dias de safra no período"],
         ["Motivo industrial", formatHours(summary.industrial), `${formatPercent(progressFor(summary.industrial, summary.totalHours))} do total`],
         ["Motivo agrícola", formatHours(summary.agricultural), `${formatPercent(progressFor(summary.agricultural, summary.totalHours))} do total`],
         ["Fatores climáticos", formatHours(summary.climate), `${formatPercent(progressFor(summary.climate, summary.totalHours))} do total`],
