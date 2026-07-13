@@ -2684,6 +2684,7 @@
 
     const typeOptions = Object.values(TYPES);
     const stoppageCategories = ["Motivo industrial", "Motivo agrícola", "Motivo fatores climáticos"];
+    const EFFECTIVE_MILLING_TONS_PER_HOUR = 500;
     const machineProductionTypes = ["Colhedora", "Transbordo", "Caminhão Próprio"];
     const ownHarvestFronts = ["Frente 4001", "Frente 4002", "Frente 4003"];
     const thirdHarvestFronts = ["Frente 4007", "Frente 4009"];
@@ -5434,10 +5435,36 @@
       return [...grouped.values()].sort((a, b) => b.hours - a.hours || a.label.localeCompare(b.label, "pt-BR", { numeric: true }));
     }
 
-    function renderStoppageKpis(rows) {
+    function stoppageEffectiveMilling(range, summary) {
+      const targetInfo = targetInfoForRange(range.start, range.end);
+      const days = targetInfo.targetDays || 0;
+      const plannedHours = days * 24;
+      const stoppedHours = Math.min(summary.totalHours, plannedHours);
+      const stoppedDays = stoppedHours / 24;
+      const effectiveDays = Math.max(days - stoppedDays, 0);
+      const effectiveHours = Math.max(plannedHours - stoppedHours, 0);
+      const lossTons = stoppedHours * EFFECTIVE_MILLING_TONS_PER_HOUR;
+      const effectiveTons = effectiveDays * EFFECTIVE_MILLING_TONS_PER_HOUR * 24;
+      return {
+        days,
+        plannedHours,
+        stoppedHours,
+        stoppedDays,
+        effectiveDays,
+        effectiveHours,
+        lossTons,
+        effectiveTons,
+        percent: progressFor(effectiveHours, plannedHours)
+      };
+    }
+
+    function renderStoppageKpis(rows, range = stoppageRange()) {
       const summary = stoppageSummary(rows);
+      const effective = stoppageEffectiveMilling(range, summary);
       const kpis = [
         ["Total parado", formatHours(summary.totalHours), `${summary.records} lançamento${summary.records === 1 ? "" : "s"}`],
+        ["Dias efetivos", formatNumber(effective.effectiveDays), effective.days ? `Previsto ${formatNumber(effective.days)} - parada ${formatNumber(effective.stoppedDays)} dia` : "Sem dias de safra no período"],
+        ["Moagem efetiva", formatNumber(effective.effectiveTons), effective.days ? `${formatNumber(effective.effectiveDays)} dias efetivos x 12.000 t/dia` : "Sem dias de safra no período"],
         ["Motivo industrial", formatHours(summary.industrial), `${formatPercent(progressFor(summary.industrial, summary.totalHours))} do total`],
         ["Motivo agrícola", formatHours(summary.agricultural), `${formatPercent(progressFor(summary.agricultural, summary.totalHours))} do total`],
         ["Fatores climáticos", formatHours(summary.climate), `${formatPercent(progressFor(summary.climate, summary.totalHours))} do total`],
@@ -5532,7 +5559,7 @@
       els.stoppageSource.textContent = rows.length
         ? `${rows.length} parada${rows.length === 1 ? "" : "s"} no período ${rangeLabel}.`
         : `Nenhuma parada lançada no período ${rangeLabel}.`;
-      renderStoppageKpis(rows);
+      renderStoppageKpis(rows, range);
       renderStoppageGroupedTables(rows);
       renderStoppageRows(rows);
     }
