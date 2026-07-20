@@ -1738,6 +1738,13 @@
         <div class="panel-body" id="reportsPatioTimesWrap"></div>
       </section>
 
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Paradas da usina</h2>
+        </div>
+        <div class="panel-body" id="reportsStoppageWrap"></div>
+      </section>
+
       <section class="dashboard-grid">
         <section class="panel">
           <div class="panel-head">
@@ -2759,6 +2766,7 @@
       reportsParticipationWrap: document.querySelector("#reportsParticipationWrap"),
       reportsTransportWrap: document.querySelector("#reportsTransportWrap"),
       reportsPatioTimesWrap: document.querySelector("#reportsPatioTimesWrap"),
+      reportsStoppageWrap: document.querySelector("#reportsStoppageWrap"),
       reportsFrontWrap: document.querySelector("#reportsFrontWrap"),
       reportsTypeWrap: document.querySelector("#reportsTypeWrap"),
       reportsRankingWrap: document.querySelector("#reportsRankingWrap"),
@@ -8390,12 +8398,14 @@
         ? formatDate(range.start)
         : `${formatDate(range.start)} a ${formatDate(range.end)}`;
       const patioCount = patioRowsForRange(range).length;
+      const stoppageCount = stoppageRowsForRange(range).length;
       const chips = [
         `Período: ${rangeLabel}`,
         `Meta: ${targetContext.targetDays} dia${targetContext.targetDays === 1 ? "" : "s"} (${targetContext.label})`,
         `Dias exibidos: ${filteredRecords.length}`,
         `Registros filtrados: ${rows.length}/${baseRows.length}`,
-        `Tempo de pátio: ${patioCount} viagem${patioCount === 1 ? "" : "s"}`
+        `Tempo de pátio: ${patioCount} viagem${patioCount === 1 ? "" : "s"}`,
+        `Paradas usina: ${stoppageCount} lançamento${stoppageCount === 1 ? "" : "s"}`
       ];
 
       if (filters.type !== "all") chips.push(`Operação: ${reportTypeLabel(filters.type)}`);
@@ -8418,6 +8428,9 @@
       const externalCane = baseSummary.florestaCane + baseSummary.valeCane;
       const averagePerDay = launchedDays ? baseSummary.total / launchedDays : 0;
       const patioSummary = patioTimeSummary(patioRowsForRange(range));
+      const stoppageRows = stoppageRowsForRange(range);
+      const stoppage = stoppageSummary(stoppageRows);
+      const effective = stoppageEffectiveMilling(range, stoppage);
       const kpis = [
         { label: "Moagem do período", value: formatNumber(baseSummary.total), detail: "Base sem somar transporte" },
         { label: "Meta analisada", value: formatNumber(baseSummary.targetTotal), detail: `${targetContext.targetDays} dia${targetContext.targetDays === 1 ? "" : "s"} de meta` },
@@ -8433,6 +8446,9 @@
         { label: "Transporte total", value: formatNumber(baseSummary.transportTotal), detail: `${formatPercent(baseSummary.transportPercent)} sobre moagem` },
         { label: "Tempo palha", value: formatMinutes(patioSummary.avgPalha), detail: `${patioSummary.trips} viagem${patioSummary.trips === 1 ? "" : "s"} no período` },
         { label: "Tempo usina", value: formatMinutes(patioSummary.avgUsina), detail: "Chegada usina até saída pesagem" },
+        { label: "Paradas usina", value: formatHours(stoppage.totalHours), detail: `${stoppage.records} lançamento${stoppage.records === 1 ? "" : "s"} no período` },
+        { label: "Dias efetivos", value: formatNumber(effective.effectiveDays), detail: effective.days ? `Previsto ${formatNumber(effective.days)} - parada ${formatNumber(effective.stoppedDays)} dia` : "Sem dias de safra" },
+        { label: "Moagem efetiva/dia", value: formatNumber(effective.effectiveAveragePerDay), detail: `Desconto médio ${formatNumber(effective.lossAveragePerDay)} t/dia` },
         { label: "Dias lançados", value: `${launchedDays}/${info.targetDays || 0}`, detail: `${info.selectedDays} dia${info.selectedDays === 1 ? "" : "s"} no período` },
         { label: "Média diária", value: formatNumber(averagePerDay), detail: "Moagem média nos dias exibidos" }
       ];
@@ -8810,6 +8826,71 @@
       els.reportsPatioTimesWrap.innerHTML = patioTimesOverviewHtml(range, {
         emptyMessage: "Sem lançamentos de tempo de pátio no período do relatório."
       });
+    }
+
+    function renderReportsStoppages(range) {
+      const rows = stoppageRowsForRange(range);
+      const summary = stoppageSummary(rows);
+      const effective = stoppageEffectiveMilling(range, summary);
+      const categoryRows = groupedStoppageRows(rows, (row) => row.category);
+      const dailyRows = groupedStoppageRows(rows, (row) => row.date).sort((a, b) => a.label.localeCompare(b.label));
+      const cards = [
+        ["Total parado", formatHours(summary.totalHours), `${summary.records} lançamento${summary.records === 1 ? "" : "s"}`],
+        ["Dias efetivos", formatNumber(effective.effectiveDays), effective.days ? `Previsto ${formatNumber(effective.days)} - parada ${formatNumber(effective.stoppedDays)} dia` : "Sem dias de safra"],
+        ["Moagem efetiva média/dia", formatNumber(effective.effectiveAveragePerDay), effective.days ? `Desconto médio ${formatNumber(effective.lossAveragePerDay)} t/dia` : "Sem dias de safra"],
+        ["Motivo industrial", formatHours(summary.industrial), `${formatPercent(progressFor(summary.industrial, summary.totalHours))} do total`],
+        ["Motivo agrícola", formatHours(summary.agricultural), `${formatPercent(progressFor(summary.agricultural, summary.totalHours))} do total`],
+        ["Fatores climáticos", formatHours(summary.climate), `${formatPercent(progressFor(summary.climate, summary.totalHours))} do total`]
+      ];
+
+      const categoryTable = categoryRows.length ? `
+        <table>
+          <thead><tr><th>Tipo do motivo</th><th>Horas paradas</th><th>% total</th><th>Lançamentos</th><th>Motivos</th></tr></thead>
+          <tbody>
+            ${categoryRows.map((item) => `
+              <tr>
+                <td>${escapeHtml(item.label)}</td>
+                <td>${formatHours(item.hours)}</td>
+                <td>${formatPercent(progressFor(item.hours, summary.totalHours))}</td>
+                <td>${item.records}</td>
+                <td>${escapeHtml([...item.reasons].slice(0, 5).join(", ") || "-")}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      ` : '<div class="empty-state">Sem paradas por motivo no período.</div>';
+
+      const dailyTable = dailyRows.length ? `
+        <table>
+          <thead><tr><th>Data</th><th>Horas paradas</th><th>Lançamentos</th><th>Motivos</th></tr></thead>
+          <tbody>
+            ${dailyRows.map((item) => `
+              <tr>
+                <td>${formatDate(item.label)}</td>
+                <td>${formatHours(item.hours)}</td>
+                <td>${item.records}</td>
+                <td>${escapeHtml([...item.reasons].slice(0, 5).join(", ") || "-")}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      ` : '<div class="empty-state">Sem evolução diária de paradas no período.</div>';
+
+      els.reportsStoppageWrap.innerHTML = `
+        <div class="advanced-metrics">
+          ${cards.map(([label, value, detail]) => `
+            <div class="goal-metric">
+              <span>${escapeHtml(label)}</span>
+              <strong>${escapeHtml(value)}</strong>
+              <small>${escapeHtml(detail)}</small>
+            </div>
+          `).join("")}
+        </div>
+        <div class="dashboard-grid" style="margin-top: 14px;">
+          <div class="table-wrap">${categoryTable}</div>
+          <div class="table-wrap">${dailyTable}</div>
+        </div>
+      `;
     }
 
     function renderReportsFront(rows, baseSummary) {
@@ -9291,7 +9372,8 @@
       const rangeLabel = range.start === range.end
         ? formatDate(range.start)
         : `${formatDate(range.start)} a ${formatDate(range.end)}`;
-      els.reportsPrintSubtitle.textContent = `${rangeLabel} · Moagem ${formatNumber(baseSummary.total)} · ${filteredRecords.length} dia${filteredRecords.length === 1 ? "" : "s"} · ${rows.length} registro${rows.length === 1 ? "" : "s"} filtrado${rows.length === 1 ? "" : "s"}`;
+      const stoppageCount = stoppageRowsForRange(range).length;
+      els.reportsPrintSubtitle.textContent = `${rangeLabel} · Moagem ${formatNumber(baseSummary.total)} · ${filteredRecords.length} dia${filteredRecords.length === 1 ? "" : "s"} · ${rows.length} registro${rows.length === 1 ? "" : "s"} filtrado${rows.length === 1 ? "" : "s"} · ${stoppageCount} parada${stoppageCount === 1 ? "" : "s"}`;
     }
 
     function renderManagementReports() {
@@ -9319,6 +9401,7 @@
       renderReportsParticipation(baseSummary);
       renderReportsTransport(baseSummary);
       renderReportsPatioTimes(range);
+      renderReportsStoppages(range);
       renderReportsFront(rows, baseSummary);
       renderReportsType(rows, baseSummary, targetContext.targetDays);
       renderReportsRanking(rows, baseSummary);
@@ -11137,6 +11220,11 @@
       const patioTransportRows = patioTransportDetailRows(patioRows);
       const patioShiftRows = patioDetailRowsByGroup(patioRows, patioShiftFor, ["Turno A", "Turno B", "Turno C", "Sem turno"]);
       const patioShiftMatrix = patioShiftTransportMatrixRows(patioRows);
+      const reportStoppageRows = stoppageRowsForRange(range);
+      const reportStoppageSummary = stoppageSummary(reportStoppageRows);
+      const reportStoppageEffective = stoppageEffectiveMilling(range, reportStoppageSummary);
+      const reportStoppageCategoryRows = groupedStoppageRows(reportStoppageRows, (row) => row.category);
+      const reportStoppageDailyRows = groupedStoppageRows(reportStoppageRows, (row) => row.date).sort((a, b) => a.label.localeCompare(b.label));
       const trendStats = reportEvolutionStats(dailyItems);
       const externalCane = baseSummary.florestaCane + baseSummary.valeCane;
       const filteredVolume = rowProductionTotal(rows);
@@ -11177,6 +11265,9 @@
         ["Transporte total", formatNumber(baseSummary.transportTotal), formatPercent(baseSummary.transportPercent), transportDifference >= 0 ? "good" : "warn"],
         ["Média palha", formatMinutes(patioSummary.avgPalha), `${patioSummary.trips} viagem${patioSummary.trips === 1 ? "" : "s"}`, patioSummary.palhaAlerts ? "warn" : ""],
         ["Média usina", formatMinutes(patioSummary.avgUsina), "Chegada usina até saída pesagem", patioSummary.missingWeighing ? "warn" : ""],
+        ["Paradas usina", formatHours(reportStoppageSummary.totalHours), `${reportStoppageSummary.records} lançamento${reportStoppageSummary.records === 1 ? "" : "s"}`, reportStoppageSummary.totalHours ? "warn" : ""],
+        ["Dias efetivos", formatNumber(reportStoppageEffective.effectiveDays), `Parada ${formatNumber(reportStoppageEffective.stoppedDays)} dia`, reportStoppageEffective.stoppedDays ? "warn" : ""],
+        ["Moagem efetiva/dia", formatNumber(reportStoppageEffective.effectiveAveragePerDay), `Desconto ${formatNumber(reportStoppageEffective.lossAveragePerDay)} t/dia`, reportStoppageEffective.lossAveragePerDay ? "warn" : ""],
         ["Dias exibidos", `${filteredRecords.length}`, `${dailyItems.length} no gráfico`, ""]
       ];
       const insightCards = [
@@ -11261,6 +11352,34 @@
         ["Maior usina", patioSummary.maxUsina ? formatMinutes(patioMillMinutes(patioSummary.maxUsina)) : "0 min", patioSummary.maxUsina ? `${patioSummary.maxUsina.truck} · ${patioSummary.maxUsina.front}` : "Sem registro"],
         ["Alertas", String(patioSummary.palhaAlerts + patioSummary.missingWeighing), `${patioSummary.palhaAlerts} palha > 90 min · ${patioSummary.missingWeighing} sem saída`]
       ];
+      const stoppageSummaryRows = [
+        ["Total parado", formatHours(reportStoppageSummary.totalHours), `${reportStoppageSummary.records} lançamento${reportStoppageSummary.records === 1 ? "" : "s"}`],
+        ["Dias previstos", formatNumber(reportStoppageEffective.days), "Dias de safra considerados no período"],
+        ["Dias descontados", formatNumber(reportStoppageEffective.stoppedDays), `${formatHours(reportStoppageSummary.totalHours)} convertidas em dias`],
+        ["Dias efetivos", formatNumber(reportStoppageEffective.effectiveDays), "Dias previstos menos dias parados"],
+        ["Moagem efetiva média/dia", formatNumber(reportStoppageEffective.effectiveAveragePerDay), `Desconto médio ${formatNumber(reportStoppageEffective.lossAveragePerDay)} t/dia`],
+        ["Perda estimada", formatNumber(reportStoppageEffective.lossTons), `${EFFECTIVE_MILLING_TONS_PER_HOUR} t/h x horas paradas`]
+      ];
+      const stoppageCategoryTableRows = reportStoppageCategoryRows.map((item) => [
+        item.label,
+        formatHours(item.hours),
+        formatPercent(progressFor(item.hours, reportStoppageSummary.totalHours)),
+        String(item.records),
+        [...item.reasons].slice(0, 5).join(", ") || "-"
+      ]);
+      const stoppageDailyTableRows = reportStoppageDailyRows.map((item) => [
+        formatDate(item.label),
+        formatHours(item.hours),
+        String(item.records),
+        [...item.reasons].slice(0, 5).join(", ") || "-"
+      ]);
+      const stoppageDetailRows = reportStoppageRows.map((row) => [
+        formatDate(row.date),
+        row.category,
+        formatHours(row.hours),
+        row.reason || "-",
+        row.note || "-"
+      ]);
       const patioFrontTableRows = patioFrontRows.map((item) => [
         item.name,
         String(item.trips),
@@ -11461,6 +11580,15 @@
                   ${pdfTable(patioShiftMatrix.headers, patioShiftMatrix.rows)}
                   ${pdfTable(["Frente", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Máx. usina", "Ciclo médio", "Alertas"], patioFrontTableRows, { limit: 12 })}
                 ` : '<div class="pdf-empty">Sem lançamentos de tempo de pátio no período do relatório.</div>'}
+              </div>
+              <div class="pdf-section full soft">
+                <div class="pdf-title"><h2>Paradas da usina</h2><span class="muted">Horas paradas, dias efetivos e moagem efetiva média/dia</span></div>
+                ${pdfTable(["Indicador", "Valor", "Detalhe"], stoppageSummaryRows)}
+                ${reportStoppageRows.length ? `
+                  ${pdfTable(["Tipo do motivo", "Horas paradas", "% total", "Lançamentos", "Motivos"], stoppageCategoryTableRows)}
+                  ${pdfTable(["Data", "Horas paradas", "Lançamentos", "Motivos"], stoppageDailyTableRows, { limit: 20 })}
+                  ${pdfTable(["Data", "Tipo", "Horas", "Motivo", "Observação"], stoppageDetailRows, { limit: 30 })}
+                ` : '<div class="pdf-empty">Sem paradas da usina lançadas no período do relatório.</div>'}
               </div>
               <div class="pdf-section">
                 <div class="pdf-title"><h2>Ranking de origens</h2><span class="muted">Top por volume</span></div>
