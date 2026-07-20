@@ -1733,7 +1733,7 @@
 
       <section class="panel">
         <div class="panel-head">
-          <h2>Tempos de palha e usina</h2>
+          <h2>Tempos de palha</h2>
         </div>
         <div class="panel-body" id="reportsPatioTimesWrap"></div>
       </section>
@@ -6460,6 +6460,15 @@
       `;
     }
 
+    function withoutColumns(headers, rows, removedHeaders = []) {
+      const removed = new Set(removedHeaders);
+      const keepIndexes = headers.map((header, index) => removed.has(header) ? -1 : index).filter((index) => index >= 0);
+      return {
+        headers: keepIndexes.map((index) => headers[index]),
+        rows: rows.map((row) => keepIndexes.map((index) => row[index]))
+      };
+    }
+
     function patioDetailRowsByGroup(rows, groupGetter, order = []) {
       const grouped = new Map();
       rows.forEach((record) => {
@@ -8445,7 +8454,6 @@
         { label: "Transp. terceiro", value: formatPercent(baseSummary.thirdTransportPercent), detail: `${formatNumber(baseSummary.thirdTransport)} entregue` },
         { label: "Transporte total", value: formatNumber(baseSummary.transportTotal), detail: `${formatPercent(baseSummary.transportPercent)} sobre moagem` },
         { label: "Tempo palha", value: formatMinutes(patioSummary.avgPalha), detail: `${patioSummary.trips} viagem${patioSummary.trips === 1 ? "" : "s"} no período` },
-        { label: "Tempo usina", value: formatMinutes(patioSummary.avgUsina), detail: "Chegada usina até saída pesagem" },
         { label: "Paradas usina", value: formatHours(stoppage.totalHours), detail: `${stoppage.records} lançamento${stoppage.records === 1 ? "" : "s"} no período` },
         { label: "Dias efetivos", value: formatNumber(effective.effectiveDays), detail: effective.days ? `Previsto ${formatNumber(effective.days)} - parada ${formatNumber(effective.stoppedDays)} dia` : "Sem dias de safra" },
         { label: "Moagem efetiva/dia", value: formatNumber(effective.effectiveAveragePerDay), detail: `Desconto médio ${formatNumber(effective.lossAveragePerDay)} t/dia` },
@@ -8719,6 +8727,7 @@
     function patioTimesOverviewHtml(range, options = {}) {
       const patioRows = patioRowsForRange(range);
       const summary = patioTimeSummary(patioRows);
+      const showMillTime = options.showMillTime !== false;
       if (!summary.trips) {
         return `<div class="empty-state">${escapeHtml(options.emptyMessage || "Sem lançamentos de tempo de pátio no período selecionado.")}</div>`;
       }
@@ -8729,6 +8738,38 @@
       const transportRows = patioTransportDetailRows(patioRows);
       const shiftRows = patioDetailRowsByGroup(patioRows, patioShiftFor, ["Turno A", "Turno B", "Turno C", "Sem turno"]);
       const matrix = patioShiftTransportMatrixRows(patioRows);
+      const transportHeaders = ["Transporte", "Base", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Alertas"];
+      const shiftHeaders = ["Turno", "Horário", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Alertas"];
+      const frontHeaders = ["Frente", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Máx. usina", "Ciclo médio", "Alertas"];
+      const transportTable = showMillTime ? { headers: transportHeaders, rows: transportRows } : withoutColumns(transportHeaders, transportRows, ["Média usina"]);
+      const shiftTable = showMillTime ? { headers: shiftHeaders, rows: shiftRows } : withoutColumns(shiftHeaders, shiftRows, ["Média usina"]);
+      const frontTable = showMillTime
+        ? {
+          headers: frontHeaders,
+          rows: visibleFrontRows.map((item) => [
+            item.name,
+            String(item.trips),
+            String(item.trucksCount),
+            formatMinutes(item.avgFieldMinutes),
+            formatMinutes(item.maxFieldMinutes),
+            formatMinutes(item.avgMillMinutes),
+            formatMinutes(item.maxMillMinutes),
+            formatMinutes(item.avgCycleMinutes),
+            String(item.alerts)
+          ])
+        }
+        : {
+          headers: withoutColumns(frontHeaders, [], ["Média usina", "Máx. usina"]).headers,
+          rows: visibleFrontRows.map((item) => [
+            item.name,
+            String(item.trips),
+            String(item.trucksCount),
+            formatMinutes(item.avgFieldMinutes),
+            formatMinutes(item.maxFieldMinutes),
+            formatMinutes(item.avgCycleMinutes),
+            String(item.alerts)
+          ])
+        };
       const frontTitle = options.frontLimit && frontRows.length > options.frontLimit
         ? `Frentes críticas (${options.frontLimit} de ${frontRows.length})`
         : "Tempos por frente";
@@ -8745,72 +8786,41 @@
             <strong>${formatMinutes(summary.avgPalha)}</strong>
             <small>Início carga até fim carga</small>
           </div>
-          <div class="goal-metric">
+          ${showMillTime ? `<div class="goal-metric">
             <span>Média usina</span>
             <strong>${formatMinutes(summary.avgUsina)}</strong>
             <small>Chegada usina até saída pesagem</small>
-          </div>
+          </div>` : ""}
           <div class="goal-metric">
             <span>Maior palha</span>
             <strong>${summary.maxPalha ? formatMinutes(summary.maxPalha.fieldMinutes) : "0 min"}</strong>
             <small>${summary.maxPalha ? `${summary.maxPalha.truck} · ${summary.maxPalha.front}` : "Sem registro"}</small>
           </div>
-          <div class="goal-metric">
+          ${showMillTime ? `<div class="goal-metric">
             <span>Maior usina</span>
             <strong>${summary.maxUsina ? formatMinutes(patioMillMinutes(summary.maxUsina)) : "0 min"}</strong>
             <small>${summary.maxUsina ? `${summary.maxUsina.truck} · ${summary.maxUsina.front}` : "Sem registro"}</small>
-          </div>
+          </div>` : ""}
           <div class="goal-metric">
             <span>Alertas</span>
-            <strong>${summary.palhaAlerts + summary.missingWeighing}</strong>
-            <small>${summary.palhaAlerts} palha > 90 min · ${summary.missingWeighing} sem saída</small>
+            <strong>${showMillTime ? summary.palhaAlerts + summary.missingWeighing : summary.palhaAlerts}</strong>
+            <small>${showMillTime ? `${summary.palhaAlerts} palha > 90 min · ${summary.missingWeighing} sem saída` : `${summary.palhaAlerts} palha > 90 min`}</small>
           </div>
         </div>
         <div class="dashboard-grid">
           <div>
             <h3>Separado por transporte</h3>
-            ${patioSummaryTable(["Transporte", "Base", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Alertas"], transportRows, "Sem classe de transporte no período.")}
+            ${patioSummaryTable(transportTable.headers, transportTable.rows, "Sem classe de transporte no período.")}
           </div>
           <div>
             <h3>Separado por turno</h3>
-            ${patioSummaryTable(["Turno", "Horário", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Alertas"], shiftRows, "Sem turnos no período.")}
+            ${patioSummaryTable(shiftTable.headers, shiftTable.rows, "Sem turnos no período.")}
           </div>
         </div>
         <h3>Turno x transporte</h3>
         ${patioSummaryTable(matrix.headers, matrix.rows, "Sem matriz por turno e transporte.")}
         <h3>${escapeHtml(frontTitle)}</h3>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Frente</th>
-                <th>Viagens</th>
-                <th>Caminhões</th>
-                <th>Média palha</th>
-                <th>Máx. palha</th>
-                <th>Média usina</th>
-                <th>Máx. usina</th>
-                <th>Ciclo médio</th>
-                <th>Alertas</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${visibleFrontRows.map((item) => `
-                <tr>
-                  <td>${escapeHtml(item.name)}</td>
-                  <td>${item.trips}</td>
-                  <td>${item.trucksCount}</td>
-                  <td>${formatMinutes(item.avgFieldMinutes)}</td>
-                  <td>${formatMinutes(item.maxFieldMinutes)}</td>
-                  <td>${formatMinutes(item.avgMillMinutes)}</td>
-                  <td>${formatMinutes(item.maxMillMinutes)}</td>
-                  <td>${formatMinutes(item.avgCycleMinutes)}</td>
-                  <td>${item.alerts}</td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-        </div>
+        ${patioSummaryTable(frontTable.headers, frontTable.rows, "Sem frente no período.")}
       `;
     }
 
@@ -8824,7 +8834,8 @@
 
     function renderReportsPatioTimes(range) {
       els.reportsPatioTimesWrap.innerHTML = patioTimesOverviewHtml(range, {
-        emptyMessage: "Sem lançamentos de tempo de pátio no período do relatório."
+        emptyMessage: "Sem lançamentos de tempo de pátio no período do relatório.",
+        showMillTime: false
       });
     }
 
@@ -10827,6 +10838,31 @@
       const patioTransportRows = patioTransportDetailRows(patioRows);
       const patioShiftRows = patioDetailRowsByGroup(patioRows, patioShiftFor, ["Turno A", "Turno B", "Turno C", "Sem turno"]);
       const patioShiftMatrix = patioShiftTransportMatrixRows(patioRows);
+      const csvPatioTransportTable = withoutColumns(
+        ["Transporte", "Base", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Alertas"],
+        patioTransportRows,
+        ["Média usina"]
+      );
+      const csvPatioShiftTable = withoutColumns(
+        ["Turno", "Horário", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Alertas"],
+        patioShiftRows,
+        ["Média usina"]
+      );
+      const csvPatioFrontTable = withoutColumns(
+        ["Frente", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Máx. usina", "Ciclo médio", "Alertas"],
+        patioFrontRows.map((item) => [
+          item.name,
+          item.trips,
+          item.trucksCount,
+          formatMinutes(item.avgFieldMinutes),
+          formatMinutes(item.maxFieldMinutes),
+          formatMinutes(item.avgMillMinutes),
+          formatMinutes(item.maxMillMinutes),
+          formatMinutes(item.avgCycleMinutes),
+          item.alerts
+        ]),
+        ["Média usina", "Máx. usina"]
+      );
       const lines = [
         ["Relatório Gerencial - Produção Diária da Cambuí"],
         ["Período", `${formatDate(range.start)} a ${formatDate(range.end)}`],
@@ -10850,43 +10886,30 @@
         ["KM médio próprio", formatKm(baseSummary.ownTransportKmAvg), `${baseSummary.ownTransportKmRecords} dia${baseSummary.ownTransportKmRecords === 1 ? "" : "s"} com KM lançado`],
         ["KM médio terceiro", formatKm(baseSummary.thirdTransportKmAvg), `${baseSummary.thirdTransportKmRecords} dia${baseSummary.thirdTransportKmRecords === 1 ? "" : "s"} com KM lançado`],
         [],
-        ["Tempos de palha e usina"],
+        ["Tempos de palha"],
         ["Base do tempo de palha", "Início carga até fim carga quando disponível"],
         ["Viagens", patioSummary.trips],
         ["Caminhões", patioSummary.trucks],
         ["Frentes", patioSummary.fronts],
         ["Média palha", formatMinutes(patioSummary.avgPalha)],
-        ["Média usina", formatMinutes(patioSummary.avgUsina)],
         ["Maior palha", patioSummary.maxPalha ? `${formatMinutes(patioSummary.maxPalha.fieldMinutes)} - ${patioSummary.maxPalha.truck} - ${patioSummary.maxPalha.front}` : ""],
-        ["Maior usina", patioSummary.maxUsina ? `${formatMinutes(patioMillMinutes(patioSummary.maxUsina))} - ${patioSummary.maxUsina.truck} - ${patioSummary.maxUsina.front}` : ""],
         ["Alertas palha > 90 min", patioSummary.palhaAlerts],
-        ["Sem saída de pesagem", patioSummary.missingWeighing],
         [],
         ["Tempos por transporte"],
-        ["Transporte", "Base", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Alertas"],
-        ...patioTransportRows,
+        csvPatioTransportTable.headers,
+        ...csvPatioTransportTable.rows,
         [],
         ["Tempos por turno"],
-        ["Turno", "Horário", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Alertas"],
-        ...patioShiftRows,
+        csvPatioShiftTable.headers,
+        ...csvPatioShiftTable.rows,
         [],
         ["Turno x transporte"],
         patioShiftMatrix.headers,
         ...patioShiftMatrix.rows,
         [],
         ["Tempos por frente"],
-        ["Frente", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Máx. usina", "Ciclo médio", "Alertas"],
-        ...patioFrontRows.map((item) => [
-          item.name,
-          item.trips,
-          item.trucksCount,
-          formatMinutes(item.avgFieldMinutes),
-          formatMinutes(item.maxFieldMinutes),
-          formatMinutes(item.avgMillMinutes),
-          formatMinutes(item.maxMillMinutes),
-          formatMinutes(item.avgCycleMinutes),
-          item.alerts
-        ]),
+        csvPatioFrontTable.headers,
+        ...csvPatioFrontTable.rows,
         [],
         ["Diário"],
         ["Data", "Moagem", "Volume filtrado", "Meta", "% meta", "% própria", "% terceira", "% transp. próprio", "% transp. terceiro", "% transp. total", "Falta", "Registros filtrados"],
@@ -11264,7 +11287,6 @@
         ["KM méd. terceiro", formatKm(baseSummary.thirdTransportKmAvg), `${baseSummary.thirdTransportKmRecords} dia${baseSummary.thirdTransportKmRecords === 1 ? "" : "s"}`, ""],
         ["Transporte total", formatNumber(baseSummary.transportTotal), formatPercent(baseSummary.transportPercent), transportDifference >= 0 ? "good" : "warn"],
         ["Média palha", formatMinutes(patioSummary.avgPalha), `${patioSummary.trips} viagem${patioSummary.trips === 1 ? "" : "s"}`, patioSummary.palhaAlerts ? "warn" : ""],
-        ["Média usina", formatMinutes(patioSummary.avgUsina), "Chegada usina até saída pesagem", patioSummary.missingWeighing ? "warn" : ""],
         ["Paradas usina", formatHours(reportStoppageSummary.totalHours), `${reportStoppageSummary.records} lançamento${reportStoppageSummary.records === 1 ? "" : "s"}`, reportStoppageSummary.totalHours ? "warn" : ""],
         ["Dias efetivos", formatNumber(reportStoppageEffective.effectiveDays), `Parada ${formatNumber(reportStoppageEffective.stoppedDays)} dia`, reportStoppageEffective.stoppedDays ? "warn" : ""],
         ["Moagem efetiva/dia", formatNumber(reportStoppageEffective.effectiveAveragePerDay), `Desconto ${formatNumber(reportStoppageEffective.lossAveragePerDay)} t/dia`, reportStoppageEffective.lossAveragePerDay ? "warn" : ""],
@@ -11347,10 +11369,8 @@
       const patioSummaryRows = [
         ["Viagens", String(patioSummary.trips), `${patioSummary.trucks} caminhão${patioSummary.trucks === 1 ? "" : "ões"} · ${patioSummary.fronts} frente${patioSummary.fronts === 1 ? "" : "s"}`],
         ["Média palha", formatMinutes(patioSummary.avgPalha), "Início carga até fim carga"],
-        ["Média usina", formatMinutes(patioSummary.avgUsina), "Chegada usina até saída pesagem"],
         ["Maior palha", patioSummary.maxPalha ? formatMinutes(patioSummary.maxPalha.fieldMinutes) : "0 min", patioSummary.maxPalha ? `${patioSummary.maxPalha.truck} · ${patioSummary.maxPalha.front}` : "Sem registro"],
-        ["Maior usina", patioSummary.maxUsina ? formatMinutes(patioMillMinutes(patioSummary.maxUsina)) : "0 min", patioSummary.maxUsina ? `${patioSummary.maxUsina.truck} · ${patioSummary.maxUsina.front}` : "Sem registro"],
-        ["Alertas", String(patioSummary.palhaAlerts + patioSummary.missingWeighing), `${patioSummary.palhaAlerts} palha > 90 min · ${patioSummary.missingWeighing} sem saída`]
+        ["Alertas", String(patioSummary.palhaAlerts), `${patioSummary.palhaAlerts} palha > 90 min`]
       ];
       const stoppageSummaryRows = [
         ["Total parado", formatHours(reportStoppageSummary.totalHours), `${reportStoppageSummary.records} lançamento${reportStoppageSummary.records === 1 ? "" : "s"}`],
@@ -11391,6 +11411,21 @@
         formatMinutes(item.avgCycleMinutes),
         String(item.alerts)
       ]);
+      const pdfPatioTransportTable = withoutColumns(
+        ["Transporte", "Base", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Alertas"],
+        patioTransportRows,
+        ["Média usina"]
+      );
+      const pdfPatioShiftTable = withoutColumns(
+        ["Turno", "Horário", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Alertas"],
+        patioShiftRows,
+        ["Média usina"]
+      );
+      const pdfPatioFrontTable = withoutColumns(
+        ["Frente", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Máx. usina", "Ciclo médio", "Alertas"],
+        patioFrontTableRows,
+        ["Média usina", "Máx. usina"]
+      );
       const monthTotals = monthItems.reduce((acc, item) => {
         acc.days += item.targetContext.targetDays;
         acc.records += item.records;
@@ -11572,13 +11607,13 @@
                 ${pdfHorizontalBars(transportItems, { total: baseSummary.total })}
               </div>
               <div class="pdf-section full soft">
-                <div class="pdf-title"><h2>Tempos de palha e usina</h2><span class="muted">Base do tempo de pátio no período</span></div>
+                <div class="pdf-title"><h2>Tempos de palha</h2><span class="muted">Base do tempo de pátio no período</span></div>
                 ${patioSummary.trips ? `
                   ${pdfTable(["Indicador", "Valor", "Detalhe"], patioSummaryRows)}
-                  ${pdfTable(["Transporte", "Base", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Alertas"], patioTransportRows)}
-                  ${pdfTable(["Turno", "Horário", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Alertas"], patioShiftRows)}
+                  ${pdfTable(pdfPatioTransportTable.headers, pdfPatioTransportTable.rows)}
+                  ${pdfTable(pdfPatioShiftTable.headers, pdfPatioShiftTable.rows)}
                   ${pdfTable(patioShiftMatrix.headers, patioShiftMatrix.rows)}
-                  ${pdfTable(["Frente", "Viagens", "Caminhões", "Média palha", "Máx. palha", "Média usina", "Máx. usina", "Ciclo médio", "Alertas"], patioFrontTableRows, { limit: 12 })}
+                  ${pdfTable(pdfPatioFrontTable.headers, pdfPatioFrontTable.rows, { limit: 12 })}
                 ` : '<div class="pdf-empty">Sem lançamentos de tempo de pátio no período do relatório.</div>'}
               </div>
               <div class="pdf-section full soft">
