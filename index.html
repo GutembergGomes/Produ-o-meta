@@ -1424,12 +1424,12 @@
         <article class="stat">
           <span>Cana Floresta</span>
           <strong id="dashFlorestaCane">0</strong>
-          <small>Recebida em Cambuí</small>
+          <small id="dashFlorestaCaneStatus">Recebida em Cambuí</small>
         </article>
         <article class="stat">
           <span>Cana Vale</span>
           <strong id="dashValeCane">0</strong>
-          <small>Recebida em Cambuí</small>
+          <small id="dashValeCaneStatus">Recebida em Cambuí</small>
         </article>
         <article class="stat">
           <span>Transporte próprio</span>
@@ -1471,7 +1471,7 @@
         <article class="stat">
           <span>Acumulado total</span>
           <strong id="dashAllAccumulated">0</strong>
-          <small>Moagem salva</small>
+          <small id="dashAllAccumulatedLabel">Moagem salva</small>
         </article>
       </section>
 
@@ -2486,6 +2486,23 @@
 
       <section class="panel">
         <div class="panel-head">
+          <h2>Metas de cana de outras unidades</h2>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Meta diária</th>
+              </tr>
+            </thead>
+            <tbody id="externalCaneTargetsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
           <h2>Planejamento Safra 2026</h2>
           <span class="status-pill">Cambuí</span>
         </div>
@@ -2723,6 +2740,10 @@
       transports: [
         { type: TYPES.OWN_TRANSPORT, target: 0 },
         { type: TYPES.THIRD_TRANSPORT, target: 0 }
+      ],
+      externalCanes: [
+        { type: TYPES.FLORESTA_CANE, target: 0 },
+        { type: TYPES.VALE_CANE, target: 0 }
       ]
     };
     const defaultFirebaseConfig = {
@@ -2870,6 +2891,7 @@
       ownHarvesterTargetsBody: document.querySelector("#ownHarvesterTargetsBody"),
       thirdFrontTargetsBody: document.querySelector("#thirdFrontTargetsBody"),
       transportTargetsBody: document.querySelector("#transportTargetsBody"),
+      externalCaneTargetsBody: document.querySelector("#externalCaneTargetsBody"),
       advancedKpiWrap: document.querySelector("#advancedKpiWrap"),
       goalOverviewWrap: document.querySelector("#goalOverviewWrap"),
       typeChartWrap: document.querySelector("#typeChartWrap"),
@@ -2901,7 +2923,9 @@
       dashThirdHarvest: document.querySelector("#dashThirdHarvest"),
       dashThirdHarvestPercent: document.querySelector("#dashThirdHarvestPercent"),
       dashFlorestaCane: document.querySelector("#dashFlorestaCane"),
+      dashFlorestaCaneStatus: document.querySelector("#dashFlorestaCaneStatus"),
       dashValeCane: document.querySelector("#dashValeCane"),
+      dashValeCaneStatus: document.querySelector("#dashValeCaneStatus"),
       dashOwnTransport: document.querySelector("#dashOwnTransport"),
       dashOwnTransportPercent: document.querySelector("#dashOwnTransportPercent"),
       dashThirdTransport: document.querySelector("#dashThirdTransport"),
@@ -2920,6 +2944,7 @@
       dashMonthAccumulatedLabel: document.querySelector("#dashMonthAccumulatedLabel"),
       dashMonthAccumulatedBalance: document.querySelector("#dashMonthAccumulatedBalance"),
       dashAllAccumulated: document.querySelector("#dashAllAccumulated"),
+      dashAllAccumulatedLabel: document.querySelector("#dashAllAccumulatedLabel"),
       entryTotal: document.querySelector("#entryTotal"),
       entryOwnHarvest: document.querySelector("#entryOwnHarvest"),
       entryOwnHarvestPercent: document.querySelector("#entryOwnHarvestPercent"),
@@ -3451,6 +3476,9 @@
       if (type === TYPES.THIRD_TRANSPORT) {
         return type;
       }
+      if (type === TYPES.FLORESTA_CANE || type === TYPES.VALE_CANE) {
+        return type;
+      }
       return "";
     }
 
@@ -3460,6 +3488,7 @@
       const sourceOwnHarvesters = Array.isArray(sourceTargets.ownHarvesters) ? sourceTargets.ownHarvesters : [];
       const sourceThirdFronts = Array.isArray(sourceTargets.thirdFronts) ? sourceTargets.thirdFronts : [];
       const sourceTransports = Array.isArray(sourceTargets.transports) ? sourceTargets.transports : [];
+      const sourceExternalCanes = Array.isArray(sourceTargets.externalCanes) ? sourceTargets.externalCanes : [];
 
       const ownByFront = new Map(sourceOwnFronts.map((sourceRow) => {
         const row = sourceRow || {};
@@ -3485,6 +3514,10 @@
         const row = sourceRow || {};
         return [normalizeType(row.type), row];
       }));
+      const externalByType = new Map(sourceExternalCanes.map((sourceRow) => {
+        const row = sourceRow || {};
+        return [normalizeType(row.type), row];
+      }));
 
       return {
         ownFronts: ownHarvestFronts.map((front) => {
@@ -3507,6 +3540,13 @@
             type,
             target: Math.max(0, parseNumber(row.target ?? row.meta ?? row.dailyTarget ?? 0))
           };
+        }),
+        externalCanes: [TYPES.FLORESTA_CANE, TYPES.VALE_CANE].map((type) => {
+          const row = externalByType.get(type) || {};
+          return {
+            type,
+            target: Math.max(0, parseNumber(row.target ?? row.meta ?? row.dailyTarget ?? 0))
+          };
         })
       };
     }
@@ -3517,7 +3557,8 @@
       return {
         ownFronts: cloned.ownFronts,
         thirdFronts: cloned.thirdFronts,
-        transports: cloned.transports
+        transports: cloned.transports,
+        externalCanes: cloned.externalCanes
       };
     }
 
@@ -4617,6 +4658,11 @@
         return found ? found.target : 0;
       }
 
+      if (type === TYPES.FLORESTA_CANE || type === TYPES.VALE_CANE) {
+        const found = cleanTargets.externalCanes.find((target) => target.type === type);
+        return found ? found.target : 0;
+      }
+
       return 0;
     }
 
@@ -4885,8 +4931,8 @@
     }
 
     function detailWithTargetBalance(detail, total, target) {
-      if ((Number(target) || 0) <= 0) return detail;
-      return `${detail} · ${targetBalanceLabel(total, target)}`;
+      const planned = Number(target) || 0;
+      return `${detail} · Meta ${formatNumber(planned)} · ${targetBalanceLabel(total, planned)}`;
     }
 
     function localIsoFromDate(value) {
@@ -7001,20 +7047,27 @@
       const targetDays = options.targetDays ?? targetDaysForRows(rows);
       els[`${prefix}Total`].textContent = formatNumber(summary.total);
       if (els[`${prefix}TotalStatus`]) {
-        els[`${prefix}TotalStatus`].textContent = summary.targetTotal > 0
-          ? `Sem somar transporte · ${targetBalanceLabel(summary.total, summary.targetTotal)}`
-          : "Sem somar transporte";
+        els[`${prefix}TotalStatus`].textContent = `Sem somar transporte · Meta ${formatNumber(summary.targetTotal)} · ${targetBalanceLabel(summary.total, summary.targetTotal)}`;
       }
       const ownHarvestTarget = targetForType(TYPES.OWN_HARVEST) * targetDays;
       const thirdHarvestTarget = targetForType(TYPES.THIRD_HARVEST) * targetDays;
+      const florestaCaneTarget = targetForType(TYPES.FLORESTA_CANE) * targetDays;
+      const valeCaneTarget = targetForType(TYPES.VALE_CANE) * targetDays;
       const ownTransportTarget = targetForType(TYPES.OWN_TRANSPORT) * targetDays;
       const thirdTransportTarget = targetForType(TYPES.THIRD_TRANSPORT) * targetDays;
+      const transportTarget = ownTransportTarget + thirdTransportTarget;
       els[`${prefix}OwnHarvest`].textContent = formatNumber(summary.ownHarvest);
       els[`${prefix}OwnHarvestPercent`].textContent = detailWithTargetBalance(`${formatPercent(summary.ownHarvestPercent)} da moagem`, summary.ownHarvest, ownHarvestTarget);
       els[`${prefix}ThirdHarvest`].textContent = formatNumber(summary.thirdHarvest);
       els[`${prefix}ThirdHarvestPercent`].textContent = detailWithTargetBalance(`${formatPercent(summary.thirdHarvestPercent)} da moagem`, summary.thirdHarvest, thirdHarvestTarget);
       els[`${prefix}FlorestaCane`].textContent = formatNumber(summary.florestaCane);
+      if (els[`${prefix}FlorestaCaneStatus`]) {
+        els[`${prefix}FlorestaCaneStatus`].textContent = detailWithTargetBalance("Recebida em Cambuí", summary.florestaCane, florestaCaneTarget);
+      }
       els[`${prefix}ValeCane`].textContent = formatNumber(summary.valeCane);
+      if (els[`${prefix}ValeCaneStatus`]) {
+        els[`${prefix}ValeCaneStatus`].textContent = detailWithTargetBalance("Recebida em Cambuí", summary.valeCane, valeCaneTarget);
+      }
       els[`${prefix}OwnTransport`].textContent = formatNumber(summary.ownTransport);
       els[`${prefix}OwnTransportPercent`].textContent = detailWithTargetBalance(`${formatPercent(summary.ownTransportPercent)} da moagem`, summary.ownTransport, ownTransportTarget);
       els[`${prefix}ThirdTransport`].textContent = formatNumber(summary.thirdTransport);
@@ -7032,11 +7085,11 @@
           : "Sem KM lançado";
       }
       els[`${prefix}TransportTotal`].textContent = formatNumber(summary.transportTotal);
-      els[`${prefix}TransportPercent`].textContent = `${formatPercent(summary.transportPercent)} sobre moagem`;
+      els[`${prefix}TransportPercent`].textContent = detailWithTargetBalance(`${formatPercent(summary.transportPercent)} sobre moagem`, summary.transportTotal, transportTarget);
       els[`${prefix}Target`].textContent = formatNumber(summary.targetTotal);
       els[`${prefix}TargetStatus`].textContent = `${formatPercent(summary.targetPercent)} atingido em ${targetDays} dia${targetDays === 1 ? "" : "s"} de meta`;
       if (els[`${prefix}TargetBalance`]) {
-        els[`${prefix}TargetBalance`].textContent = targetBalanceLabel(summary.total, summary.targetTotal);
+        els[`${prefix}TargetBalance`].textContent = `Meta ${formatNumber(summary.targetTotal)} · ${targetBalanceLabel(summary.total, summary.targetTotal)}`;
       }
     }
 
@@ -7057,6 +7110,10 @@
       }
       if (type === TYPES.THIRD_HARVEST) {
         return cleanTargets.thirdFronts.reduce((sum, row) => sum + row.target, 0);
+      }
+      if (type === TYPES.FLORESTA_CANE || type === TYPES.VALE_CANE) {
+        const external = cleanTargets.externalCanes.find((row) => row.type === type);
+        return external ? external.target : 0;
       }
       const transport = cleanTargets.transports.find((row) => row.type === type);
       return transport ? transport.target : 0;
@@ -8059,8 +8116,9 @@
         : `Nenhum lançamento salvo no período ${rangeLabel}.${targetLabel}`;
       els.dashMonthAccumulated.textContent = formatNumber(monthSummary.total);
       els.dashMonthAccumulatedLabel.textContent = `Mês ${formatMonth(range.end)} até ${formatDate(monthEnd)}`;
-      els.dashMonthAccumulatedBalance.textContent = targetBalanceLabel(monthSummary.total, monthSummary.targetTotal);
+      els.dashMonthAccumulatedBalance.textContent = `Meta ${formatNumber(monthSummary.targetTotal)} · ${targetBalanceLabel(monthSummary.total, monthSummary.targetTotal)}`;
       els.dashAllAccumulated.textContent = formatNumber(allSummary.total);
+      els.dashAllAccumulatedLabel.textContent = `Meta ${formatNumber(allSummary.targetTotal)} · ${targetBalanceLabel(allSummary.total, allSummary.targetTotal)}`;
 
       setStats("dash", rows, { targetDays, targetTotal });
       renderAdvancedKpis(selectedRecords, rows, range, { targetDays, targetInfo, targetTotal });
@@ -8367,9 +8425,17 @@
       return { range: normalized, info, selectedRecords, filteredRecords, baseRows, rows, baseSummary, summary, filters, targetContext };
     }
 
-    function shareRow({ label, value, total, detail }) {
+    function shareRow({ label, value, total, detail, target = 0 }) {
       const percent = progressFor(value, total);
       const width = total > 0 ? clampPercent(percent) : 0;
+      const targetValue = Number(target) || 0;
+      const targetPercent = progressFor(value, targetValue);
+      const targetLine = `
+          <div class="chart-row-head">
+            <span>Meta ${formatNumber(targetValue)} · ${targetBalanceLabel(value, targetValue)}</span>
+            <span class="status-pill ${targetValue <= 0 ? "" : targetPercent >= 100 ? "good" : targetPercent < 85 ? "alert" : ""}">${targetValue > 0 ? formatPercent(targetPercent) : "Sem meta"}</span>
+          </div>
+      `;
       return `
         <div class="chart-row">
           <div class="chart-row-head">
@@ -8383,6 +8449,7 @@
             <span>${escapeHtml(detail || "% sobre moagem")}</span>
             <span class="status-pill ${percent >= 100 ? "good" : ""}">${formatPercent(percent)}</span>
           </div>
+          ${targetLine}
         </div>
       `;
     }
@@ -8440,19 +8507,27 @@
       const stoppageRows = stoppageRowsForRange(range);
       const stoppage = stoppageSummary(stoppageRows);
       const effective = stoppageEffectiveMilling(range, stoppage);
+      const ownHarvestTarget = targetForType(TYPES.OWN_HARVEST) * targetContext.targetDays;
+      const thirdHarvestTarget = targetForType(TYPES.THIRD_HARVEST) * targetContext.targetDays;
+      const florestaCaneTarget = targetForType(TYPES.FLORESTA_CANE) * targetContext.targetDays;
+      const valeCaneTarget = targetForType(TYPES.VALE_CANE) * targetContext.targetDays;
+      const externalCaneTarget = florestaCaneTarget + valeCaneTarget;
+      const ownTransportTarget = targetForType(TYPES.OWN_TRANSPORT) * targetContext.targetDays;
+      const thirdTransportTarget = targetForType(TYPES.THIRD_TRANSPORT) * targetContext.targetDays;
+      const transportTarget = ownTransportTarget + thirdTransportTarget;
       const kpis = [
-        { label: "Moagem do período", value: formatNumber(baseSummary.total), detail: "Base sem somar transporte" },
-        { label: "Meta analisada", value: formatNumber(baseSummary.targetTotal), detail: `${targetContext.targetDays} dia${targetContext.targetDays === 1 ? "" : "s"} de meta` },
-        { label: "% da meta", value: formatPercent(baseSummary.targetPercent), detail: hasTarget ? "Real sobre planejado" : "Meta não calculada" },
-        { label: gapLabel, value: formatNumber(gapValue), detail: difference >= 0 && hasTarget ? "Acima do planejado" : "Para atingir a meta" },
-        { label: "Volume filtrado", value: formatNumber(filteredVolume), detail: `${rows.length} registro${rows.length === 1 ? "" : "s"} em ${filteredDays} dia${filteredDays === 1 ? "" : "s"}` },
-        { label: "Moagem filtrada", value: formatNumber(summary.total), detail: `${formatPercent(progressFor(summary.total, baseSummary.total))} da moagem base` },
-        { label: "Colheita própria", value: formatPercent(baseSummary.ownHarvestPercent), detail: `${formatNumber(baseSummary.ownHarvest)} sobre moagem` },
-        { label: "Colheita terceira", value: formatPercent(baseSummary.thirdHarvestPercent), detail: `${formatNumber(baseSummary.thirdHarvest)} sobre moagem` },
-        { label: "Cana outras unid.", value: formatNumber(externalCane), detail: `${formatPercent(progressFor(externalCane, baseSummary.total))} da moagem` },
-        { label: "Transp. próprio", value: formatPercent(baseSummary.ownTransportPercent), detail: `${formatNumber(baseSummary.ownTransport)} entregue` },
-        { label: "Transp. terceiro", value: formatPercent(baseSummary.thirdTransportPercent), detail: `${formatNumber(baseSummary.thirdTransport)} entregue` },
-        { label: "Transporte total", value: formatNumber(baseSummary.transportTotal), detail: `${formatPercent(baseSummary.transportPercent)} sobre moagem` },
+        { label: "Moagem do período", value: formatNumber(baseSummary.total), detail: `Meta ${formatNumber(baseSummary.targetTotal)} · ${targetBalanceLabel(baseSummary.total, baseSummary.targetTotal)}` },
+        { label: "Meta analisada", value: formatNumber(baseSummary.targetTotal), detail: `${targetContext.targetDays} dia${targetContext.targetDays === 1 ? "" : "s"} · ${targetBalanceLabel(baseSummary.total, baseSummary.targetTotal)}` },
+        { label: "% da meta", value: formatPercent(baseSummary.targetPercent), detail: hasTarget ? `Meta ${formatNumber(baseSummary.targetTotal)}` : "Meta 0 · Sem meta calculada" },
+        { label: gapLabel, value: formatNumber(gapValue), detail: hasTarget ? `Meta ${formatNumber(baseSummary.targetTotal)} · ${difference >= 0 ? "Acima do planejado" : "Para atingir a meta"}` : "Meta 0 · Sem meta calculada" },
+        { label: "Volume filtrado", value: formatNumber(filteredVolume), detail: `${rows.length} registro${rows.length === 1 ? "" : "s"} · Meta ${formatNumber(summary.targetTotal)}` },
+        { label: "Moagem filtrada", value: formatNumber(summary.total), detail: detailWithTargetBalance(`${formatPercent(progressFor(summary.total, baseSummary.total))} da moagem base`, summary.total, summary.targetTotal) },
+        { label: "Colheita própria", value: formatPercent(baseSummary.ownHarvestPercent), detail: detailWithTargetBalance(`${formatNumber(baseSummary.ownHarvest)} sobre moagem`, baseSummary.ownHarvest, ownHarvestTarget) },
+        { label: "Colheita terceira", value: formatPercent(baseSummary.thirdHarvestPercent), detail: detailWithTargetBalance(`${formatNumber(baseSummary.thirdHarvest)} sobre moagem`, baseSummary.thirdHarvest, thirdHarvestTarget) },
+        { label: "Cana outras unid.", value: formatNumber(externalCane), detail: detailWithTargetBalance(`${formatPercent(progressFor(externalCane, baseSummary.total))} da moagem`, externalCane, externalCaneTarget) },
+        { label: "Transp. próprio", value: formatPercent(baseSummary.ownTransportPercent), detail: detailWithTargetBalance(`${formatNumber(baseSummary.ownTransport)} entregue`, baseSummary.ownTransport, ownTransportTarget) },
+        { label: "Transp. terceiro", value: formatPercent(baseSummary.thirdTransportPercent), detail: detailWithTargetBalance(`${formatNumber(baseSummary.thirdTransport)} entregue`, baseSummary.thirdTransport, thirdTransportTarget) },
+        { label: "Transporte total", value: formatNumber(baseSummary.transportTotal), detail: detailWithTargetBalance(`${formatPercent(baseSummary.transportPercent)} sobre moagem`, baseSummary.transportTotal, transportTarget) },
         { label: "Tempo palha", value: formatMinutes(patioSummary.avgPalha), detail: `${patioSummary.trips} viagem${patioSummary.trips === 1 ? "" : "s"} no período` },
         { label: "Paradas usina", value: formatHours(stoppage.totalHours), detail: `${stoppage.records} lançamento${stoppage.records === 1 ? "" : "s"} no período` },
         { label: "Dias efetivos", value: formatNumber(effective.effectiveDays), detail: effective.days ? `Previsto ${formatNumber(effective.days)} - parada ${formatNumber(effective.stoppedDays)} dia` : "Sem dias de safra" },
@@ -8669,30 +8744,30 @@
       `;
     }
 
-    function renderReportsParticipation(summary) {
+    function renderReportsParticipation(summary, targetDays = 0) {
       if (summary.total <= 0) {
         els.reportsParticipationWrap.innerHTML = '<div class="empty-state">Sem moagem no período para calcular participação.</div>';
         return;
       }
 
       els.reportsParticipationWrap.innerHTML = [
-        shareRow({ label: "Colheita própria", value: summary.ownHarvest, total: summary.total, detail: "% do moído pelas frentes próprias" }),
-        shareRow({ label: "Colheita terceira", value: summary.thirdHarvest, total: summary.total, detail: "% do moído pelas frentes terceiras" }),
-        shareRow({ label: "Cana Floresta", value: summary.florestaCane, total: summary.total, detail: "% recebido de outra unidade" }),
-        shareRow({ label: "Cana Vale", value: summary.valeCane, total: summary.total, detail: "% recebido de outra unidade" })
+        shareRow({ label: "Colheita própria", value: summary.ownHarvest, total: summary.total, detail: "% do moído pelas frentes próprias", target: targetForType(TYPES.OWN_HARVEST) * targetDays }),
+        shareRow({ label: "Colheita terceira", value: summary.thirdHarvest, total: summary.total, detail: "% do moído pelas frentes terceiras", target: targetForType(TYPES.THIRD_HARVEST) * targetDays }),
+        shareRow({ label: "Cana Floresta", value: summary.florestaCane, total: summary.total, detail: "% recebido de outra unidade", target: targetForType(TYPES.FLORESTA_CANE) * targetDays }),
+        shareRow({ label: "Cana Vale", value: summary.valeCane, total: summary.total, detail: "% recebido de outra unidade", target: targetForType(TYPES.VALE_CANE) * targetDays })
       ].join("");
     }
 
-    function renderReportsTransport(summary) {
+    function renderReportsTransport(summary, targetDays = 0) {
       if (summary.total <= 0 && summary.transportTotal <= 0) {
         els.reportsTransportWrap.innerHTML = '<div class="empty-state">Sem moagem ou transporte no período selecionado.</div>';
         return;
       }
 
       els.reportsTransportWrap.innerHTML = [
-        shareRow({ label: "Transporte próprio", value: summary.ownTransport, total: summary.total, detail: "% entregue por caminhões próprios" }),
-        shareRow({ label: "Transporte terceiro", value: summary.thirdTransport, total: summary.total, detail: "% entregue por terceiros" }),
-        shareRow({ label: "Total transportado", value: summary.transportTotal, total: summary.total, detail: "% transportado sobre a moagem" }),
+        shareRow({ label: "Transporte próprio", value: summary.ownTransport, total: summary.total, detail: "% entregue por caminhões próprios", target: targetForType(TYPES.OWN_TRANSPORT) * targetDays }),
+        shareRow({ label: "Transporte terceiro", value: summary.thirdTransport, total: summary.total, detail: "% entregue por terceiros", target: targetForType(TYPES.THIRD_TRANSPORT) * targetDays }),
+        shareRow({ label: "Total transportado", value: summary.transportTotal, total: summary.total, detail: "% transportado sobre a moagem", target: (targetForType(TYPES.OWN_TRANSPORT) + targetForType(TYPES.THIRD_TRANSPORT)) * targetDays }),
         metricRow({ label: "KM médio próprio", value: formatKm(summary.ownTransportKmAvg), detail: summary.ownTransportKmRecords ? `${summary.ownTransportKmRecords} dia${summary.ownTransportKmRecords === 1 ? "" : "s"} com KM lançado` : "Sem KM lançado" }),
         metricRow({ label: "KM médio terceiro", value: formatKm(summary.thirdTransportKmAvg), detail: summary.thirdTransportKmRecords ? `${summary.thirdTransportKmRecords} dia${summary.thirdTransportKmRecords === 1 ? "" : "s"} com KM lançado` : "Sem KM lançado" })
       ].join("");
@@ -9409,8 +9484,8 @@
       renderReportsKpis(baseSummary, summary, info, filteredRecords, rows, targetContext, range);
       renderReportsExecutive(filteredRecords, rows, baseSummary, summary, info, filters);
       renderReportsInsights(filteredRecords, rows, baseSummary, filters);
-      renderReportsParticipation(baseSummary);
-      renderReportsTransport(baseSummary);
+      renderReportsParticipation(baseSummary, targetContext.targetDays);
+      renderReportsTransport(baseSummary, targetContext.targetDays);
       renderReportsPatioTimes(range);
       renderReportsStoppages(range);
       renderReportsFront(rows, baseSummary);
@@ -10378,6 +10453,13 @@
         </tr>
       `).join("");
 
+      els.externalCaneTargetsBody.innerHTML = targets.externalCanes.map((row) => `
+        <tr>
+          <td>${escapeHtml(row.type)}</td>
+          <td>${targetNumberInput("externalCanes", row.type, row.target, `Meta diária ${row.type}`)}</td>
+        </tr>
+      `).join("");
+
       renderSafraRealMonth();
     }
 
@@ -10396,6 +10478,12 @@
 
       if (section === "transports") {
         const row = targets.transports.find((item) => item.type === normalizeType(idOrKey));
+        if (row) row.target = parseNumber(value);
+        return;
+      }
+
+      if (section === "externalCanes") {
+        const row = targets.externalCanes.find((item) => item.type === normalizeType(idOrKey));
         if (row) row.target = parseNumber(value);
       }
     }
@@ -11331,11 +11419,19 @@
         }
       ];
       const mixItems = [
-        { label: "Colheita própria", value: baseSummary.ownHarvest },
-        { label: "Colheita terceira", value: baseSummary.thirdHarvest },
-        { label: "Cana Floresta", value: baseSummary.florestaCane },
-        { label: "Cana Vale", value: baseSummary.valeCane }
-      ].filter((item) => item.value > 0);
+        { label: "Colheita própria", value: baseSummary.ownHarvest, target: targetForType(TYPES.OWN_HARVEST) * targetContext.targetDays },
+        { label: "Colheita terceira", value: baseSummary.thirdHarvest, target: targetForType(TYPES.THIRD_HARVEST) * targetContext.targetDays },
+        { label: "Cana Floresta", value: baseSummary.florestaCane, target: targetForType(TYPES.FLORESTA_CANE) * targetContext.targetDays },
+        { label: "Cana Vale", value: baseSummary.valeCane, target: targetForType(TYPES.VALE_CANE) * targetContext.targetDays }
+      ].filter((item) => item.value > 0 || item.target > 0);
+      const mixTargetRows = mixItems.map((item) => [
+        item.label,
+        formatNumber(item.value),
+        formatPercent(progressFor(item.value, baseSummary.total)),
+        item.target > 0 ? formatNumber(item.target) : "-",
+        item.target > 0 ? targetBalanceLabel(item.value, item.target) : "Sem meta",
+        item.target > 0 ? formatPercent(progressFor(item.value, item.target)) : "-"
+      ]);
       const transportItems = [
         { label: "Transporte próprio", value: baseSummary.ownTransport },
         { label: "Transporte terceiro", value: baseSummary.thirdTransport },
@@ -11601,6 +11697,7 @@
               <div class="pdf-section">
                 <div class="pdf-title"><h2>Mix da moagem</h2><span class="muted">% sobre moagem</span></div>
                 ${pdfHorizontalBars(mixItems, { total: baseSummary.total })}
+                ${pdfTable(["Origem", "Volume", "% moagem", "Meta", "Falta/Sobra", "% meta"], mixTargetRows)}
               </div>
               <div class="pdf-section">
                 <div class="pdf-title"><h2>Transporte sobre moagem</h2><span class="muted">Próprio e terceiro</span></div>
@@ -12571,7 +12668,7 @@
 
     document.querySelector("#saveTargetsBtn").addEventListener("click", saveTargets);
 
-    [els.ownHarvesterTargetsBody, els.thirdFrontTargetsBody, els.transportTargetsBody].forEach((body) => {
+    [els.ownHarvesterTargetsBody, els.thirdFrontTargetsBody, els.transportTargetsBody, els.externalCaneTargetsBody].forEach((body) => {
       body.addEventListener("input", (event) => {
         const target = event.target;
         const section = target.dataset.targetSection;
