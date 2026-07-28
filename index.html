@@ -1373,6 +1373,7 @@
       <button class="nav-tab" type="button" data-view="reports" aria-selected="false">Relatórios Gerenciais</button>
       <button class="nav-tab" type="button" data-view="patio" aria-selected="false">Tempo de Pátio</button>
       <button class="nav-tab" type="button" data-view="stoppages" aria-selected="false">Paradas da Usina</button>
+      <button class="nav-tab" type="button" data-view="reductions" aria-selected="false">Redução de Moagem</button>
       <button class="nav-tab" type="button" data-view="machines" aria-selected="false">Produção das Máquinas</button>
       <button class="nav-tab" type="button" data-view="entry" aria-selected="false">Lançamento Diário</button>
       <button class="nav-tab" type="button" data-view="targets" aria-selected="false">Metas Diárias</button>
@@ -1745,6 +1746,13 @@
         <div class="panel-body" id="reportsStoppageWrap"></div>
       </section>
 
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Redução de moagem</h2>
+        </div>
+        <div class="panel-body" id="reportsReductionWrap"></div>
+      </section>
+
       <section class="dashboard-grid">
         <section class="panel">
           <div class="panel-head">
@@ -2102,6 +2110,77 @@
           <h2>Paradas lançadas</h2>
         </div>
         <div class="table-wrap" id="stoppageRowsWrap"></div>
+      </section>
+    </section>
+
+    <section class="view" id="reductionsView" hidden>
+      <div class="filter-bar dashboard-filter">
+        <div class="field">
+          <label for="reductionStartDate">Início do período</label>
+          <input id="reductionStartDate" type="date">
+        </div>
+        <div class="field">
+          <label for="reductionEndDate">Fim do período</label>
+          <input id="reductionEndDate" type="date">
+        </div>
+        <div class="filter-note" id="reductionSource">Nenhuma redução lançada no período.</div>
+        <div class="actions">
+          <button class="btn-secondary" id="reductionTodayBtn" type="button">Hoje</button>
+          <button class="btn-secondary" id="reductionMonthBtn" type="button">Mês atual</button>
+          <button class="btn-primary" id="saveReductionsDbBtn" type="button">Salvar no banco</button>
+          <button class="btn-secondary" id="pullReductionsDbBtn" type="button">Atualizar do banco</button>
+          <button class="btn-secondary btn-danger" id="deleteReductionRangeBtn" type="button">Excluir período</button>
+        </div>
+      </div>
+
+      <section class="stats-grid" id="reductionKpiWrap" aria-label="Indicadores de redução de moagem"></section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Lançamento de redução de moagem</h2>
+          <span class="status-pill" id="reductionEntryMode">Novo</span>
+        </div>
+        <input id="reductionEntryId" type="hidden">
+        <div class="manual-grid">
+          <div class="field">
+            <label for="reductionDate">Data operacional</label>
+            <input id="reductionDate" type="date">
+          </div>
+          <div class="field">
+            <label for="reductionStart">Início</label>
+            <input id="reductionStart" type="datetime-local">
+          </div>
+          <div class="field">
+            <label for="reductionEnd">Fim</label>
+            <input id="reductionEnd" type="datetime-local">
+          </div>
+          <div class="field">
+            <label for="reductionHours">Horas</label>
+            <input id="reductionHours" class="number-input" inputmode="decimal" type="text" placeholder="Ex.: 23:59">
+          </div>
+          <div class="field">
+            <label for="reductionMilling">Moagem (t)</label>
+            <input id="reductionMilling" class="number-input" inputmode="decimal" type="text" placeholder="0">
+          </div>
+          <div class="field">
+            <label for="reductionRpm">RPM</label>
+            <input id="reductionRpm" class="number-input" inputmode="decimal" type="text" placeholder="0">
+          </div>
+          <div class="field">
+            <label for="reductionNote">Observação</label>
+            <input id="reductionNote" type="text" placeholder="Opcional">
+          </div>
+          <button class="btn-primary" id="saveReductionEntryBtn" type="button">Adicionar redução</button>
+          <button class="btn-secondary" id="cancelReductionEditBtn" type="button" hidden>Cancelar edição</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Reduções lançadas</h2>
+          <span class="status-pill">Lançamentos individuais</span>
+        </div>
+        <div class="table-wrap" id="reductionRowsWrap"></div>
       </section>
     </section>
 
@@ -2677,6 +2756,8 @@
     const PATIO_SYNC_KEY = "cambui.daily.production.patio.sync.v1";
     const STOPPAGE_STORAGE_KEY = "cambui.daily.production.stoppages.v1";
     const STOPPAGE_SYNC_KEY = "cambui.daily.production.stoppages.sync.v1";
+    const REDUCTION_STORAGE_KEY = "cambui.daily.production.reductions.v1";
+    const REDUCTION_SYNC_KEY = "cambui.daily.production.reductions.sync.v1";
     const MACHINE_PRODUCTION_STORAGE_KEY = "cambui.daily.production.machines.v1";
     const MACHINE_PRODUCTION_SYNC_KEY = "cambui.daily.production.machines.sync.v1";
     const FIREBASE_CONFIG_KEY = "cambui.daily.production.firebase.config.v1";
@@ -2761,6 +2842,7 @@
       reportsView: document.querySelector("#reportsView"),
       patioView: document.querySelector("#patioView"),
       stoppagesView: document.querySelector("#stoppagesView"),
+      reductionsView: document.querySelector("#reductionsView"),
       machinesView: document.querySelector("#machinesView"),
       entryView: document.querySelector("#entryView"),
       targetsView: document.querySelector("#targetsView"),
@@ -2788,6 +2870,7 @@
       reportsTransportWrap: document.querySelector("#reportsTransportWrap"),
       reportsPatioTimesWrap: document.querySelector("#reportsPatioTimesWrap"),
       reportsStoppageWrap: document.querySelector("#reportsStoppageWrap"),
+      reportsReductionWrap: document.querySelector("#reportsReductionWrap"),
       reportsFrontWrap: document.querySelector("#reportsFrontWrap"),
       reportsTypeWrap: document.querySelector("#reportsTypeWrap"),
       reportsRankingWrap: document.querySelector("#reportsRankingWrap"),
@@ -2850,6 +2933,20 @@
       stoppageCategoryWrap: document.querySelector("#stoppageCategoryWrap"),
       stoppageDailyWrap: document.querySelector("#stoppageDailyWrap"),
       stoppageRowsWrap: document.querySelector("#stoppageRowsWrap"),
+      reductionStartDate: document.querySelector("#reductionStartDate"),
+      reductionEndDate: document.querySelector("#reductionEndDate"),
+      reductionSource: document.querySelector("#reductionSource"),
+      reductionKpiWrap: document.querySelector("#reductionKpiWrap"),
+      reductionEntryMode: document.querySelector("#reductionEntryMode"),
+      reductionEntryId: document.querySelector("#reductionEntryId"),
+      reductionDate: document.querySelector("#reductionDate"),
+      reductionStart: document.querySelector("#reductionStart"),
+      reductionEnd: document.querySelector("#reductionEnd"),
+      reductionHours: document.querySelector("#reductionHours"),
+      reductionMilling: document.querySelector("#reductionMilling"),
+      reductionRpm: document.querySelector("#reductionRpm"),
+      reductionNote: document.querySelector("#reductionNote"),
+      reductionRowsWrap: document.querySelector("#reductionRowsWrap"),
       machineStartDate: document.querySelector("#machineStartDate"),
       machineEndDate: document.querySelector("#machineEndDate"),
       machineFrontFilter: document.querySelector("#machineFrontFilter"),
@@ -2976,6 +3073,8 @@
     let patioLocalUpdatedAt = loadPatioUpdatedAt();
     let stoppageRecords = loadStoppageRecords();
     let stoppageLocalUpdatedAt = loadStoppageUpdatedAt();
+    let reductionRecords = loadReductionRecords();
+    let reductionLocalUpdatedAt = loadReductionUpdatedAt();
     let machineProductionRecords = loadMachineProductionRecords();
     let machineProductionLocalUpdatedAt = loadMachineProductionUpdatedAt();
     let firebaseConfig = loadFirebaseConfig();
@@ -3126,6 +3225,13 @@
       return new Intl.NumberFormat("pt-BR", {
         maximumFractionDigits: value % 1 === 0 ? 0 : 3
       }).format(value || 0);
+    }
+
+    function formatNumberFixed(value, digits = 2) {
+      return new Intl.NumberFormat("pt-BR", {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits
+      }).format(Number(value) || 0);
     }
 
     function formatPercent(value) {
@@ -3813,6 +3919,7 @@
           recordCount: records.length,
           patioRecordCount: getCleanPatioRecords(patioRecords).length,
           stoppageRecordCount: getCleanStoppageRecords(stoppageRecords).length,
+          reductionRecordCount: getCleanReductionRecords(reductionRecords).length,
           machineProductionRecordCount: getCleanMachineProductionRecords(machineProductionRecords).length
         }, { merge: true });
       }, {
@@ -3835,6 +3942,7 @@
           recordCount: records.length,
           patioRecordCount: getCleanPatioRecords(patioRecords).length,
           stoppageRecordCount: getCleanStoppageRecords(stoppageRecords).length,
+          reductionRecordCount: getCleanReductionRecords(reductionRecords).length,
           machineProductionRecordCount: getCleanMachineProductionRecords(machineProductionRecords).length
         }, { merge: true });
       }, options);
@@ -3861,6 +3969,7 @@
           recordCount: records.length,
           patioRecordCount: getCleanPatioRecords(patioRecords).length,
           stoppageRecordCount: getCleanStoppageRecords(stoppageRecords).length,
+          reductionRecordCount: getCleanReductionRecords(reductionRecords).length,
           machineProductionRecordCount: getCleanMachineProductionRecords(machineProductionRecords).length,
           lastRecordDate: cleanRecord.date
         }, { merge: true });
@@ -3895,6 +4004,7 @@
           recordCount: records.length,
           patioRecordCount: getCleanPatioRecords(patioRecords).length,
           stoppageRecordCount: getCleanStoppageRecords(stoppageRecords).length,
+          reductionRecordCount: getCleanReductionRecords(reductionRecords).length,
           machineProductionRecordCount: getCleanMachineProductionRecords(machineProductionRecords).length
         }, { merge: true });
       }, options);
@@ -3904,6 +4014,7 @@
       const cleanRecords = getCleanRecords(records);
       const cleanPatioRecords = getCleanPatioRecords(patioRecords);
       const cleanStoppageRecords = getCleanStoppageRecords(stoppageRecords);
+      const cleanReductionRecords = getCleanReductionRecords(reductionRecords);
       const cleanMachineProductionRecords = getCleanMachineProductionRecords(machineProductionRecords);
       const localDates = new Set(cleanRecords.map((record) => record.date));
       const lastRecord = cleanRecords[cleanRecords.length - 1] || null;
@@ -3922,6 +4033,9 @@
           stoppageUpdatedAt: now,
           stoppageRecordCount: cleanStoppageRecords.length,
           stoppageRecords: cleanStoppageRecords,
+          reductionUpdatedAt: now,
+          reductionRecordCount: cleanReductionRecords.length,
+          reductionRecords: cleanReductionRecords,
           machineProductionUpdatedAt: now,
           machineProductionRecordCount: cleanMachineProductionRecords.length,
           machineProductionRecords: cleanMachineProductionRecords,
@@ -3949,6 +4063,7 @@
         await Promise.all([...deletes, ...writes]);
         persistPatioUpdatedAt(now);
         persistStoppageUpdatedAt(now);
+        persistReductionUpdatedAt(now);
         persistMachineProductionUpdatedAt(now);
       }, options);
     }
@@ -3982,6 +4097,22 @@
           stoppageRecords: cleanStoppageRecords
         }, { merge: true });
         persistStoppageUpdatedAt(now);
+      }, options);
+    }
+
+    async function syncReductionRecordsToFirebase(options = {}) {
+      const cleanReductionRecords = getCleanReductionRecords(reductionRecords);
+      const now = new Date().toISOString();
+      return runFirebaseTask(async (root) => {
+        await root.set({
+          plant: PLANT,
+          version: APP_VERSION,
+          updatedAt: now,
+          reductionUpdatedAt: now,
+          reductionRecordCount: cleanReductionRecords.length,
+          reductionRecords: cleanReductionRecords
+        }, { merge: true });
+        persistReductionUpdatedAt(now);
       }, options);
     }
 
@@ -4030,13 +4161,18 @@
         : [];
       const remoteStoppageUpdatedAt = String((downloaded.meta && (downloaded.meta.stoppageUpdatedAt || downloaded.meta.updatedAt)) || "");
       const hasRemoteStoppagePayload = downloaded.meta && Array.isArray(downloaded.meta.stoppageRecords);
+      const remoteReductionRecords = downloaded.meta && Array.isArray(downloaded.meta.reductionRecords)
+        ? getCleanReductionRecords(downloaded.meta.reductionRecords)
+        : [];
+      const remoteReductionUpdatedAt = String((downloaded.meta && (downloaded.meta.reductionUpdatedAt || downloaded.meta.updatedAt)) || "");
+      const hasRemoteReductionPayload = downloaded.meta && Array.isArray(downloaded.meta.reductionRecords);
       const remoteMachineProductionRecords = downloaded.meta && Array.isArray(downloaded.meta.machineProductionRecords)
         ? getCleanMachineProductionRecords(downloaded.meta.machineProductionRecords)
         : [];
       const remoteMachineProductionUpdatedAt = String((downloaded.meta && (downloaded.meta.machineProductionUpdatedAt || downloaded.meta.updatedAt)) || "");
       const hasRemoteMachineProductionPayload = downloaded.meta && Array.isArray(downloaded.meta.machineProductionRecords);
 
-      if (!remoteTargets && !remoteRecords.length && !hasRemotePatioPayload && !hasRemoteStoppagePayload && !hasRemoteMachineProductionPayload) {
+      if (!remoteTargets && !remoteRecords.length && !hasRemotePatioPayload && !hasRemoteStoppagePayload && !hasRemoteReductionPayload && !hasRemoteMachineProductionPayload) {
         if (!options.silent) showToast("Nenhum dado encontrado no Firebase.");
         return false;
       }
@@ -4070,6 +4206,15 @@
         persistStoppageRecords({ updatedAt: remoteStoppageUpdatedAt || new Date().toISOString() });
       }
 
+      const remoteReductionTime = Date.parse(remoteReductionUpdatedAt || "");
+      const localReductionTime = Date.parse(reductionLocalUpdatedAt || "");
+      const remoteReductionIsNewer = Number.isNaN(localReductionTime)
+        || (!Number.isNaN(remoteReductionTime) && remoteReductionTime >= localReductionTime);
+      if (hasRemoteReductionPayload && (options.forceReductionReplace || remoteReductionIsNewer)) {
+        reductionRecords = getCleanReductionRecords(remoteReductionRecords);
+        persistReductionRecords({ updatedAt: remoteReductionUpdatedAt || new Date().toISOString() });
+      }
+
       const remoteMachineProductionTime = Date.parse(remoteMachineProductionUpdatedAt || "");
       const localMachineProductionTime = Date.parse(machineProductionLocalUpdatedAt || "");
       const remoteMachineProductionIsNewer = Number.isNaN(localMachineProductionTime)
@@ -4086,6 +4231,7 @@
       renderManagementReports();
       renderPatio();
       renderStoppages();
+      renderReductions();
       renderMachineProductions();
       renderHistory();
       return true;
@@ -4118,6 +4264,8 @@
         patioUpdatedAt: patioLocalUpdatedAt,
         stoppageUpdatedAt: stoppageLocalUpdatedAt,
         stoppageRecords: getCleanStoppageRecords(stoppageRecords),
+        reductionUpdatedAt: reductionLocalUpdatedAt,
+        reductionRecords: getCleanReductionRecords(reductionRecords),
         machineProductionUpdatedAt: machineProductionLocalUpdatedAt,
         machineProductionRecords: getCleanMachineProductionRecords(machineProductionRecords)
       };
@@ -4171,6 +4319,14 @@
         persistStoppageRecords({ updatedAt: payload.stoppageUpdatedAt || payload.exportedAt || new Date().toISOString() });
       }
 
+      if (!Array.isArray(payload) && Array.isArray(payload.reductionRecords)) {
+        const normalizedReductions = getCleanReductionRecords(payload.reductionRecords);
+        reductionRecords = mergeRecords
+          ? getCleanReductionRecords([...reductionRecords, ...normalizedReductions])
+          : normalizedReductions;
+        persistReductionRecords({ updatedAt: payload.reductionUpdatedAt || payload.exportedAt || new Date().toISOString() });
+      }
+
       if (!Array.isArray(payload) && Array.isArray(payload.machineProductionRecords)) {
         const normalizedMachineProductions = getCleanMachineProductionRecords(payload.machineProductionRecords);
         machineProductionRecords = mergeRecords
@@ -4187,6 +4343,7 @@
       renderManagementReports();
       renderPatio();
       renderStoppages();
+      renderReductions();
       renderMachineProductions();
       renderHistory();
       return normalized.length;
@@ -4324,6 +4481,7 @@
       if (type === "targets-save") return "Metas aguardando envio";
       if (type === "patio-sync") return "Tempo de pátio aguardando sincronização";
       if (type === "stoppage-sync") return "Paradas da usina aguardando sincronização";
+      if (type === "reduction-sync") return "Redução de moagem aguardando sincronização";
       if (type === "machine-production-sync") return "Produção das máquinas aguardando sincronização";
       if (type === "upload-all") return "Base completa aguardando sincronização";
       return "Sincronização pendente";
@@ -4440,6 +4598,15 @@
           pendingMessage: "Enviando pendencia das paradas da usina...",
           successStatus: "Pendencia das paradas sincronizada.",
           errorStatus: "Nao foi possivel sincronizar as paradas pendentes."
+        });
+      }
+
+      if (item.type === "reduction-sync") {
+        return syncReductionRecordsToFirebase({
+          silent: true,
+          pendingMessage: "Enviando pendencia da redução de moagem...",
+          successStatus: "Pendencia da redução de moagem sincronizada.",
+          errorStatus: "Nao foi possivel sincronizar a redução de moagem pendente."
         });
       }
 
@@ -5514,6 +5681,473 @@
         lossAveragePerDay,
         percent: progressFor(effectiveHours, plannedHours)
       };
+    }
+
+    function operationalStartDate(date) {
+      const cleanDate = normalizeRecordDate(date);
+      if (!cleanDate) return null;
+      const [year, month, day] = cleanDate.split("-").map(Number);
+      return new Date(year, month - 1, day, 6, 0, 0, 0);
+    }
+
+    function formatOperationalDateTime(value) {
+      if (!(value instanceof Date) || Number.isNaN(value.getTime())) return "";
+      const pad = (number) => String(number).padStart(2, "0");
+      return `${pad(value.getDate())}/${pad(value.getMonth() + 1)}/${value.getFullYear()} ${pad(value.getHours())}:${pad(value.getMinutes())}`;
+    }
+
+    function formatClockHours(value) {
+      const totalMinutes = Math.round(Math.max(0, Number(value) || 0) * 60);
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      return `${hours}:${String(minutes).padStart(2, "0")}`;
+    }
+
+    function millingProductionForDate(date) {
+      const record = recordForDate(date);
+      if (!record) return 0;
+      return rowsFromRecords([record])
+        .filter((row) => !isTransport(row.type))
+        .reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+    }
+
+    function operationalDateFromDateTime(value) {
+      const text = String(value || "").trim();
+      if (!text) return "";
+      const parsed = new Date(text);
+      if (Number.isNaN(parsed.getTime())) return normalizeRecordDate(text);
+      const operational = new Date(parsed);
+      if (operational.getHours() < 6) operational.setDate(operational.getDate() - 1);
+      return dateInputFromDate(operational);
+    }
+
+    function defaultReductionStart(date = todayInputValue()) {
+      const start = operationalStartDate(date);
+      return start ? localIsoFromDate(start).slice(0, 16) : "";
+    }
+
+    function defaultReductionEnd(date = todayInputValue()) {
+      const start = operationalStartDate(date);
+      if (!start) return "";
+      const end = new Date(start.getTime() + (24 * 60 - 1) * 60000);
+      return localIsoFromDate(end).slice(0, 16);
+    }
+
+    function hoursBetweenDateTimes(start, end) {
+      const from = new Date(start);
+      const to = new Date(end);
+      if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return 0;
+      const hours = (to - from) / 3600000;
+      return hours > 0 ? hours : 0;
+    }
+
+    function normalizeReductionRecord(row) {
+      const start = String(row.start || row.inicio || row.startDateTime || "").trim();
+      const end = String(row.end || row.fim || row.endDateTime || "").trim();
+      const date = normalizeRecordDate(row.date || row.data || row.day) || operationalDateFromDateTime(start);
+      const hours = Math.max(0, parseHoursInput(row.hours ?? row.horas ?? row.duration ?? row.duracao ?? 0) || hoursBetweenDateTimes(start, end));
+      const milling = Math.max(0, parseNumber(row.milling ?? row.moagem ?? row.production ?? row.producao ?? row.toneladas ?? 0));
+      const rpm = Math.max(0, parseNumber(row.rpm ?? row.reductionRpm ?? row.rpmReducao ?? 0));
+      const note = String(row.note || row.observacao || row.obs || "").trim();
+      if (!date || !hours || !milling) return null;
+      const normalizedStart = start || defaultReductionStart(date);
+      const normalizedEnd = end || (normalizedStart ? localIsoFromDate(new Date(new Date(normalizedStart).getTime() + Math.round(hours * 60) * 60000)).slice(0, 16) : defaultReductionEnd(date));
+      return {
+        id: row.id || makeId(),
+        plant: String(row.plant || row.usina || PLANT).trim() || PLANT,
+        date,
+        start: normalizedStart,
+        end: normalizedEnd,
+        hours,
+        milling,
+        rpm,
+        note,
+        createdAt: row.createdAt || new Date().toISOString(),
+        updatedAt: row.updatedAt || new Date().toISOString()
+      };
+    }
+
+    function getCleanReductionRecords(source = reductionRecords) {
+      const byId = new Map();
+      (source || []).forEach((row) => {
+        const normalized = normalizeReductionRecord(row);
+        if (!normalized || !recordBelongsToPlant(normalized)) return;
+        byId.set(normalized.id, normalized);
+      });
+      return [...byId.values()].sort((a, b) => a.date.localeCompare(b.date) || String(a.start).localeCompare(String(b.start)));
+    }
+
+    function loadReductionRecords() {
+      try {
+        const raw = localStorage.getItem(REDUCTION_STORAGE_KEY);
+        return getCleanReductionRecords(raw ? JSON.parse(raw) : []);
+      } catch {
+        return [];
+      }
+    }
+
+    function loadReductionUpdatedAt() {
+      try {
+        return String(localStorage.getItem(REDUCTION_SYNC_KEY) || "");
+      } catch {
+        return "";
+      }
+    }
+
+    function persistReductionUpdatedAt(value = new Date().toISOString()) {
+      reductionLocalUpdatedAt = value;
+      try {
+        localStorage.setItem(REDUCTION_SYNC_KEY, value);
+      } catch {
+        // Mantém a data em memória mesmo se o navegador estiver sem espaço.
+      }
+      return value;
+    }
+
+    function persistReductionRecords(options = {}) {
+      reductionRecords = getCleanReductionRecords(reductionRecords);
+      localStorage.setItem(REDUCTION_STORAGE_KEY, JSON.stringify(reductionRecords));
+      persistReductionUpdatedAt(options.updatedAt || new Date().toISOString());
+    }
+
+    function reductionRange() {
+      return normalizeDateRange(els.reductionStartDate.value, els.reductionEndDate.value);
+    }
+
+    function setReductionRange(start, end) {
+      const range = normalizeDateRange(start, end);
+      els.reductionStartDate.value = range.start;
+      els.reductionEndDate.value = range.end;
+    }
+
+    function reductionRowsForRange(range = reductionRange()) {
+      const normalized = normalizeDateRange(range.start, range.end);
+      return getCleanReductionRecords(reductionRecords)
+        .filter((record) => record.date >= normalized.start && record.date <= normalized.end);
+    }
+
+    function reductionReportItems(rows = []) {
+      return (rows || []).map((row) => {
+        const estimatedMilling = row.hours * EFFECTIVE_MILLING_TONS_PER_HOUR;
+        const reductionTons = Math.max(estimatedMilling - row.milling, 0);
+        const reducedPerHour = row.hours ? reductionTons / row.hours : 0;
+        return {
+          ...row,
+          startDate: row.start ? new Date(row.start) : operationalStartDate(row.date),
+          endDate: row.end ? new Date(row.end) : null,
+          estimatedMilling,
+          reductionTons,
+          reducedPerHour
+        };
+      });
+    }
+
+    function reductionSummary(items = []) {
+      const totalHours = items.reduce((sum, item) => sum + (Number(item.hours) || 0), 0);
+      const totalMilling = items.reduce((sum, item) => sum + (Number(item.milling) || 0), 0);
+      const estimatedMilling = items.reduce((sum, item) => sum + (Number(item.estimatedMilling) || 0), 0);
+      const reductionTons = items.reduce((sum, item) => sum + (Number(item.reductionTons) || 0), 0);
+      const rpmRows = items.filter((item) => Number(item.rpm) > 0 && Number(item.hours) > 0);
+      const rpmHours = rpmRows.reduce((sum, item) => sum + (Number(item.hours) || 0), 0);
+      const rpmWeighted = rpmRows.reduce((sum, item) => sum + (Number(item.rpm) || 0) * (Number(item.hours) || 0), 0);
+      return {
+        days: items.length,
+        totalHours,
+        totalMilling,
+        estimatedMilling,
+        reductionTons,
+        reducedPerHour: totalHours ? reductionTons / totalHours : 0,
+        averageRpm: rpmHours ? rpmWeighted / rpmHours : 0
+      };
+    }
+
+    function reductionTableRows(items = []) {
+      return items.map((item) => [
+        formatOperationalDateTime(item.startDate),
+        formatOperationalDateTime(item.endDate),
+        formatClockHours(item.hours),
+        formatNumber(item.milling),
+        item.rpm ? formatNumberFixed(item.rpm) : "-",
+        formatNumber(item.estimatedMilling),
+        formatNumber(item.reductionTons),
+        formatNumberFixed(item.reducedPerHour)
+      ]);
+    }
+
+    function reductionSummaryRows(summary) {
+      return [
+        ["Lançamentos", String(summary.days), "Reduções individuais no período"],
+        ["Horas acompanhadas", formatClockHours(summary.totalHours), "Soma das horas lançadas"],
+        ["Moagem na redução", formatNumber(summary.totalMilling), "Moagem informada nos lançamentos"],
+        ["RPM médio", summary.averageRpm ? formatNumberFixed(summary.averageRpm) : "-", "Média ponderada pelas horas"],
+        ["Moagem estimada", formatNumber(summary.estimatedMilling), `${EFFECTIVE_MILLING_TONS_PER_HOUR} t/h x horas acompanhadas`],
+        ["Redução estimada", formatNumber(summary.reductionTons), "Moagem estimada menos moagem na redução"],
+        ["Ton/h reduzida", formatNumberFixed(summary.reducedPerHour), "Média da redução por hora"]
+      ];
+    }
+
+    function reductionHtml(rows, options = {}) {
+      const items = reductionReportItems(rows);
+      if (!items.length) {
+        return `<div class="empty-state">${escapeHtml(options.emptyMessage || "Sem reduções de moagem no período.")}</div>`;
+      }
+
+      const summary = reductionSummary(items);
+      const tableRows = reductionTableRows(items);
+      return `
+        <div class="advanced-metrics">
+          ${reductionSummaryRows(summary).map(([label, value, detail]) => `
+            <div class="goal-metric">
+              <span>${escapeHtml(label)}</span>
+              <strong>${escapeHtml(value)}</strong>
+              <small>${escapeHtml(detail)}</small>
+            </div>
+          `).join("")}
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Início</th>
+              <th>Fim</th>
+              <th>Horas</th>
+              <th>Moagem (t)</th>
+              <th>RPM</th>
+              <th>Moagem estimada</th>
+              <th>Redução (t)</th>
+              <th>Ton/h reduzida</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("")}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2"><strong>Total: ${summary.days} dia${summary.days === 1 ? "" : "s"}</strong></td>
+              <td><strong>${formatClockHours(summary.totalHours)}</strong></td>
+              <td><strong>${formatNumber(summary.totalMilling)}</strong></td>
+              <td><strong>${summary.averageRpm ? formatNumberFixed(summary.averageRpm) : "-"}</strong></td>
+              <td><strong>${formatNumber(summary.estimatedMilling)}</strong></td>
+              <td><strong>${formatNumber(summary.reductionTons)}</strong></td>
+              <td><strong>${formatNumberFixed(summary.reducedPerHour)}</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+      `;
+    }
+
+    function renderReductionKpis(rows) {
+      const items = reductionReportItems(rows);
+      const summary = reductionSummary(items);
+      const kpis = reductionSummaryRows(summary);
+      els.reductionKpiWrap.innerHTML = kpis.map(([label, value, detail]) => `
+        <article class="stat">
+          <span>${escapeHtml(label)}</span>
+          <strong>${escapeHtml(value)}</strong>
+          <small>${escapeHtml(detail)}</small>
+        </article>
+      `).join("");
+    }
+
+    function renderReductionRows(rows) {
+      if (!rows.length) {
+        els.reductionRowsWrap.innerHTML = '<div class="empty-state">Nenhuma redução de moagem lançada no período selecionado.</div>';
+        return;
+      }
+      const items = reductionReportItems(rows).sort((a, b) => b.date.localeCompare(a.date) || String(b.start).localeCompare(String(a.start)));
+      els.reductionRowsWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Início</th>
+              <th>Fim</th>
+              <th>Horas</th>
+              <th>Moagem (t)</th>
+              <th>RPM</th>
+              <th>Moagem estimada</th>
+              <th>Redução (t)</th>
+              <th>Ton/h reduzida</th>
+              <th>Observação</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map((row) => `
+              <tr>
+                <td>${formatDate(row.date)}</td>
+                <td>${formatOperationalDateTime(row.startDate)}</td>
+                <td>${formatOperationalDateTime(row.endDate)}</td>
+                <td>${formatClockHours(row.hours)}</td>
+                <td>${formatNumber(row.milling)}</td>
+                <td>${row.rpm ? formatNumberFixed(row.rpm) : "-"}</td>
+                <td>${formatNumber(row.estimatedMilling)}</td>
+                <td>${formatNumber(row.reductionTons)}</td>
+                <td>${formatNumberFixed(row.reducedPerHour)}</td>
+                <td>${escapeHtml(row.note || "")}</td>
+                <td>
+                  <div class="row-buttons">
+                    <button class="btn-secondary" type="button" data-reduction-action="edit" data-id="${escapeHtml(row.id)}">Editar</button>
+                    <button class="btn-secondary btn-danger" type="button" data-reduction-action="delete" data-id="${escapeHtml(row.id)}">Excluir</button>
+                  </div>
+                </td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderReductions() {
+      if (!els.reductionsView) return;
+      const range = reductionRange();
+      setReductionRange(range.start, range.end);
+      const rows = reductionRowsForRange(range);
+      const rangeLabel = range.start === range.end ? formatDate(range.start) : `${formatDate(range.start)} a ${formatDate(range.end)}`;
+      els.reductionSource.textContent = rows.length
+        ? `${rows.length} redução${rows.length === 1 ? "" : "ões"} de moagem no período ${rangeLabel}.`
+        : `Nenhuma redução de moagem lançada no período ${rangeLabel}.`;
+      renderReductionKpis(rows);
+      renderReductionRows(rows);
+    }
+
+    function resetReductionForm(date = els.reductionDate.value || todayInputValue()) {
+      els.reductionEntryId.value = "";
+      els.reductionDate.value = date;
+      els.reductionStart.value = defaultReductionStart(date);
+      els.reductionEnd.value = defaultReductionEnd(date);
+      els.reductionHours.value = "23:59";
+      els.reductionMilling.value = "";
+      els.reductionRpm.value = "";
+      els.reductionNote.value = "";
+      els.reductionEntryMode.textContent = "Novo";
+      els.reductionEntryMode.className = "status-pill";
+      document.querySelector("#saveReductionEntryBtn").textContent = "Adicionar redução";
+      document.querySelector("#cancelReductionEditBtn").hidden = true;
+    }
+
+    function editReductionRecord(id) {
+      const record = reductionRecords.find((item) => item.id === id);
+      if (!record) return;
+      els.reductionEntryId.value = record.id;
+      els.reductionDate.value = record.date;
+      els.reductionStart.value = String(record.start || "").slice(0, 16);
+      els.reductionEnd.value = String(record.end || "").slice(0, 16);
+      els.reductionHours.value = formatClockHours(record.hours);
+      els.reductionMilling.value = formatNumber(record.milling);
+      els.reductionRpm.value = record.rpm ? formatNumberFixed(record.rpm) : "";
+      els.reductionNote.value = record.note || "";
+      els.reductionEntryMode.textContent = "Editando";
+      els.reductionEntryMode.className = "status-pill good";
+      document.querySelector("#saveReductionEntryBtn").textContent = "Salvar alteração";
+      document.querySelector("#cancelReductionEditBtn").hidden = false;
+      els.reductionMilling.focus();
+    }
+
+    async function saveReductionEntry() {
+      const editingId = els.reductionEntryId.value;
+      const existing = reductionRecords.find((item) => item.id === editingId);
+      const record = normalizeReductionRecord({
+        id: editingId || makeId(),
+        date: els.reductionDate.value,
+        start: els.reductionStart.value,
+        end: els.reductionEnd.value,
+        hours: els.reductionHours.value,
+        milling: els.reductionMilling.value,
+        rpm: els.reductionRpm.value,
+        note: els.reductionNote.value,
+        createdAt: existing ? existing.createdAt : new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      if (!record) {
+        showToast("Informe data, horas e moagem da redução.");
+        return;
+      }
+      reductionRecords = getCleanReductionRecords([
+        record,
+        ...reductionRecords.filter((item) => item.id !== record.id)
+      ]);
+      persistReductionRecords();
+      setReductionRange(record.date, record.date);
+      resetReductionForm(record.date);
+      renderReductions();
+      addAuditEntry("reducao", `Redução de moagem lançada em ${formatDate(record.date)}.`);
+      const syncState = await syncOrQueue("reduction-sync", { source: editingId ? "reduction-edit" : "reduction-add", id: record.id }, () => syncReductionRecordsToFirebase({
+        silent: true,
+        pendingMessage: "Enviando redução de moagem ao banco...",
+        successStatus: "Redução de moagem sincronizada.",
+        errorStatus: "Redução salva localmente, mas a sincronização falhou."
+      }));
+      showToast(syncState === "synced"
+        ? editingId ? "Redução alterada e salva no banco." : "Redução adicionada e salva no banco."
+        : syncState === "queued-offline" || syncState === "queued-error"
+          ? "Redução salva. Banco ficou na fila."
+          : editingId ? "Redução alterada." : "Redução adicionada.");
+    }
+
+    async function deleteReductionRecord(id) {
+      const record = reductionRecords.find((item) => item.id === id);
+      if (!record) return;
+      reductionRecords = getCleanReductionRecords(reductionRecords.filter((item) => item.id !== id));
+      persistReductionRecords();
+      if (els.reductionEntryId.value === id) resetReductionForm(record.date);
+      renderReductions();
+      addAuditEntry("exclusao", `Redução de moagem removida de ${formatDate(record.date)}.`);
+      const syncState = await syncOrQueue("reduction-sync", { source: "reduction-delete", id }, () => syncReductionRecordsToFirebase({
+        silent: true,
+        pendingMessage: "Salvando exclusão da redução no banco...",
+        successStatus: "Exclusão da redução sincronizada.",
+        errorStatus: "Redução removida localmente, mas a sincronização falhou."
+      }));
+      showToast(syncState === "synced" ? "Redução removida e banco atualizado." : "Redução removida.");
+    }
+
+    async function deleteReductionRange() {
+      const range = reductionRange();
+      const before = getCleanReductionRecords(reductionRecords);
+      const selected = before.filter((row) => row.date >= range.start && row.date <= range.end);
+      if (!selected.length) {
+        showToast("Não há reduções de moagem para excluir no período.");
+        return;
+      }
+      reductionRecords = before.filter((row) => !selected.some((item) => item.id === row.id));
+      persistReductionRecords();
+      resetReductionForm(els.reductionDate.value || todayInputValue());
+      renderReductions();
+      addAuditEntry("exclusao", `${selected.length} redução${selected.length === 1 ? "" : "ões"} de moagem removida${selected.length === 1 ? "" : "s"}.`);
+      const syncState = await syncOrQueue("reduction-sync", { source: "reduction-range-delete", start: range.start, end: range.end }, () => syncReductionRecordsToFirebase({
+        silent: true,
+        pendingMessage: "Salvando exclusão das reduções no banco...",
+        successStatus: "Exclusão das reduções sincronizada.",
+        errorStatus: "Reduções removidas localmente, mas a sincronização falhou."
+      }));
+      showToast(syncState === "synced"
+        ? `${selected.length} redução${selected.length === 1 ? "" : "ões"} removida${selected.length === 1 ? "" : "s"} e banco atualizado.`
+        : `${selected.length} redução${selected.length === 1 ? "" : "ões"} removida${selected.length === 1 ? "" : "s"}.`);
+    }
+
+    async function saveReductionsDatabase() {
+      const total = getCleanReductionRecords(reductionRecords).length;
+      const syncState = await syncOrQueue("reduction-sync", { source: "reduction-manual-save" }, () => syncReductionRecordsToFirebase({
+        silent: true,
+        pendingMessage: "Salvando reduções de moagem no banco...",
+        successStatus: "Reduções de moagem salvas no banco.",
+        errorStatus: "Não foi possível salvar as reduções de moagem."
+      }));
+      showToast(syncState === "synced"
+        ? `${total} redução${total === 1 ? "" : "ões"} salva${total === 1 ? "" : "s"} no banco.`
+        : syncState === "queued-offline" || syncState === "queued-error"
+          ? "Reduções ficaram na fila para salvar no banco."
+          : "Configure o Firebase para salvar as reduções no banco.");
+    }
+
+    async function pullReductionsDatabase() {
+      const loaded = await downloadAllDataFromFirebase({
+        silent: true,
+        forceReductionReplace: true,
+        pendingMessage: "Atualizando reduções de moagem pelo banco...",
+        successStatus: "Reduções de moagem atualizadas pelo banco."
+      });
+      showToast(loaded ? "Reduções de moagem atualizadas pelo banco." : "Nenhuma redução foi carregada do banco.");
     }
 
     function renderStoppageKpis(rows, range = stoppageRange()) {
@@ -7021,6 +7655,7 @@
         reports: els.reportsView,
         patio: els.patioView,
         stoppages: els.stoppagesView,
+        reductions: els.reductionsView,
         machines: els.machinesView,
         entry: els.entryView,
         targets: els.targetsView,
@@ -7036,6 +7671,7 @@
       if (name === "reports") renderManagementReports();
       if (name === "patio") renderPatio();
       if (name === "stoppages") renderStoppages();
+      if (name === "reductions") renderReductions();
       if (name === "machines") renderMachineProductions();
       if (name === "entry") renderEntry();
       if (name === "targets") renderTargets();
@@ -8475,13 +9111,15 @@
         : `${formatDate(range.start)} a ${formatDate(range.end)}`;
       const patioCount = patioRowsForRange(range).length;
       const stoppageCount = stoppageRowsForRange(range).length;
+      const reductionCount = reductionRowsForRange(range).length;
       const chips = [
         `Período: ${rangeLabel}`,
         `Meta: ${targetContext.targetDays} dia${targetContext.targetDays === 1 ? "" : "s"} (${targetContext.label})`,
         `Dias exibidos: ${filteredRecords.length}`,
         `Registros filtrados: ${rows.length}/${baseRows.length}`,
         `Tempo de pátio: ${patioCount} viagem${patioCount === 1 ? "" : "s"}`,
-        `Paradas usina: ${stoppageCount} lançamento${stoppageCount === 1 ? "" : "s"}`
+        `Paradas usina: ${stoppageCount} lançamento${stoppageCount === 1 ? "" : "s"}`,
+        `Redução moagem: ${reductionCount} lançamento${reductionCount === 1 ? "" : "s"}`
       ];
 
       if (filters.type !== "all") chips.push(`Operação: ${reportTypeLabel(filters.type)}`);
@@ -8507,6 +9145,8 @@
       const stoppageRows = stoppageRowsForRange(range);
       const stoppage = stoppageSummary(stoppageRows);
       const effective = stoppageEffectiveMilling(range, stoppage);
+      const reductionItems = reductionReportItems(reductionRowsForRange(range));
+      const reduction = reductionSummary(reductionItems);
       const ownHarvestTarget = targetForType(TYPES.OWN_HARVEST) * targetContext.targetDays;
       const thirdHarvestTarget = targetForType(TYPES.THIRD_HARVEST) * targetContext.targetDays;
       const florestaCaneTarget = targetForType(TYPES.FLORESTA_CANE) * targetContext.targetDays;
@@ -8530,6 +9170,7 @@
         { label: "Transporte total", value: formatNumber(baseSummary.transportTotal), detail: detailWithTargetBalance(`${formatPercent(baseSummary.transportPercent)} sobre moagem`, baseSummary.transportTotal, transportTarget) },
         { label: "Tempo palha", value: formatMinutes(patioSummary.avgPalha), detail: `${patioSummary.trips} viagem${patioSummary.trips === 1 ? "" : "s"} no período` },
         { label: "Paradas usina", value: formatHours(stoppage.totalHours), detail: `${stoppage.records} lançamento${stoppage.records === 1 ? "" : "s"} no período` },
+        { label: "Redução moagem", value: formatNumber(reduction.reductionTons), detail: `${reduction.days} lançamento${reduction.days === 1 ? "" : "s"} · ${formatNumberFixed(reduction.reducedPerHour)} t/h` },
         { label: "Dias efetivos", value: formatNumber(effective.effectiveDays), detail: effective.days ? `Previsto ${formatNumber(effective.days)} - parada ${formatNumber(effective.stoppedDays)} dia` : "Sem dias de safra" },
         { label: "Moagem efetiva/dia", value: formatNumber(effective.effectiveAveragePerDay), detail: `Desconto médio ${formatNumber(effective.lossAveragePerDay)} t/dia` },
         { label: "Dias lançados", value: `${launchedDays}/${info.targetDays || 0}`, detail: `${info.selectedDays} dia${info.selectedDays === 1 ? "" : "s"} no período` },
@@ -8977,6 +9618,13 @@
           <div class="table-wrap">${dailyTable}</div>
         </div>
       `;
+    }
+
+    function renderReportsReductions(range) {
+      const rows = reductionRowsForRange(range);
+      els.reportsReductionWrap.innerHTML = `<div class="table-wrap">${reductionHtml(rows, {
+        emptyMessage: "Sem reduções de moagem lançadas no período do relatório."
+      })}</div>`;
     }
 
     function renderReportsFront(rows, baseSummary) {
@@ -9459,7 +10107,8 @@
         ? formatDate(range.start)
         : `${formatDate(range.start)} a ${formatDate(range.end)}`;
       const stoppageCount = stoppageRowsForRange(range).length;
-      els.reportsPrintSubtitle.textContent = `${rangeLabel} · Moagem ${formatNumber(baseSummary.total)} · ${filteredRecords.length} dia${filteredRecords.length === 1 ? "" : "s"} · ${rows.length} registro${rows.length === 1 ? "" : "s"} filtrado${rows.length === 1 ? "" : "s"} · ${stoppageCount} parada${stoppageCount === 1 ? "" : "s"}`;
+      const reductionCount = reductionRowsForRange(range).length;
+      els.reportsPrintSubtitle.textContent = `${rangeLabel} · Moagem ${formatNumber(baseSummary.total)} · ${filteredRecords.length} dia${filteredRecords.length === 1 ? "" : "s"} · ${rows.length} registro${rows.length === 1 ? "" : "s"} filtrado${rows.length === 1 ? "" : "s"} · ${stoppageCount} parada${stoppageCount === 1 ? "" : "s"} · ${reductionCount} redução${reductionCount === 1 ? "" : "ões"}`;
     }
 
     function renderManagementReports() {
@@ -9488,6 +10137,7 @@
       renderReportsTransport(baseSummary, targetContext.targetDays);
       renderReportsPatioTimes(range);
       renderReportsStoppages(range);
+      renderReportsReductions(range);
       renderReportsFront(rows, baseSummary);
       renderReportsType(rows, baseSummary, targetContext.targetDays);
       renderReportsRanking(rows, baseSummary);
@@ -10951,6 +11601,14 @@
         ]),
         ["Média usina", "Máx. usina"]
       );
+      const reportStoppageRows = stoppageRowsForRange(range);
+      const reportStoppageSummary = stoppageSummary(reportStoppageRows);
+      const reportStoppageEffective = stoppageEffectiveMilling(range, reportStoppageSummary);
+      const reportStoppageCategoryRows = groupedStoppageRows(reportStoppageRows, (row) => row.category);
+      const reportStoppageDailyRows = groupedStoppageRows(reportStoppageRows, (row) => row.date).sort((a, b) => a.label.localeCompare(b.label));
+      const reportReductionRows = reductionRowsForRange(range);
+      const reportReductionItems = reductionReportItems(reportReductionRows);
+      const reportReductionSummary = reductionSummary(reportReductionItems);
       const lines = [
         ["Relatório Gerencial - Produção Diária da Cambuí"],
         ["Período", `${formatDate(range.start)} a ${formatDate(range.end)}`],
@@ -10998,6 +11656,45 @@
         ["Tempos por frente"],
         csvPatioFrontTable.headers,
         ...csvPatioFrontTable.rows,
+        [],
+        ["Paradas da usina"],
+        ["Total parado", formatHours(reportStoppageSummary.totalHours)],
+        ["Dias efetivos", formatNumber(reportStoppageEffective.effectiveDays)],
+        ["Moagem efetiva média/dia", formatNumber(reportStoppageEffective.effectiveAveragePerDay)],
+        ["Perda estimada", formatNumber(reportStoppageEffective.lossTons)],
+        [],
+        ["Paradas por motivo"],
+        ["Tipo do motivo", "Horas paradas", "% total", "Lançamentos", "Motivos"],
+        ...reportStoppageCategoryRows.map((item) => [
+          item.label,
+          formatHours(item.hours),
+          formatPercent(progressFor(item.hours, reportStoppageSummary.totalHours)),
+          item.records,
+          [...item.reasons].slice(0, 5).join(", ") || "-"
+        ]),
+        [],
+        ["Evolução diária das paradas"],
+        ["Data", "Horas paradas", "Lançamentos", "Motivos"],
+        ...reportStoppageDailyRows.map((item) => [
+          formatDate(item.label),
+          formatHours(item.hours),
+          item.records,
+          [...item.reasons].slice(0, 5).join(", ") || "-"
+        ]),
+        [],
+        ["Redução de moagem"],
+        ["Início", "Fim", "Horas", "Moagem (t)", "RPM", "Moagem estimada", "Redução (t)", "Ton/h reduzida"],
+        ...reductionTableRows(reportReductionItems),
+        reportReductionRows.length ? [
+          `Total: ${reportReductionSummary.days} dia${reportReductionSummary.days === 1 ? "" : "s"}`,
+          "",
+          formatClockHours(reportReductionSummary.totalHours),
+          formatNumber(reportReductionSummary.totalMilling),
+          reportReductionSummary.averageRpm ? formatNumberFixed(reportReductionSummary.averageRpm) : "-",
+          formatNumber(reportReductionSummary.estimatedMilling),
+          formatNumber(reportReductionSummary.reductionTons),
+          formatNumberFixed(reportReductionSummary.reducedPerHour)
+        ] : [],
         [],
         ["Diário"],
         ["Data", "Moagem", "Volume filtrado", "Meta", "% meta", "% própria", "% terceira", "% transp. próprio", "% transp. terceiro", "% transp. total", "Falta", "Registros filtrados"],
@@ -11336,6 +12033,9 @@
       const reportStoppageEffective = stoppageEffectiveMilling(range, reportStoppageSummary);
       const reportStoppageCategoryRows = groupedStoppageRows(reportStoppageRows, (row) => row.category);
       const reportStoppageDailyRows = groupedStoppageRows(reportStoppageRows, (row) => row.date).sort((a, b) => a.label.localeCompare(b.label));
+      const reportReductionRows = reductionRowsForRange(range);
+      const reportReductionItems = reductionReportItems(reportReductionRows);
+      const reportReductionSummary = reductionSummary(reportReductionItems);
       const trendStats = reportEvolutionStats(dailyItems);
       const externalCane = baseSummary.florestaCane + baseSummary.valeCane;
       const filteredVolume = rowProductionTotal(rows);
@@ -11376,6 +12076,7 @@
         ["Transporte total", formatNumber(baseSummary.transportTotal), formatPercent(baseSummary.transportPercent), transportDifference >= 0 ? "good" : "warn"],
         ["Média palha", formatMinutes(patioSummary.avgPalha), `${patioSummary.trips} viagem${patioSummary.trips === 1 ? "" : "s"}`, patioSummary.palhaAlerts ? "warn" : ""],
         ["Paradas usina", formatHours(reportStoppageSummary.totalHours), `${reportStoppageSummary.records} lançamento${reportStoppageSummary.records === 1 ? "" : "s"}`, reportStoppageSummary.totalHours ? "warn" : ""],
+        ["Redução moagem", formatNumber(reportReductionSummary.reductionTons), `${reportReductionSummary.days} lançamento${reportReductionSummary.days === 1 ? "" : "s"} · ${formatNumberFixed(reportReductionSummary.reducedPerHour)} t/h`, reportReductionSummary.reductionTons ? "warn" : ""],
         ["Dias efetivos", formatNumber(reportStoppageEffective.effectiveDays), `Parada ${formatNumber(reportStoppageEffective.stoppedDays)} dia`, reportStoppageEffective.stoppedDays ? "warn" : ""],
         ["Moagem efetiva/dia", formatNumber(reportStoppageEffective.effectiveAveragePerDay), `Desconto ${formatNumber(reportStoppageEffective.lossAveragePerDay)} t/dia`, reportStoppageEffective.lossAveragePerDay ? "warn" : ""],
         ["Dias exibidos", `${filteredRecords.length}`, `${dailyItems.length} no gráfico`, ""]
@@ -11496,6 +12197,8 @@
         row.reason || "-",
         row.note || "-"
       ]);
+      const reductionSummaryTableRows = reductionSummaryRows(reportReductionSummary);
+      const reductionDetailTableRows = reductionTableRows(reportReductionItems);
       const patioFrontTableRows = patioFrontRows.map((item) => [
         item.name,
         String(item.trips),
@@ -11721,6 +12424,13 @@
                   ${pdfTable(["Data", "Horas paradas", "Lançamentos", "Motivos"], stoppageDailyTableRows, { limit: 20 })}
                   ${pdfTable(["Data", "Tipo", "Horas", "Motivo", "Observação"], stoppageDetailRows, { limit: 30 })}
                 ` : '<div class="pdf-empty">Sem paradas da usina lançadas no período do relatório.</div>'}
+              </div>
+              <div class="pdf-section full soft">
+                <div class="pdf-title"><h2>Redução de moagem</h2><span class="muted">Lançamentos individuais · jornada operacional 06:00 às 05:59</span></div>
+                ${reportReductionRows.length ? `
+                  ${pdfTable(["Indicador", "Valor", "Detalhe"], reductionSummaryTableRows)}
+                  ${pdfTable(["Início", "Fim", "Horas", "Moagem (t)", "RPM", "Moagem estimada", "Redução (t)", "Ton/h reduzida"], reductionDetailTableRows, { limit: 30 })}
+                ` : '<div class="pdf-empty">Sem reduções de moagem lançadas no período do relatório.</div>'}
               </div>
               <div class="pdf-section">
                 <div class="pdf-title"><h2>Ranking de origens</h2><span class="muted">Top por volume</span></div>
@@ -12615,6 +13325,54 @@
     });
     els.stoppageHours.addEventListener("change", () => {
       els.stoppageHours.value = formatDurationHours(parseHoursInput(els.stoppageHours.value));
+    });
+
+    els.reductionStartDate.addEventListener("change", renderReductions);
+    els.reductionEndDate.addEventListener("change", renderReductions);
+    document.querySelector("#reductionTodayBtn").addEventListener("click", () => {
+      const today = todayInputValue();
+      setReductionRange(today, today);
+      resetReductionForm(today);
+      renderReductions();
+    });
+    document.querySelector("#reductionMonthBtn").addEventListener("click", () => {
+      const baseDate = els.reductionEndDate.value || todayInputValue();
+      const range = monthRangeFor(baseDate);
+      setReductionRange(range.start, baseDate);
+      renderReductions();
+    });
+    document.querySelector("#saveReductionEntryBtn").addEventListener("click", saveReductionEntry);
+    document.querySelector("#cancelReductionEditBtn").addEventListener("click", () => resetReductionForm(els.reductionDate.value || todayInputValue()));
+    document.querySelector("#saveReductionsDbBtn").addEventListener("click", saveReductionsDatabase);
+    document.querySelector("#pullReductionsDbBtn").addEventListener("click", pullReductionsDatabase);
+    document.querySelector("#deleteReductionRangeBtn").addEventListener("click", deleteReductionRange);
+    els.reductionDate.addEventListener("change", () => {
+      if (!els.reductionStart.value || els.reductionStart.value.slice(0, 10) !== els.reductionDate.value) {
+        els.reductionStart.value = defaultReductionStart(els.reductionDate.value);
+        els.reductionEnd.value = defaultReductionEnd(els.reductionDate.value);
+      }
+    });
+    [els.reductionStart, els.reductionEnd].forEach((field) => {
+      field.addEventListener("change", () => {
+        const hours = hoursBetweenDateTimes(els.reductionStart.value, els.reductionEnd.value);
+        if (hours) els.reductionHours.value = formatClockHours(hours);
+        if (!els.reductionDate.value) els.reductionDate.value = operationalDateFromDateTime(els.reductionStart.value);
+      });
+    });
+    els.reductionHours.addEventListener("change", () => {
+      els.reductionHours.value = formatClockHours(parseHoursInput(els.reductionHours.value));
+    });
+    els.reductionMilling.addEventListener("change", () => {
+      if (els.reductionMilling.value.trim()) els.reductionMilling.value = formatNumber(parseNumber(els.reductionMilling.value));
+    });
+    els.reductionRpm.addEventListener("change", () => {
+      if (els.reductionRpm.value.trim()) els.reductionRpm.value = formatNumberFixed(parseNumber(els.reductionRpm.value));
+    });
+    els.reductionRowsWrap.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-reduction-action]");
+      if (!button) return;
+      if (button.dataset.reductionAction === "edit") editReductionRecord(button.dataset.id);
+      if (button.dataset.reductionAction === "delete") deleteReductionRecord(button.dataset.id);
     });
 
     els.machineStartDate.addEventListener("change", renderMachineProductions);
