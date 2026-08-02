@@ -3856,6 +3856,64 @@
       return firebaseState.db.collection("productionApps").doc("cambui");
     }
 
+    function safeFirebaseDocId(value) {
+      const raw = String(value || makeId()).trim() || makeId();
+      return encodeURIComponent(raw).replace(/\./g, "%2E").slice(0, 1400) || makeId();
+    }
+
+    function firebaseDeleteField() {
+      return window.firebase && firebase.firestore && firebase.firestore.FieldValue
+        ? firebase.firestore.FieldValue.delete()
+        : undefined;
+    }
+
+    function firebaseLargeArrayCleanupFields() {
+      const deleteField = firebaseDeleteField();
+      if (!deleteField) return {};
+      return {
+        patioRecords: deleteField,
+        stoppageRecords: deleteField,
+        reductionRecords: deleteField,
+        machineProductionRecords: deleteField
+      };
+    }
+
+    async function runFirebaseWritesInChunks(tasks, size = 300) {
+      for (let index = 0; index < tasks.length; index += size) {
+        const chunk = tasks.slice(index, index + size);
+        await Promise.all(chunk.map((task) => task()));
+      }
+    }
+
+    async function syncFirebaseCollection(root, collectionName, rows) {
+      const collectionRef = root.collection(collectionName);
+      const cleanRows = Array.isArray(rows) ? rows : [];
+      const byDocId = new Map();
+      cleanRows.forEach((row) => {
+        const id = String(row && row.id ? row.id : makeId());
+        byDocId.set(safeFirebaseDocId(id), { ...row, id, plant: String(row.plant || PLANT).trim() || PLANT });
+      });
+
+      const snapshot = await collectionRef.get();
+      const tasks = [];
+      snapshot.docs.forEach((doc) => {
+        if (!byDocId.has(doc.id)) tasks.push(() => doc.ref.delete());
+      });
+      byDocId.forEach((row, docId) => {
+        tasks.push(() => collectionRef.doc(docId).set(row));
+      });
+
+      await runFirebaseWritesInChunks(tasks);
+    }
+
+    async function readFirebaseCollection(root, collectionName) {
+      const snapshot = await root.collection(collectionName).get();
+      return snapshot.docs.map((doc) => {
+        const data = doc.data() || {};
+        return { id: data.id || decodeURIComponent(doc.id), ...data };
+      });
+    }
+
     async function ensureFirebaseReady(options = {}) {
       const silent = Boolean(options.silent);
       const force = Boolean(options.force);
@@ -3985,7 +4043,8 @@
           patioRecordCount: getCleanPatioRecords(patioRecords).length,
           stoppageRecordCount: getCleanStoppageRecords(stoppageRecords).length,
           reductionRecordCount: getCleanReductionRecords(reductionRecords).length,
-          machineProductionRecordCount: getCleanMachineProductionRecords(machineProductionRecords).length
+          machineProductionRecordCount: getCleanMachineProductionRecords(machineProductionRecords).length,
+          ...firebaseLargeArrayCleanupFields()
         }, { merge: true });
       }, {
         silent: true,
@@ -4008,7 +4067,8 @@
           patioRecordCount: getCleanPatioRecords(patioRecords).length,
           stoppageRecordCount: getCleanStoppageRecords(stoppageRecords).length,
           reductionRecordCount: getCleanReductionRecords(reductionRecords).length,
-          machineProductionRecordCount: getCleanMachineProductionRecords(machineProductionRecords).length
+          machineProductionRecordCount: getCleanMachineProductionRecords(machineProductionRecords).length,
+          ...firebaseLargeArrayCleanupFields()
         }, { merge: true });
       }, options);
     }
@@ -4036,7 +4096,8 @@
           stoppageRecordCount: getCleanStoppageRecords(stoppageRecords).length,
           reductionRecordCount: getCleanReductionRecords(reductionRecords).length,
           machineProductionRecordCount: getCleanMachineProductionRecords(machineProductionRecords).length,
-          lastRecordDate: cleanRecord.date
+          lastRecordDate: cleanRecord.date,
+          ...firebaseLargeArrayCleanupFields()
         }, { merge: true });
         await root.collection("records").doc(cleanRecord.date).set(cleanRecord, { merge: true });
       }, options);
@@ -4070,7 +4131,8 @@
           patioRecordCount: getCleanPatioRecords(patioRecords).length,
           stoppageRecordCount: getCleanStoppageRecords(stoppageRecords).length,
           reductionRecordCount: getCleanReductionRecords(reductionRecords).length,
-          machineProductionRecordCount: getCleanMachineProductionRecords(machineProductionRecords).length
+          machineProductionRecordCount: getCleanMachineProductionRecords(machineProductionRecords).length,
+          ...firebaseLargeArrayCleanupFields()
         }, { merge: true });
       }, options);
     }
@@ -4095,17 +4157,14 @@
           recordCount: cleanRecords.length,
           patioUpdatedAt: now,
           patioRecordCount: cleanPatioRecords.length,
-          patioRecords: cleanPatioRecords,
           stoppageUpdatedAt: now,
           stoppageRecordCount: cleanStoppageRecords.length,
-          stoppageRecords: cleanStoppageRecords,
           reductionUpdatedAt: now,
           reductionRecordCount: cleanReductionRecords.length,
-          reductionRecords: cleanReductionRecords,
           machineProductionUpdatedAt: now,
           machineProductionRecordCount: cleanMachineProductionRecords.length,
-          machineProductionRecords: cleanMachineProductionRecords,
-          lastRecordDate: lastRecord ? lastRecord.date : ""
+          lastRecordDate: lastRecord ? lastRecord.date : "",
+          ...firebaseLargeArrayCleanupFields()
         }, { merge: true });
 
         const recordsRef = root.collection("records");
@@ -4127,6 +4186,12 @@
         }, { merge: true }));
 
         await Promise.all([...deletes, ...writes]);
+        await Promise.all([
+          syncFirebaseCollection(root, "patioRecords", cleanPatioRecords),
+          syncFirebaseCollection(root, "stoppageRecords", cleanStoppageRecords),
+          syncFirebaseCollection(root, "reductionRecords", cleanReductionRecords),
+          syncFirebaseCollection(root, "machineProductionRecords", cleanMachineProductionRecords)
+        ]);
         persistPatioUpdatedAt(now);
         persistStoppageUpdatedAt(now);
         persistReductionUpdatedAt(now);
@@ -4144,8 +4209,9 @@
           updatedAt: now,
           patioUpdatedAt: now,
           patioRecordCount: cleanPatioRecords.length,
-          patioRecords: cleanPatioRecords
+          ...firebaseLargeArrayCleanupFields()
         }, { merge: true });
+        await syncFirebaseCollection(root, "patioRecords", cleanPatioRecords);
         persistPatioUpdatedAt(now);
       }, options);
     }
@@ -4160,8 +4226,9 @@
           updatedAt: now,
           stoppageUpdatedAt: now,
           stoppageRecordCount: cleanStoppageRecords.length,
-          stoppageRecords: cleanStoppageRecords
+          ...firebaseLargeArrayCleanupFields()
         }, { merge: true });
+        await syncFirebaseCollection(root, "stoppageRecords", cleanStoppageRecords);
         persistStoppageUpdatedAt(now);
       }, options);
     }
@@ -4176,8 +4243,9 @@
           updatedAt: now,
           reductionUpdatedAt: now,
           reductionRecordCount: cleanReductionRecords.length,
-          reductionRecords: cleanReductionRecords
+          ...firebaseLargeArrayCleanupFields()
         }, { merge: true });
+        await syncFirebaseCollection(root, "reductionRecords", cleanReductionRecords);
         persistReductionUpdatedAt(now);
       }, options);
     }
@@ -4204,22 +4272,31 @@
           updatedAt: now,
           machineProductionUpdatedAt: now,
           machineProductionRecordCount: cleanMachineProductionRecords.length,
-          machineProductionRecords: cleanMachineProductionRecords
+          ...firebaseLargeArrayCleanupFields()
         }, { merge: true });
+        await syncFirebaseCollection(root, "machineProductionRecords", cleanMachineProductionRecords);
         persistMachineProductionUpdatedAt(now);
       }, options);
     }
 
     async function downloadAllDataFromFirebase(options = {}) {
       const downloaded = await runFirebaseTask(async (root) => {
-        const [metaSnapshot, recordSnapshots] = await Promise.all([
+        const [metaSnapshot, recordSnapshots, patioRows, stoppageRows, reductionRows, machineProductionRows] = await Promise.all([
           root.get(),
-          root.collection("records").get()
+          root.collection("records").get(),
+          readFirebaseCollection(root, "patioRecords"),
+          readFirebaseCollection(root, "stoppageRecords"),
+          readFirebaseCollection(root, "reductionRecords"),
+          readFirebaseCollection(root, "machineProductionRecords")
         ]);
 
         return {
           meta: metaSnapshot.exists ? metaSnapshot.data() : {},
-          records: recordSnapshots.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+          records: recordSnapshots.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+          patioRecords: patioRows,
+          stoppageRecords: stoppageRows,
+          reductionRecords: reductionRows,
+          machineProductionRecords: machineProductionRows
         };
       }, options);
 
@@ -4229,26 +4306,46 @@
 
       const remoteTargets = downloaded.meta && downloaded.meta.targets ? cloneTargets(downloaded.meta.targets) : null;
       const remoteRecords = consolidateRecords(downloaded.records || []);
-      const remotePatioRecords = downloaded.meta && Array.isArray(downloaded.meta.patioRecords)
-        ? getCleanPatioRecords(downloaded.meta.patioRecords)
+      const remotePatioRows = Array.isArray(downloaded.patioRecords) && downloaded.patioRecords.length
+        ? downloaded.patioRecords
+        : downloaded.meta && Array.isArray(downloaded.meta.patioRecords)
+          ? downloaded.meta.patioRecords
+          : [];
+      const remotePatioRecords = remotePatioRows.length
+        ? getCleanPatioRecords(remotePatioRows)
         : [];
       const remotePatioUpdatedAt = String((downloaded.meta && (downloaded.meta.patioUpdatedAt || downloaded.meta.updatedAt)) || "");
-      const hasRemotePatioPayload = downloaded.meta && Array.isArray(downloaded.meta.patioRecords);
-      const remoteStoppageRecords = downloaded.meta && Array.isArray(downloaded.meta.stoppageRecords)
-        ? getCleanStoppageRecords(downloaded.meta.stoppageRecords)
+      const hasRemotePatioPayload = Boolean(remotePatioRows.length || downloaded.meta && (Array.isArray(downloaded.meta.patioRecords) || "patioRecordCount" in downloaded.meta || downloaded.meta.patioUpdatedAt));
+      const remoteStoppageRows = Array.isArray(downloaded.stoppageRecords) && downloaded.stoppageRecords.length
+        ? downloaded.stoppageRecords
+        : downloaded.meta && Array.isArray(downloaded.meta.stoppageRecords)
+          ? downloaded.meta.stoppageRecords
+          : [];
+      const remoteStoppageRecords = remoteStoppageRows.length
+        ? getCleanStoppageRecords(remoteStoppageRows)
         : [];
       const remoteStoppageUpdatedAt = String((downloaded.meta && (downloaded.meta.stoppageUpdatedAt || downloaded.meta.updatedAt)) || "");
-      const hasRemoteStoppagePayload = downloaded.meta && Array.isArray(downloaded.meta.stoppageRecords);
-      const remoteReductionRecords = downloaded.meta && Array.isArray(downloaded.meta.reductionRecords)
-        ? getCleanReductionRecords(downloaded.meta.reductionRecords)
+      const hasRemoteStoppagePayload = Boolean(remoteStoppageRows.length || downloaded.meta && (Array.isArray(downloaded.meta.stoppageRecords) || "stoppageRecordCount" in downloaded.meta || downloaded.meta.stoppageUpdatedAt));
+      const remoteReductionRows = Array.isArray(downloaded.reductionRecords) && downloaded.reductionRecords.length
+        ? downloaded.reductionRecords
+        : downloaded.meta && Array.isArray(downloaded.meta.reductionRecords)
+          ? downloaded.meta.reductionRecords
+          : [];
+      const remoteReductionRecords = remoteReductionRows.length
+        ? getCleanReductionRecords(remoteReductionRows)
         : [];
       const remoteReductionUpdatedAt = String((downloaded.meta && (downloaded.meta.reductionUpdatedAt || downloaded.meta.updatedAt)) || "");
-      const hasRemoteReductionPayload = downloaded.meta && Array.isArray(downloaded.meta.reductionRecords);
-      const remoteMachineProductionRecords = downloaded.meta && Array.isArray(downloaded.meta.machineProductionRecords)
-        ? getCleanMachineProductionRecords(downloaded.meta.machineProductionRecords)
+      const hasRemoteReductionPayload = Boolean(remoteReductionRows.length || downloaded.meta && (Array.isArray(downloaded.meta.reductionRecords) || "reductionRecordCount" in downloaded.meta || downloaded.meta.reductionUpdatedAt));
+      const remoteMachineProductionRows = Array.isArray(downloaded.machineProductionRecords) && downloaded.machineProductionRecords.length
+        ? downloaded.machineProductionRecords
+        : downloaded.meta && Array.isArray(downloaded.meta.machineProductionRecords)
+          ? downloaded.meta.machineProductionRecords
+          : [];
+      const remoteMachineProductionRecords = remoteMachineProductionRows.length
+        ? getCleanMachineProductionRecords(remoteMachineProductionRows)
         : [];
       const remoteMachineProductionUpdatedAt = String((downloaded.meta && (downloaded.meta.machineProductionUpdatedAt || downloaded.meta.updatedAt)) || "");
-      const hasRemoteMachineProductionPayload = downloaded.meta && Array.isArray(downloaded.meta.machineProductionRecords);
+      const hasRemoteMachineProductionPayload = Boolean(remoteMachineProductionRows.length || downloaded.meta && (Array.isArray(downloaded.meta.machineProductionRecords) || "machineProductionRecordCount" in downloaded.meta || downloaded.meta.machineProductionUpdatedAt));
 
       if (!remoteTargets && !remoteRecords.length && !hasRemotePatioPayload && !hasRemoteStoppagePayload && !hasRemoteReductionPayload && !hasRemoteMachineProductionPayload) {
         if (!options.silent) showToast("Nenhum dado encontrado no Firebase.");
