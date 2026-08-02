@@ -920,6 +920,34 @@
       padding: 0 14px 14px;
     }
 
+    .acceptance-controls {
+      display: grid;
+      grid-template-columns: minmax(240px, 1fr) minmax(150px, 220px);
+      gap: 12px;
+      align-items: end;
+      padding: 0 14px 14px;
+    }
+
+    .check-control {
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--surface-3);
+      color: var(--ink);
+      font-size: .9rem;
+      font-weight: 800;
+    }
+
+    .check-control input {
+      width: 18px;
+      min-height: 18px;
+      accent-color: var(--green);
+    }
+
     .workspace-hint {
       color: var(--muted);
       font-size: .88rem;
@@ -1249,6 +1277,10 @@
 
       .patio-entry-grid,
       .patio-entry-footer {
+        grid-template-columns: 1fr;
+      }
+
+      .acceptance-controls {
         grid-template-columns: 1fr;
       }
 
@@ -2262,6 +2294,16 @@
           <input class="file-input" id="machineImportFile" type="file" accept="image/*,.pdf,application/pdf">
           <span class="workspace-hint">Antes de escolher o arquivo, o sistema solicitará o dia, a frente própria e se o relatório é de colhedora, transbordo ou caminhão próprio.</span>
         </div>
+        <div class="acceptance-controls">
+          <label class="check-control" for="machineAcceptDifference">
+            <input id="machineAcceptDifference" type="checkbox">
+            <span>Aceitar diferença pequena na conferência</span>
+          </label>
+          <div class="field">
+            <label for="machineDifferenceLimit">Limite aceito (t)</label>
+            <input id="machineDifferenceLimit" class="number-input" inputmode="decimal" type="text" value="1">
+          </div>
+        </div>
       </section>
 
       <dialog class="import-dialog" id="machineImportDialog">
@@ -2978,6 +3020,8 @@
       machineFleet: document.querySelector("#machineFleet"),
       machineProduction: document.querySelector("#machineProduction"),
       machineNote: document.querySelector("#machineNote"),
+      machineAcceptDifference: document.querySelector("#machineAcceptDifference"),
+      machineDifferenceLimit: document.querySelector("#machineDifferenceLimit"),
       machineImportFile: document.querySelector("#machineImportFile"),
       machineImportDialog: document.querySelector("#machineImportDialog"),
       machineImportDate: document.querySelector("#machineImportDate"),
@@ -4036,10 +4080,11 @@
       const cleanPatioRecords = getCleanPatioRecords(patioRecords);
       const cleanStoppageRecords = getCleanStoppageRecords(stoppageRecords);
       const cleanReductionRecords = getCleanReductionRecords(reductionRecords);
-      const cleanMachineProductionRecords = getCleanMachineProductionRecords(machineProductionRecords);
+      const cleanMachineProductionRecords = prepareMachineProductionRowsForSync(machineProductionRecords);
       const localDates = new Set(cleanRecords.map((record) => record.date));
       const lastRecord = cleanRecords[cleanRecords.length - 1] || null;
       const now = new Date().toISOString();
+      machineProductionRecords = cleanMachineProductionRecords;
 
       return runFirebaseTask(async (root) => {
         await root.set({
@@ -4085,7 +4130,7 @@
         persistPatioUpdatedAt(now);
         persistStoppageUpdatedAt(now);
         persistReductionUpdatedAt(now);
-        persistMachineProductionUpdatedAt(now);
+        persistMachineProductionRecords({ updatedAt: now });
       }, options);
     }
 
@@ -4138,7 +4183,19 @@
     }
 
     async function syncMachineProductionRecordsToFirebase(options = {}) {
-      const cleanMachineProductionRecords = getCleanMachineProductionRecords(machineProductionRecords);
+      const cleanMachineProductionRecords = prepareMachineProductionRowsForSync(machineProductionRecords);
+      const invalid = invalidMachineProductionGroups(cleanMachineProductionRecords);
+      if (invalid.length) {
+        firebaseState.lastError = machineProductionMismatchMessage(invalid[0]);
+        firebaseState.lastMessage = options.errorStatus
+          ? `${options.errorStatus} ${firebaseState.lastError}`
+          : firebaseState.lastError;
+        renderFirebaseStatus();
+        if (!options.silent) showToast(firebaseState.lastError);
+        return false;
+      }
+      machineProductionRecords = cleanMachineProductionRecords;
+      persistMachineProductionRecords();
       const now = new Date().toISOString();
       return runFirebaseTask(async (root) => {
         await root.set({
@@ -6398,6 +6455,9 @@
       const fleet = String(row.fleet || row.frota || row.machine || row.maquina || row.equipment || row.caminhao || "").trim();
       const production = Math.max(0, parseNumber(row.production ?? row.producao ?? row.toneladas ?? row.total ?? 0));
       const note = String(row.note || row.observacao || row.obs || "").trim();
+      const differenceAccepted = row.differenceAccepted === true || row.acceptedDifference === true || row.acceptDifference === true;
+      const differenceAcceptedLimit = Math.max(0, parseNumber(row.differenceAcceptedLimit ?? row.acceptedDifferenceLimit ?? 0));
+      const differenceAcceptedAmount = Math.max(0, parseNumber(row.differenceAcceptedAmount ?? row.acceptedDifferenceAmount ?? 0));
       if (!date || !front || !machineType || !fleet || !production) return null;
       return {
         id: row.id || makeId(),
@@ -6408,6 +6468,10 @@
         fleet,
         production,
         note,
+        differenceAccepted,
+        differenceAcceptedAt: differenceAccepted ? String(row.differenceAcceptedAt || row.acceptedDifferenceAt || "") : "",
+        differenceAcceptedLimit: differenceAccepted ? differenceAcceptedLimit : 0,
+        differenceAcceptedAmount: differenceAccepted ? differenceAcceptedAmount : 0,
         createdAt: row.createdAt || new Date().toISOString(),
         updatedAt: row.updatedAt || new Date().toISOString()
       };
@@ -6514,47 +6578,112 @@
             machineType: row.machineType,
             production: 0,
             records: 0,
-            machines: new Set()
+            machines: new Set(),
+            acceptedDifference: false,
+            acceptedLimit: 0,
+            acceptedAmount: 0
           });
         }
         const item = grouped.get(key);
         item.production += Number(row.production) || 0;
         item.records += 1;
         item.machines.add(normalizeKey(row.fleet));
+        if (row.differenceAccepted) {
+          item.acceptedDifference = true;
+          item.acceptedLimit = Math.max(item.acceptedLimit, Number(row.differenceAcceptedLimit) || 0);
+          item.acceptedAmount = Math.max(item.acceptedAmount, Number(row.differenceAcceptedAmount) || 0);
+        }
       });
 
       return [...grouped.values()]
         .map((item) => {
           const target = dailyOwnFrontProduction(item.date, item.front);
           const difference = item.production - target;
-          let status = "Batendo";
-          let tone = "good";
-          if (target <= 0) {
-            status = "Sem lançamento diário";
-            tone = "alert";
-          } else if (difference > MACHINE_PRODUCTION_TOLERANCE) {
-            status = "Passou";
-            tone = "alert";
-          } else if (difference < -MACHINE_PRODUCTION_TOLERANCE) {
-            status = "Faltando";
-            tone = "";
-          }
           return {
             ...item,
             target,
             difference,
             machineCount: item.machines.size,
-            status,
-            tone
+            status: "Batendo",
+            tone: "good"
           };
         })
         .sort((a, b) => b.date.localeCompare(a.date) || a.front.localeCompare(b.front, "pt-BR", { numeric: true }) || a.machineType.localeCompare(b.machineType));
     }
 
+    function machineProductionDifferenceLimit() {
+      if (!els.machineDifferenceLimit) return 0;
+      const limit = parseNumber(els.machineDifferenceLimit.value);
+      return limit > 0 ? Math.max(limit, MACHINE_PRODUCTION_TOLERANCE) : 0;
+    }
+
+    function isMachineProductionDifferenceOverrideOn() {
+      return Boolean(els.machineAcceptDifference && els.machineAcceptDifference.checked);
+    }
+
+    function machineProductionStoredDifferenceAccepted(group) {
+      if (!group || !group.acceptedDifference) return false;
+      const diff = Math.abs(Number(group.difference) || 0);
+      const limit = Math.max(MACHINE_PRODUCTION_TOLERANCE, Number(group.acceptedLimit) || Number(group.acceptedAmount) || 0);
+      return diff <= limit;
+    }
+
+    function machineProductionDifferenceAllowed(group) {
+      if (!group || group.target <= 0) return false;
+      const diff = Math.abs(Number(group.difference) || 0);
+      if (diff <= MACHINE_PRODUCTION_TOLERANCE) return true;
+      if (machineProductionStoredDifferenceAccepted(group)) return true;
+      return isMachineProductionDifferenceOverrideOn() && diff <= machineProductionDifferenceLimit();
+    }
+
+    function machineProductionDisplayStatus(group) {
+      if (!group || group.target <= 0) return { label: "Sem lançamento diário", tone: "alert" };
+      const diff = Math.abs(Number(group.difference) || 0);
+      if (diff <= MACHINE_PRODUCTION_TOLERANCE) return { label: "Batendo", tone: "good" };
+      if (machineProductionDifferenceAllowed(group)) return { label: "Aceito", tone: "good" };
+      if (group.difference > MACHINE_PRODUCTION_TOLERANCE) return { label: "Passou", tone: "alert" };
+      return { label: "Faltando", tone: "" };
+    }
+
+    function applyMachineProductionDifferenceAcceptance(rows, groups) {
+      const list = Array.isArray(groups) ? groups : [groups];
+      const byKey = new Map(list.filter(Boolean).map((group) => [group.key, group]));
+      if (!byKey.size) return rows;
+      const now = new Date().toISOString();
+      return getCleanMachineProductionRecords(rows).map((row) => {
+        const group = byKey.get(machineProductionGroupKey(row));
+        if (!group) return row;
+        const diff = Math.abs(Number(group.difference) || 0);
+        return {
+          ...row,
+          differenceAccepted: true,
+          differenceAcceptedAt: now,
+          differenceAcceptedLimit: Math.max(machineProductionDifferenceLimit(), diff, MACHINE_PRODUCTION_TOLERANCE),
+          differenceAcceptedAmount: diff,
+          updatedAt: now
+        };
+      });
+    }
+
+    function pendingMachineProductionAcceptances(rows = getCleanMachineProductionRecords(machineProductionRecords)) {
+      if (!isMachineProductionDifferenceOverrideOn()) return [];
+      return machineProductionConsistencyRows(rows).filter((group) => {
+        const diff = Math.abs(Number(group.difference) || 0);
+        return group.target > 0
+          && diff > MACHINE_PRODUCTION_TOLERANCE
+          && diff <= machineProductionDifferenceLimit()
+          && !machineProductionStoredDifferenceAccepted(group);
+      });
+    }
+
+    function prepareMachineProductionRowsForSync(rows = getCleanMachineProductionRecords(machineProductionRecords)) {
+      const cleanRows = getCleanMachineProductionRecords(rows);
+      const acceptances = pendingMachineProductionAcceptances(cleanRows);
+      return acceptances.length ? applyMachineProductionDifferenceAcceptance(cleanRows, acceptances) : cleanRows;
+    }
+
     function invalidMachineProductionGroups(rows = getCleanMachineProductionRecords(machineProductionRecords)) {
-      return machineProductionConsistencyRows(rows).filter((item) => (
-        item.target <= 0 || Math.abs(item.difference) > MACHINE_PRODUCTION_TOLERANCE
-      ));
+      return machineProductionConsistencyRows(rows).filter((item) => !machineProductionDifferenceAllowed(item));
     }
 
     function machineProductionGroupAfterSave(record, editingId = "") {
@@ -6588,6 +6717,9 @@
       if (group.target <= 0) {
         return `Lance primeiro a produção diária de ${group.front} em ${formatDate(group.date)}.`;
       }
+      if (machineProductionDifferenceAllowed(group) && Math.abs(group.difference) > MACHINE_PRODUCTION_TOLERANCE) {
+        return `${group.front} ${group.machineType} com diferença aceita de ${formatNumber(Math.abs(group.difference))} t.`;
+      }
       if (group.difference > MACHINE_PRODUCTION_TOLERANCE) {
         return `${group.front} ${group.machineType} passou ${formatNumber(group.difference)} t do lançamento diário.`;
       }
@@ -6618,17 +6750,20 @@
             </tr>
           </thead>
           <tbody>
-            ${items.map((item) => `
-              <tr>
-                <td>${formatDate(item.date)}</td>
-                <td>${escapeHtml(item.front)}</td>
-                <td>${escapeHtml(item.machineType)}</td>
-                <td>${formatNumber(item.target)}</td>
-                <td>${formatNumber(item.production)}</td>
-                <td>${formatNumber(item.difference)}</td>
-                <td><span class="status-pill ${escapeHtml(item.tone)}">${escapeHtml(item.status)}</span></td>
-              </tr>
-            `).join("")}
+            ${items.map((item) => {
+              const status = machineProductionDisplayStatus(item);
+              return `
+                <tr>
+                  <td>${formatDate(item.date)}</td>
+                  <td>${escapeHtml(item.front)}</td>
+                  <td>${escapeHtml(item.machineType)}</td>
+                  <td>${formatNumber(item.target)}</td>
+                  <td>${formatNumber(item.production)}</td>
+                  <td>${formatNumber(item.difference)}</td>
+                  <td><span class="status-pill ${escapeHtml(status.tone)}">${escapeHtml(status.label)}</span></td>
+                </tr>
+              `;
+            }).join("")}
           </tbody>
         </table>
       `;
@@ -6887,14 +7022,18 @@
         return;
       }
 
-      const { nextRecord, nextRows, group, merged } = machineProductionGroupAfterSave(record, editingId);
+      let { nextRecord, nextRows, group, merged } = machineProductionGroupAfterSave(record, editingId);
       if (!group || group.target <= 0) {
         showToast(machineProductionMismatchMessage(group));
         return;
       }
-      if (group.difference > MACHINE_PRODUCTION_TOLERANCE) {
+      if (group.difference > MACHINE_PRODUCTION_TOLERANCE && !machineProductionDifferenceAllowed(group)) {
         showToast(machineProductionMismatchMessage(group));
         return;
+      }
+      if (machineProductionDifferenceAllowed(group) && Math.abs(group.difference) > MACHINE_PRODUCTION_TOLERANCE && !machineProductionStoredDifferenceAccepted(group)) {
+        nextRows = applyMachineProductionDifferenceAcceptance(nextRows, group);
+        group = machineProductionConsistencyRows(nextRows).find((item) => item.key === machineProductionGroupKey(nextRecord)) || group;
       }
 
       machineProductionRecords = nextRows;
@@ -6904,19 +7043,21 @@
       renderMachineProductions();
       addAuditEntry("maquinas", `${nextRecord.machineType} ${nextRecord.fleet} lançada em ${nextRecord.front} no dia ${formatDate(nextRecord.date)}.`);
 
-      const isBalanced = Math.abs(group.difference) <= MACHINE_PRODUCTION_TOLERANCE;
-      const balanceMessage = isBalanced
-        ? "Conferência batendo com o lançamento diário."
-        : machineProductionMismatchMessage(group);
-      if (!isBalanced) {
+      const canSyncGroup = machineProductionDifferenceAllowed(group);
+      const balanceMessage = machineProductionMismatchMessage(group);
+      if (!canSyncGroup) {
         showToast(`${editingId ? "Produção alterada" : merged ? "Produção somada" : "Produção adicionada"} localmente. ${balanceMessage} Banco não enviado ainda.`);
         return;
       }
-      const allInvalid = invalidMachineProductionGroups(nextRows);
+      const rowsForSync = prepareMachineProductionRowsForSync(nextRows);
+      const allInvalid = invalidMachineProductionGroups(rowsForSync);
       if (allInvalid.length) {
         showToast(`Produção salva localmente. Corrija antes de enviar ao banco: ${machineProductionMismatchMessage(allInvalid[0])}`);
         return;
       }
+      machineProductionRecords = rowsForSync;
+      persistMachineProductionRecords();
+      renderMachineProductions();
 
       const syncState = await syncOrQueue("machine-production-sync", { source: editingId ? "machine-edit" : merged ? "machine-merge" : "machine-add", id: nextRecord.id }, () => syncMachineProductionRecordsToFirebase({
         silent: true,
@@ -6939,11 +7080,15 @@
       if (els.machineEntryId.value === id) resetMachineProductionForm(record.date);
       renderMachineProductions();
       addAuditEntry("exclusao", `Produção da máquina ${record.fleet} removida de ${formatDate(record.date)}.`);
-      const invalid = invalidMachineProductionGroups();
+      const rowsForSync = prepareMachineProductionRowsForSync(machineProductionRecords);
+      const invalid = invalidMachineProductionGroups(rowsForSync);
       if (invalid.length) {
         showToast(`Produção removida localmente. ${machineProductionMismatchMessage(invalid[0])} Banco não enviado ainda.`);
         return;
       }
+      machineProductionRecords = rowsForSync;
+      persistMachineProductionRecords();
+      renderMachineProductions();
       const syncState = await syncOrQueue("machine-production-sync", { source: "machine-delete", id }, () => syncMachineProductionRecordsToFirebase({
         silent: true,
         pendingMessage: "Salvando exclusão da produção no banco...",
@@ -6971,11 +7116,15 @@
       resetMachineProductionForm(els.machineDate.value || todayInputValue());
       renderMachineProductions();
       addAuditEntry("exclusao", `${selected.length} produção${selected.length === 1 ? "" : "ões"} de máquinas removida${selected.length === 1 ? "" : "s"}.`);
-      const invalid = invalidMachineProductionGroups();
+      const rowsForSync = prepareMachineProductionRowsForSync(machineProductionRecords);
+      const invalid = invalidMachineProductionGroups(rowsForSync);
       if (invalid.length) {
         showToast(`Produções removidas localmente. ${machineProductionMismatchMessage(invalid[0])} Banco não enviado ainda.`);
         return;
       }
+      machineProductionRecords = rowsForSync;
+      persistMachineProductionRecords();
+      renderMachineProductions();
       const syncState = await syncOrQueue("machine-production-sync", { source: "machine-range-delete", start: range.start, end: range.end, front }, () => syncMachineProductionRecordsToFirebase({
         silent: true,
         pendingMessage: "Salvando exclusão das produções no banco...",
@@ -6988,13 +7137,16 @@
     }
 
     async function saveMachineProductionsDatabase() {
-      const cleanRows = getCleanMachineProductionRecords(machineProductionRecords);
+      const cleanRows = prepareMachineProductionRowsForSync(machineProductionRecords);
       const total = cleanRows.length;
       const invalid = invalidMachineProductionGroups(cleanRows);
       if (invalid.length) {
         showToast(`Corrija antes de salvar no banco: ${machineProductionMismatchMessage(invalid[0])}`);
         return;
       }
+      machineProductionRecords = cleanRows;
+      persistMachineProductionRecords();
+      renderMachineProductions();
       const syncState = await syncOrQueue("machine-production-sync", { source: "machine-manual-save" }, () => syncMachineProductionRecordsToFirebase({
         silent: true,
         pendingMessage: "Salvando produção das máquinas no banco...",
@@ -11161,16 +11313,21 @@
           return;
         }
 
-        const cleanNextRecords = getCleanMachineProductionRecords(nextRecords);
-        const importedGroup = machineProductionConsistencyRows(cleanNextRecords)
+        let cleanNextRecords = getCleanMachineProductionRecords(nextRecords);
+        let importedGroup = machineProductionConsistencyRows(cleanNextRecords)
           .find((item) => (
             item.date === reportDate
             && item.front === front
             && item.machineType === machineType
           ));
-        if (!importedGroup || importedGroup.target <= 0 || Math.abs(importedGroup.difference) > MACHINE_PRODUCTION_TOLERANCE) {
+        if (!importedGroup || !machineProductionDifferenceAllowed(importedGroup)) {
           showToast(`Arquivo não salvo: ${machineProductionMismatchMessage(importedGroup)}`);
           return;
+        }
+        if (Math.abs(importedGroup.difference) > MACHINE_PRODUCTION_TOLERANCE && !machineProductionStoredDifferenceAccepted(importedGroup)) {
+          cleanNextRecords = applyMachineProductionDifferenceAcceptance(cleanNextRecords, importedGroup);
+          importedGroup = machineProductionConsistencyRows(cleanNextRecords)
+            .find((item) => item.date === reportDate && item.front === front && item.machineType === machineType) || importedGroup;
         }
 
         machineProductionRecords = cleanNextRecords;
@@ -11182,11 +11339,15 @@
         renderMachineProductions();
         addAuditEntry("importacao", `Produção de ${machineType.toLowerCase()} importada para ${front} em ${formatDate(reportDate)}: ${added} nova${added === 1 ? "" : "s"}, ${updated} atualizada${updated === 1 ? "" : "s"}.`);
 
-        const invalid = invalidMachineProductionGroups(machineProductionRecords);
+        const rowsForSync = prepareMachineProductionRowsForSync(machineProductionRecords);
+        const invalid = invalidMachineProductionGroups(rowsForSync);
         if (invalid.length) {
           showToast(`Arquivo salvo localmente. Corrija antes de enviar ao banco: ${machineProductionMismatchMessage(invalid[0])}`);
           return;
         }
+        machineProductionRecords = rowsForSync;
+        persistMachineProductionRecords();
+        renderMachineProductions();
 
         const syncState = await syncOrQueue("machine-production-sync", { source: "machine-file-import", date: reportDate, front, machineType }, () => syncMachineProductionRecordsToFirebase({
           silent: true,
@@ -13698,6 +13859,12 @@
     document.querySelector("#deleteMachineRangeBtn").addEventListener("click", deleteMachineProductionRange);
     els.machineProduction.addEventListener("change", () => {
       els.machineProduction.value = formatNumber(parseNumber(els.machineProduction.value));
+    });
+    els.machineAcceptDifference.addEventListener("change", renderMachineProductions);
+    els.machineDifferenceLimit.addEventListener("change", () => {
+      const limit = machineProductionDifferenceLimit();
+      els.machineDifferenceLimit.value = limit ? formatNumber(limit) : "";
+      renderMachineProductions();
     });
     els.machineRowsWrap.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-machine-action]");
