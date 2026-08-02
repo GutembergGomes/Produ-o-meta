@@ -2244,7 +2244,7 @@
           </div>
           <div class="field">
             <label for="machineFleet">Identificação da máquina</label>
-            <input id="machineFleet" type="text" placeholder="Ex.: 4001-01, TB-01, 6700">
+            <input id="machineFleet" list="machineFleetOptions" type="text" placeholder="Ex.: 4001-01, TB-01, 6700">
           </div>
           <div class="field">
             <label for="machineProduction">Produção</label>
@@ -2296,6 +2296,22 @@
           <button class="btn-primary" id="chooseMachineImportFileBtn" type="button">Escolher foto ou PDF</button>
         </div>
       </dialog>
+
+      <section class="dashboard-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Conferência com lançamento diário</h2>
+          </div>
+          <div class="table-wrap" id="machineConsistencyWrap"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Resumo por equipamento</h2>
+          </div>
+          <div class="table-wrap" id="machineEquipmentWrap"></div>
+        </section>
+      </section>
 
       <section class="dashboard-grid">
         <section class="panel">
@@ -2744,6 +2760,7 @@
 
   <datalist id="frontOptions"></datalist>
   <datalist id="fleetOptions"></datalist>
+  <datalist id="machineFleetOptions"></datalist>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -2791,6 +2808,7 @@
     const stoppageCategories = ["Motivo industrial", "Motivo agrícola", "Motivo fatores climáticos"];
     const EFFECTIVE_MILLING_TONS_PER_HOUR = 500;
     const machineProductionTypes = ["Colhedora", "Transbordo", "Caminhão Próprio"];
+    const MACHINE_PRODUCTION_TOLERANCE = 0.01;
     const ownHarvestFronts = ["Frente 4001", "Frente 4002", "Frente 4003"];
     const thirdHarvestFronts = ["Frente 4007", "Frente 4009"];
     const frontOptions = [...ownHarvestFronts, ...thirdHarvestFronts];
@@ -2965,6 +2983,8 @@
       machineImportDate: document.querySelector("#machineImportDate"),
       machineImportFront: document.querySelector("#machineImportFront"),
       machineImportType: document.querySelector("#machineImportType"),
+      machineConsistencyWrap: document.querySelector("#machineConsistencyWrap"),
+      machineEquipmentWrap: document.querySelector("#machineEquipmentWrap"),
       machineTypeWrap: document.querySelector("#machineTypeWrap"),
       machineFrontWrap: document.querySelector("#machineFrontWrap"),
       machineRowsWrap: document.querySelector("#machineRowsWrap"),
@@ -3009,6 +3029,7 @@
       safraRealMonthWrap: document.querySelector("#safraRealMonthWrap"),
       frontOptions: document.querySelector("#frontOptions"),
       fleetOptions: document.querySelector("#fleetOptions"),
+      machineFleetOptions: document.querySelector("#machineFleetOptions"),
       toast: document.querySelector("#toast"),
       importFile: document.querySelector("#importFile"),
       pendingSyncWrap: document.querySelector("#pendingSyncWrap"),
@@ -6458,6 +6479,161 @@
         .filter((record) => front === "all" || record.front === front);
     }
 
+    function dailyOwnFrontProduction(date, front) {
+      const record = recordForDate(date);
+      if (!record) return 0;
+      return rowsFromRecords([record])
+        .filter((row) => row.type === TYPES.OWN_HARVEST && sameText(row.front, front))
+        .reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+    }
+
+    function machineProductionGroupKey(row) {
+      return [
+        normalizeRecordDate(row.date),
+        normalizeKey(row.front),
+        normalizeKey(row.machineType)
+      ].join("|");
+    }
+
+    function machineProductionEquipmentKey(row) {
+      return [
+        normalizeKey(row.machineType),
+        normalizeKey(row.fleet)
+      ].join("|");
+    }
+
+    function machineProductionConsistencyRows(rows = getCleanMachineProductionRecords(machineProductionRecords)) {
+      const grouped = new Map();
+      (rows || []).forEach((row) => {
+        const key = machineProductionGroupKey(row);
+        if (!grouped.has(key)) {
+          grouped.set(key, {
+            key,
+            date: row.date,
+            front: row.front,
+            machineType: row.machineType,
+            production: 0,
+            records: 0,
+            machines: new Set()
+          });
+        }
+        const item = grouped.get(key);
+        item.production += Number(row.production) || 0;
+        item.records += 1;
+        item.machines.add(normalizeKey(row.fleet));
+      });
+
+      return [...grouped.values()]
+        .map((item) => {
+          const target = dailyOwnFrontProduction(item.date, item.front);
+          const difference = item.production - target;
+          let status = "Batendo";
+          let tone = "good";
+          if (target <= 0) {
+            status = "Sem lançamento diário";
+            tone = "alert";
+          } else if (difference > MACHINE_PRODUCTION_TOLERANCE) {
+            status = "Passou";
+            tone = "alert";
+          } else if (difference < -MACHINE_PRODUCTION_TOLERANCE) {
+            status = "Faltando";
+            tone = "";
+          }
+          return {
+            ...item,
+            target,
+            difference,
+            machineCount: item.machines.size,
+            status,
+            tone
+          };
+        })
+        .sort((a, b) => b.date.localeCompare(a.date) || a.front.localeCompare(b.front, "pt-BR", { numeric: true }) || a.machineType.localeCompare(b.machineType));
+    }
+
+    function invalidMachineProductionGroups(rows = getCleanMachineProductionRecords(machineProductionRecords)) {
+      return machineProductionConsistencyRows(rows).filter((item) => (
+        item.target <= 0 || Math.abs(item.difference) > MACHINE_PRODUCTION_TOLERANCE
+      ));
+    }
+
+    function machineProductionGroupAfterSave(record, editingId = "") {
+      const base = getCleanMachineProductionRecords(machineProductionRecords)
+        .filter((item) => item.id !== editingId && item.id !== record.id);
+      const duplicate = !editingId ? base.find((item) => (
+        item.date === record.date
+        && item.front === record.front
+        && item.machineType === record.machineType
+        && sameText(item.fleet, record.fleet)
+      )) : null;
+      const nextRecord = duplicate
+        ? {
+          ...duplicate,
+          production: (Number(duplicate.production) || 0) + (Number(record.production) || 0),
+          note: record.note && duplicate.note && !duplicate.note.includes(record.note) ? `${duplicate.note}; ${record.note}` : duplicate.note || record.note,
+          updatedAt: new Date().toISOString()
+        }
+        : record;
+      const nextRows = getCleanMachineProductionRecords([
+        nextRecord,
+        ...base.filter((item) => item.id !== (duplicate ? duplicate.id : ""))
+      ]);
+      const group = machineProductionConsistencyRows(nextRows)
+        .find((item) => item.key === machineProductionGroupKey(nextRecord));
+      return { nextRecord, nextRows, group, merged: Boolean(duplicate) };
+    }
+
+    function machineProductionMismatchMessage(group) {
+      if (!group) return "Conferência da produção não localizada.";
+      if (group.target <= 0) {
+        return `Lance primeiro a produção diária de ${group.front} em ${formatDate(group.date)}.`;
+      }
+      if (group.difference > MACHINE_PRODUCTION_TOLERANCE) {
+        return `${group.front} ${group.machineType} passou ${formatNumber(group.difference)} t do lançamento diário.`;
+      }
+      if (group.difference < -MACHINE_PRODUCTION_TOLERANCE) {
+        return `${group.front} ${group.machineType} ainda falta ${formatNumber(Math.abs(group.difference))} t para bater o lançamento diário.`;
+      }
+      return `${group.front} ${group.machineType} batendo com o lançamento diário.`;
+    }
+
+    function renderMachineProductionConsistency(rows) {
+      const items = machineProductionConsistencyRows(rows);
+      if (!items.length) {
+        els.machineConsistencyWrap.innerHTML = '<div class="empty-state">Sem produção de máquinas para conferir com o lançamento diário.</div>';
+        return;
+      }
+
+      els.machineConsistencyWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Frente</th>
+              <th>Tipo</th>
+              <th>Lançamento diário</th>
+              <th>Máquinas</th>
+              <th>Diferença</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map((item) => `
+              <tr>
+                <td>${formatDate(item.date)}</td>
+                <td>${escapeHtml(item.front)}</td>
+                <td>${escapeHtml(item.machineType)}</td>
+                <td>${formatNumber(item.target)}</td>
+                <td>${formatNumber(item.production)}</td>
+                <td>${formatNumber(item.difference)}</td>
+                <td><span class="status-pill ${escapeHtml(item.tone)}">${escapeHtml(item.status)}</span></td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
     function machineProductionSummary(rows = []) {
       const productionFor = (type) => rows
         .filter((row) => row.machineType === type)
@@ -6488,15 +6664,72 @@
         .sort((a, b) => b.production - a.production || a.label.localeCompare(b.label, "pt-BR", { numeric: true }));
     }
 
+    function machineEquipmentRows(rows) {
+      const grouped = new Map();
+      rows.forEach((row) => {
+        const key = machineProductionEquipmentKey(row);
+        if (!grouped.has(key)) {
+          grouped.set(key, {
+            machineType: row.machineType,
+            fleet: row.fleet,
+            production: 0,
+            records: 0,
+            fronts: new Set(),
+            days: new Set()
+          });
+        }
+        const item = grouped.get(key);
+        item.production += Number(row.production) || 0;
+        item.records += 1;
+        item.fronts.add(row.front);
+        item.days.add(row.date);
+      });
+      return [...grouped.values()]
+        .map((item) => ({
+          ...item,
+          frontsLabel: [...item.fronts].sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true })).join(", "),
+          dayCount: item.days.size
+        }))
+        .sort((a, b) => b.production - a.production || a.fleet.localeCompare(b.fleet, "pt-BR", { numeric: true }));
+    }
+
+    function renderMachineEquipmentSummary(rows) {
+      const items = machineEquipmentRows(rows);
+      if (!items.length) {
+        els.machineEquipmentWrap.innerHTML = '<div class="empty-state">Sem equipamentos cadastrados no período.</div>';
+        return;
+      }
+
+      els.machineEquipmentWrap.innerHTML = `
+        <table>
+          <thead><tr><th>Equipamento</th><th>Tipo</th><th>Frentes trabalhadas</th><th>Produção total</th><th>Dias</th><th>Registros</th></tr></thead>
+          <tbody>
+            ${items.map((item) => `
+              <tr>
+                <td>${escapeHtml(item.fleet)}</td>
+                <td>${escapeHtml(item.machineType)}</td>
+                <td>${escapeHtml(item.frontsLabel || "-")}</td>
+                <td>${formatNumber(item.production)}</td>
+                <td>${item.dayCount}</td>
+                <td>${item.records}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
     function renderMachineProductionKpis(rows) {
       const summary = machineProductionSummary(rows);
+      const pending = invalidMachineProductionGroups(rows).length;
       const kpis = [
         ["Produção lançada", formatNumber(summary.total), `${summary.records} registro${summary.records === 1 ? "" : "s"}`],
         ["Colhedoras", formatNumber(summary.harvesters), `${formatPercent(progressFor(summary.harvesters, summary.total))} do lançado`],
         ["Transbordos", formatNumber(summary.transshipments), `${formatPercent(progressFor(summary.transshipments, summary.total))} do lançado`],
         ["Caminhões próprios", formatNumber(summary.trucks), `${formatPercent(progressFor(summary.trucks, summary.total))} do lançado`],
         ["Máquinas", String(summary.machines), "Equipamentos identificados"],
-        ["Dias lançados", String(summary.days), "Dias com produção"]
+        ["Dias lançados", String(summary.days), "Dias com produção"],
+        ["Conferências pendentes", String(pending), pending ? "Ajuste antes de salvar no banco" : "Tudo batendo"]
       ];
       els.machineKpiWrap.innerHTML = kpis.map(([label, value, detail]) => `
         <article class="stat">
@@ -6596,7 +6829,10 @@
       els.machineSource.textContent = rows.length
         ? `${rows.length} lançamento${rows.length === 1 ? "" : "s"} em ${frontLabel}, de ${rangeLabel}.`
         : `Nenhuma produção de máquina em ${frontLabel}, de ${rangeLabel}.`;
+      renderOptions();
       renderMachineProductionKpis(rows);
+      renderMachineProductionConsistency(rows);
+      renderMachineEquipmentSummary(rows);
       renderMachineProductionGroups(rows);
       renderMachineProductionRows(rows);
     }
@@ -6651,27 +6887,48 @@
         return;
       }
 
-      machineProductionRecords = getCleanMachineProductionRecords([
-        record,
-        ...machineProductionRecords.filter((item) => item.id !== record.id)
-      ]);
-      persistMachineProductionRecords();
-      setMachineProductionRange(record.date, record.date);
-      resetMachineProductionForm(record.date);
-      renderMachineProductions();
-      addAuditEntry("maquinas", `${record.machineType} ${record.fleet} lançada em ${record.front} no dia ${formatDate(record.date)}.`);
+      const { nextRecord, nextRows, group, merged } = machineProductionGroupAfterSave(record, editingId);
+      if (!group || group.target <= 0) {
+        showToast(machineProductionMismatchMessage(group));
+        return;
+      }
+      if (group.difference > MACHINE_PRODUCTION_TOLERANCE) {
+        showToast(machineProductionMismatchMessage(group));
+        return;
+      }
 
-      const syncState = await syncOrQueue("machine-production-sync", { source: editingId ? "machine-edit" : "machine-add", id: record.id }, () => syncMachineProductionRecordsToFirebase({
+      machineProductionRecords = nextRows;
+      persistMachineProductionRecords();
+      setMachineProductionRange(nextRecord.date, nextRecord.date);
+      resetMachineProductionForm(nextRecord.date);
+      renderMachineProductions();
+      addAuditEntry("maquinas", `${nextRecord.machineType} ${nextRecord.fleet} lançada em ${nextRecord.front} no dia ${formatDate(nextRecord.date)}.`);
+
+      const isBalanced = Math.abs(group.difference) <= MACHINE_PRODUCTION_TOLERANCE;
+      const balanceMessage = isBalanced
+        ? "Conferência batendo com o lançamento diário."
+        : machineProductionMismatchMessage(group);
+      if (!isBalanced) {
+        showToast(`${editingId ? "Produção alterada" : merged ? "Produção somada" : "Produção adicionada"} localmente. ${balanceMessage} Banco não enviado ainda.`);
+        return;
+      }
+      const allInvalid = invalidMachineProductionGroups(nextRows);
+      if (allInvalid.length) {
+        showToast(`Produção salva localmente. Corrija antes de enviar ao banco: ${machineProductionMismatchMessage(allInvalid[0])}`);
+        return;
+      }
+
+      const syncState = await syncOrQueue("machine-production-sync", { source: editingId ? "machine-edit" : merged ? "machine-merge" : "machine-add", id: nextRecord.id }, () => syncMachineProductionRecordsToFirebase({
         silent: true,
         pendingMessage: "Enviando produção das máquinas ao banco...",
         successStatus: "Produção das máquinas sincronizada.",
         errorStatus: "Produção salva localmente, mas a sincronização falhou."
       }));
       showToast(syncState === "synced"
-        ? editingId ? "Produção alterada e salva no banco." : "Produção adicionada e salva no banco."
+        ? `${editingId ? "Produção alterada" : merged ? "Produção somada" : "Produção adicionada"} e salva no banco. ${balanceMessage}`
         : syncState === "queued-offline" || syncState === "queued-error"
-          ? "Produção salva. Banco ficou na fila."
-          : editingId ? "Produção alterada." : "Produção adicionada.");
+          ? `Produção salva. Banco ficou na fila. ${balanceMessage}`
+          : `${editingId ? "Produção alterada" : merged ? "Produção somada" : "Produção adicionada"}. ${balanceMessage}`);
     }
 
     async function deleteMachineProduction(id) {
@@ -6682,6 +6939,11 @@
       if (els.machineEntryId.value === id) resetMachineProductionForm(record.date);
       renderMachineProductions();
       addAuditEntry("exclusao", `Produção da máquina ${record.fleet} removida de ${formatDate(record.date)}.`);
+      const invalid = invalidMachineProductionGroups();
+      if (invalid.length) {
+        showToast(`Produção removida localmente. ${machineProductionMismatchMessage(invalid[0])} Banco não enviado ainda.`);
+        return;
+      }
       const syncState = await syncOrQueue("machine-production-sync", { source: "machine-delete", id }, () => syncMachineProductionRecordsToFirebase({
         silent: true,
         pendingMessage: "Salvando exclusão da produção no banco...",
@@ -6709,6 +6971,11 @@
       resetMachineProductionForm(els.machineDate.value || todayInputValue());
       renderMachineProductions();
       addAuditEntry("exclusao", `${selected.length} produção${selected.length === 1 ? "" : "ões"} de máquinas removida${selected.length === 1 ? "" : "s"}.`);
+      const invalid = invalidMachineProductionGroups();
+      if (invalid.length) {
+        showToast(`Produções removidas localmente. ${machineProductionMismatchMessage(invalid[0])} Banco não enviado ainda.`);
+        return;
+      }
       const syncState = await syncOrQueue("machine-production-sync", { source: "machine-range-delete", start: range.start, end: range.end, front }, () => syncMachineProductionRecordsToFirebase({
         silent: true,
         pendingMessage: "Salvando exclusão das produções no banco...",
@@ -6721,7 +6988,13 @@
     }
 
     async function saveMachineProductionsDatabase() {
-      const total = getCleanMachineProductionRecords(machineProductionRecords).length;
+      const cleanRows = getCleanMachineProductionRecords(machineProductionRecords);
+      const total = cleanRows.length;
+      const invalid = invalidMachineProductionGroups(cleanRows);
+      if (invalid.length) {
+        showToast(`Corrija antes de salvar no banco: ${machineProductionMismatchMessage(invalid[0])}`);
+        return;
+      }
       const syncState = await syncOrQueue("machine-production-sync", { source: "machine-manual-save" }, () => syncMachineProductionRecordsToFirebase({
         silent: true,
         pendingMessage: "Salvando produção das máquinas no banco...",
@@ -7647,6 +7920,11 @@
         .filter(Boolean);
       const uniqueFleets = [...new Set(knownFleets)];
       els.fleetOptions.innerHTML = uniqueFleets.map((item) => `<option value="${escapeHtml(item)}"></option>`).join("");
+      const knownMachines = getCleanMachineProductionRecords(machineProductionRecords)
+        .map((row) => String(row.fleet || "").trim())
+        .filter(Boolean);
+      const uniqueMachines = [...new Set(knownMachines)].sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true }));
+      els.machineFleetOptions.innerHTML = uniqueMachines.map((item) => `<option value="${escapeHtml(item)}"></option>`).join("");
     }
 
     function switchView(name) {
@@ -10883,13 +11161,32 @@
           return;
         }
 
-        machineProductionRecords = getCleanMachineProductionRecords(nextRecords);
+        const cleanNextRecords = getCleanMachineProductionRecords(nextRecords);
+        const importedGroup = machineProductionConsistencyRows(cleanNextRecords)
+          .find((item) => (
+            item.date === reportDate
+            && item.front === front
+            && item.machineType === machineType
+          ));
+        if (!importedGroup || importedGroup.target <= 0 || Math.abs(importedGroup.difference) > MACHINE_PRODUCTION_TOLERANCE) {
+          showToast(`Arquivo não salvo: ${machineProductionMismatchMessage(importedGroup)}`);
+          return;
+        }
+
+        machineProductionRecords = cleanNextRecords;
         persistMachineProductionRecords();
         els.machineDate.value = reportDate;
         els.machineType.value = machineType;
+        els.machineFront.value = front;
         setMachineProductionRange(reportDate, reportDate);
         renderMachineProductions();
         addAuditEntry("importacao", `Produção de ${machineType.toLowerCase()} importada para ${front} em ${formatDate(reportDate)}: ${added} nova${added === 1 ? "" : "s"}, ${updated} atualizada${updated === 1 ? "" : "s"}.`);
+
+        const invalid = invalidMachineProductionGroups(machineProductionRecords);
+        if (invalid.length) {
+          showToast(`Arquivo salvo localmente. Corrija antes de enviar ao banco: ${machineProductionMismatchMessage(invalid[0])}`);
+          return;
+        }
 
         const syncState = await syncOrQueue("machine-production-sync", { source: "machine-file-import", date: reportDate, front, machineType }, () => syncMachineProductionRecordsToFirebase({
           silent: true,
@@ -13610,9 +13907,11 @@
     setManagementRange(initialReportRange.start, initialDate);
     setPatioRange(initialPatioRange.start, initialPatioDate);
     setStoppageRange(initialReportRange.start, initialDate);
+    setReductionRange(initialReportRange.start, initialDate);
     setMachineProductionRange(initialReportRange.start, initialDate);
     resetPatioEntryForm({ date: initialPatioDate });
     resetStoppageForm(initialDate);
+    resetReductionForm(initialDate);
     resetMachineProductionForm(initialDate);
     els.entryDate.value = initialDate;
     renderTargets();
@@ -13621,6 +13920,7 @@
     renderManagementReports();
     renderPatio();
     renderStoppages();
+    renderReductions();
     renderMachineProductions();
     renderHistory();
 
