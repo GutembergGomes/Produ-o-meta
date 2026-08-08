@@ -447,6 +447,79 @@
       line-height: 1;
     }
 
+    .analysis-board {
+      display: grid;
+      gap: 14px;
+    }
+
+    .analysis-head {
+      display: grid;
+      grid-template-columns: minmax(220px, .75fr) minmax(0, 1fr);
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .analysis-status {
+      display: grid;
+      gap: 8px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-left: 6px solid var(--green);
+      border-radius: var(--radius);
+      background: var(--surface-3);
+    }
+
+    .analysis-status.warn {
+      border-left-color: var(--blue);
+    }
+
+    .analysis-status.alert {
+      border-left-color: var(--red);
+    }
+
+    .analysis-status strong {
+      font-size: clamp(1.45rem, 2.4vw, 2.1rem);
+      line-height: 1;
+    }
+
+    .analysis-status span,
+    .analysis-status small {
+      color: var(--muted);
+      font-weight: 760;
+    }
+
+    .analysis-columns {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .compact-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .compact-row {
+      display: grid;
+      gap: 4px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-3);
+    }
+
+    .compact-row strong {
+      line-height: 1.2;
+    }
+
+    .compact-row span {
+      color: var(--muted);
+      font-size: .82rem;
+      font-weight: 740;
+      line-height: 1.35;
+    }
+
     .dashboard-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -665,6 +738,10 @@
 
     .alert-item.alert {
       border-left-color: var(--red);
+    }
+
+    .alert-item.warn {
+      border-left-color: var(--blue);
     }
 
     .alert-item.good {
@@ -1256,6 +1333,11 @@
         grid-template-columns: 1fr;
       }
 
+      .analysis-head,
+      .analysis-columns {
+        grid-template-columns: 1fr;
+      }
+
       .dashboard-chart-grid {
         grid-template-columns: 1fr;
       }
@@ -1343,6 +1425,11 @@
       }
 
       .advanced-metrics {
+        grid-template-columns: 1fr;
+      }
+
+      .analysis-head,
+      .analysis-columns {
         grid-template-columns: 1fr;
       }
 
@@ -1566,6 +1653,14 @@
         <div class="panel-body" id="advancedKpiWrap"></div>
       </section>
 
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Central de Análise</h2>
+          <span class="status-pill">Gestão automática</span>
+        </div>
+        <div class="panel-body" id="dashboardAnalysisCenterWrap"></div>
+      </section>
+
       <section class="dashboard-chart-grid" aria-label="Gráficos do dashboard">
         <section class="panel">
           <div class="panel-head">
@@ -1722,6 +1817,7 @@
           <button class="btn-secondary" id="reportsSafraBtn" type="button">Safra 2026</button>
           <button class="btn-secondary" id="reportsAllBtn" type="button">Todo acumulado</button>
           <button class="btn-secondary" id="exportReportsCsvBtn" type="button">CSV</button>
+          <button class="btn-secondary" id="exportReportsExcelBtn" type="button">Excel</button>
           <button class="btn-primary" id="printReportsBtn" type="button">Gerar PDF</button>
         </div>
       </div>
@@ -1796,6 +1892,14 @@
       <div class="report-filter-summary" id="reportsFilterSummaryWrap"></div>
 
       <section class="stats-grid" id="reportsKpiWrap" aria-label="Indicadores gerenciais"></section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Central de Análise Gerencial</h2>
+          <span class="status-pill">Alertas, metas e auditoria</span>
+        </div>
+        <div class="panel-body" id="reportsAnalysisCenterWrap"></div>
+      </section>
 
       <section class="dashboard-grid">
         <section class="panel">
@@ -3067,6 +3171,7 @@
       reportsFilterSummaryWrap: document.querySelector("#reportsFilterSummaryWrap"),
       reportsPrintSubtitle: document.querySelector("#reportsPrintSubtitle"),
       reportsKpiWrap: document.querySelector("#reportsKpiWrap"),
+      reportsAnalysisCenterWrap: document.querySelector("#reportsAnalysisCenterWrap"),
       reportsExecutiveWrap: document.querySelector("#reportsExecutiveWrap"),
       reportsInsightsWrap: document.querySelector("#reportsInsightsWrap"),
       reportsParticipationWrap: document.querySelector("#reportsParticipationWrap"),
@@ -3209,6 +3314,7 @@
       transportTargetsBody: document.querySelector("#transportTargetsBody"),
       externalCaneTargetsBody: document.querySelector("#externalCaneTargetsBody"),
       advancedKpiWrap: document.querySelector("#advancedKpiWrap"),
+      dashboardAnalysisCenterWrap: document.querySelector("#dashboardAnalysisCenterWrap"),
       goalOverviewWrap: document.querySelector("#goalOverviewWrap"),
       typeChartWrap: document.querySelector("#typeChartWrap"),
       frontChartWrap: document.querySelector("#frontChartWrap"),
@@ -10201,6 +10307,343 @@
       }
     }
 
+    function rangeText(range) {
+      const normalized = normalizeDateRange(range.start, range.end);
+      return normalized.start === normalized.end
+        ? formatDate(normalized.start)
+        : `${formatDate(normalized.start)} a ${formatDate(normalized.end)}`;
+    }
+
+    function latestAuditRows(limit = 8) {
+      return auditLog.slice(0, limit).map((item) => ({
+        date: formatDateTime(item.createdAt),
+        type: item.type || "ação",
+        user: "Usuário local",
+        message: item.message || ""
+      }));
+    }
+
+    function analysisTargetRows(rows, targetDays) {
+      return typeOptions
+        .map((type) => {
+          const production = productionByType(rows, type);
+          const target = targetForType(type) * (targetDays || 0);
+          const recordsCount = rows.filter((row) => row.type === type).length;
+          return {
+            type,
+            production,
+            target,
+            percent: progressFor(production, target),
+            balance: production - target,
+            records: recordsCount
+          };
+        })
+        .filter((item) => item.production > 0 || item.target > 0 || item.records > 0)
+        .sort((a, b) => a.percent - b.percent || b.production - a.production);
+    }
+
+    function analysisCenterData(range, selectedRecords, rows, options = {}) {
+      const normalizedRange = normalizeDateRange(range.start, range.end);
+      const targetDays = options.targetDays || 0;
+      const targetTotal = options.targetTotal || plannedTargetForRange(normalizedRange.start, normalizedRange.end);
+      const summary = summarizeRows(rows, { targetDays, targetTotal });
+      const daily = dailySummaries(selectedRecords);
+      const machineRows = machineProductionRowsForDateRange(normalizedRange);
+      const machineSummary = machineProductionSummary(machineRows);
+      const machineConsistency = machineProductionConsistencyRows(machineRows);
+      const machineIssues = machineConsistency.filter((item) => {
+        const status = machineProductionDisplayStatus(item);
+        return status.tone === "alert" || status.tone === "warn";
+      });
+      const equipmentRows = equipmentAverageRowsFromRecords(selectedRecords);
+      const targetRows = analysisTargetRows(rows, targetDays);
+      const frontRows = aggregateBy(rows.filter((row) => isFrontProduction(row.type)), "front").slice(0, 6);
+      const machineEquipmentItems = machineEquipmentRows(machineRows);
+      const topMachineRows = machineEquipmentItems.slice(0, 6);
+      const lowMachineRows = [...machineEquipmentItems]
+        .filter((item) => item.production > 0)
+        .sort((a, b) => a.averagePerDay - b.averagePerDay || a.fleet.localeCompare(b.fleet, "pt-BR", { numeric: true }))
+        .slice(0, 6);
+      const lowEquipmentAverageRows = [...equipmentRows]
+        .filter((item) => item.averagePerEquipment > 0)
+        .sort((a, b) => a.averagePerEquipment - b.averagePerEquipment)
+        .slice(0, 5);
+      const patioRows = patioRowsForRange(normalizedRange);
+      const patioSummary = patioTimeSummary(patioRows);
+      const stoppageRows = stoppageRowsForRange(normalizedRange);
+      const stoppageData = stoppageSummary(stoppageRows);
+      const reductionRows = reductionRowsForRange(normalizedRange);
+      const reductionData = reductionSummary(reductionReportItems(reductionRows));
+      const noTargetRows = rows.filter((row) => !isExternalCane(row.type) && !isTransport(row.type) && targetForRow(row, targets, rowsForSameDate(row, rows)) <= 0);
+      const belowTargetDays = daily.filter((item) => item.targetTotal > 0 && item.targetPercent < 85);
+      const missingTransportDays = daily.filter((item) => item.total > 0 && item.transportTotal <= 0);
+      const transportGapDays = daily.filter((item) => {
+        if (!item.total || !item.transportTotal) return false;
+        return Math.abs(item.transportTotal - item.total) > Math.max(item.total * 0.05, 50);
+      });
+      const missingMachineDetail = summary.total > 0 && !machineRows.length;
+      const alerts = [];
+
+      if (!selectedRecords.length) {
+        alerts.push({ tone: "alert", title: "Sem lançamento diário", text: `Nenhum lançamento encontrado em ${rangeText(normalizedRange)}.` });
+      }
+      if (summary.targetTotal > 0 && summary.targetPercent < 85) {
+        alerts.push({ tone: "alert", title: "Meta crítica", text: `${formatPercent(summary.targetPercent)} da meta; faltam ${formatNumber(summary.remaining)}.` });
+      } else if (summary.targetTotal > 0 && summary.targetPercent < 100) {
+        alerts.push({ tone: "warn", title: "Meta em aberto", text: `${formatPercent(summary.targetPercent)} da meta; acompanhe o fechamento do período.` });
+      }
+      if (belowTargetDays.length) {
+        const worst = [...belowTargetDays].sort((a, b) => a.targetPercent - b.targetPercent)[0];
+        alerts.push({ tone: "alert", title: "Dias abaixo de 85%", text: `${belowTargetDays.length} dia${belowTargetDays.length === 1 ? "" : "s"}; pior em ${formatDate(worst.date)} com ${formatPercent(worst.targetPercent)}.` });
+      }
+      if (missingTransportDays.length) {
+        alerts.push({ tone: "alert", title: "Moagem sem transporte", text: `${missingTransportDays.length} dia${missingTransportDays.length === 1 ? "" : "s"} com produção e sem transporte lançado.` });
+      }
+      if (transportGapDays.length) {
+        alerts.push({ tone: "warn", title: "Transporte diferente da moagem", text: `${transportGapDays.length} dia${transportGapDays.length === 1 ? "" : "s"} com diferença acima de 5%.` });
+      }
+      if (noTargetRows.length) {
+        alerts.push({ tone: "alert", title: "Metas faltando", text: `${noTargetRows.length} registro${noTargetRows.length === 1 ? "" : "s"} sem meta cadastrada.` });
+      }
+      if (machineIssues.length) {
+        alerts.push({ tone: "alert", title: "Conferência de máquinas", text: `${machineIssues.length} grupo${machineIssues.length === 1 ? "" : "s"} com diferença ou pendência.` });
+      } else if (missingMachineDetail) {
+        alerts.push({ tone: "warn", title: "Sem detalhe das máquinas", text: "Existe moagem lançada, mas nenhuma produção por equipamento no período." });
+      }
+      if (patioSummary.palhaAlerts) {
+        alerts.push({ tone: "warn", title: "Tempo de palha alto", text: `${patioSummary.palhaAlerts} alerta${patioSummary.palhaAlerts === 1 ? "" : "s"} acima de 90 min.` });
+      }
+      if (stoppageData.totalHours) {
+        alerts.push({ tone: "warn", title: "Paradas registradas", text: `${formatHours(stoppageData.totalHours)} de parada em ${stoppageData.records} lançamento${stoppageData.records === 1 ? "" : "s"}.` });
+      }
+      if (reductionData.reductionTons) {
+        alerts.push({ tone: "warn", title: "Redução de moagem", text: `${formatNumber(reductionData.reductionTons)} t estimadas de redução no período.` });
+      }
+      if (!alerts.length) {
+        alerts.push({ tone: "good", title: "Operação consistente", text: "Sem alerta crítico nos dados analisados." });
+      }
+
+      const criticalCount = alerts.filter((item) => item.tone === "alert").length;
+      const warningCount = alerts.filter((item) => item.tone === "warn").length;
+      const score = Math.max(0, Math.round(100 - criticalCount * 18 - warningCount * 8));
+      const scoreTone = score < 65 ? "alert" : score < 85 ? "warn" : "good";
+      const statusLabel = scoreTone === "good" ? "Bom" : scoreTone === "warn" ? "Atenção" : "Crítico";
+      const averageDay = selectedRecords.length ? summary.total / selectedRecords.length : 0;
+      const machineLoads = machineRows.reduce((sum, row) => sum + (Number(row.loads) || 0), 0);
+      const bestDay = daily.length ? [...daily].sort((a, b) => b.total - a.total)[0] : null;
+      const worstDay = daily.length ? [...daily].sort((a, b) => a.targetPercent - b.targetPercent)[0] : null;
+      const recommendations = [];
+
+      if (summary.targetTotal > 0 && summary.targetPercent < 100) recommendations.push(`Focar ${formatNumber(summary.remaining)} t restantes para fechar a meta do período.`);
+      if (missingTransportDays.length) recommendations.push("Conferir os dias com moagem sem transporte lançado.");
+      if (machineIssues.length) recommendations.push("Revisar a conferência entre lançamento diário e produção por máquinas.");
+      if (lowMachineRows.length) recommendations.push(`Acompanhar menor média de equipamento: ${lowMachineRows[0].fleet} com ${formatNumber(lowMachineRows[0].averagePerDay)} por dia.`);
+      if (patioSummary.palhaAlerts) recommendations.push("Atuar nos tempos de palha acima de 90 min.");
+      if (!recommendations.length) recommendations.push("Manter rotina de lançamento, importação e conferência diária.");
+
+      return {
+        range: normalizedRange,
+        summary,
+        daily,
+        alerts,
+        criticalCount,
+        warningCount,
+        score,
+        scoreTone,
+        statusLabel,
+        averageDay,
+        bestDay,
+        worstDay,
+        recommendations,
+        targetRows,
+        frontRows,
+        equipmentRows,
+        lowEquipmentAverageRows,
+        machineRows,
+        machineSummary,
+        machineEquipmentRows: machineEquipmentItems,
+        topMachineRows,
+        lowMachineRows,
+        machineConsistency,
+        machineIssues,
+        machineLoads,
+        patioSummary,
+        stoppageData,
+        reductionData,
+        auditRows: latestAuditRows(8)
+      };
+    }
+
+    function renderAnalysisTable(headers, rows, emptyMessage) {
+      if (!rows.length) return `<div class="empty-state">${escapeHtml(emptyMessage)}</div>`;
+      return `
+        <table>
+          <thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
+          <tbody>
+            ${rows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function analysisCenterHtml(data) {
+      const metricCards = [
+        ["Moagem", formatNumber(data.summary.total), `${formatPercent(data.summary.targetPercent)} da meta`],
+        ["Falta/Sobra", data.summary.targetTotal > 0 ? formatNumber(data.summary.total - data.summary.targetTotal) : "-", data.summary.targetTotal > 0 ? "Real - meta" : "Sem meta"],
+        ["Média/dia", formatNumber(data.averageDay), `${data.daily.length} dia${data.daily.length === 1 ? "" : "s"} analisado${data.daily.length === 1 ? "" : "s"}`],
+        ["Máquinas", formatNumber(data.machineSummary.total), `${data.machineSummary.machines} equipamento${data.machineSummary.machines === 1 ? "" : "s"}`],
+        ["Média maq./dia", formatNumber(data.machineSummary.averagePerMachineDay), `${data.machineSummary.machineDays} máquina-dia`],
+        ["Cargas", formatNumber(data.machineLoads), data.machineLoads ? `${formatNumber(data.machineSummary.total / data.machineLoads)} média/carga` : "Sem cargas"]
+      ];
+      const targetTable = data.targetRows.slice(0, 8).map((item) => [
+        item.type,
+        formatNumber(item.production),
+        formatNumber(item.target),
+        formatPercent(item.percent),
+        item.target > 0 ? targetBalanceLabel(item.production, item.target) : "Sem meta"
+      ]);
+      const frontTable = data.frontRows.map((item) => [
+        item.name,
+        formatNumber(item.production),
+        formatNumber(item.target),
+        formatPercent(item.percent),
+        String(item.records)
+      ]);
+      const machineTable = data.topMachineRows.map((item) => [
+        item.fleet,
+        item.machineType,
+        item.frontsLabel || "-",
+        formatNumber(item.production),
+        formatNumber(item.averagePerDay),
+        String(item.dayCount)
+      ]);
+      const weakMachineTable = data.lowMachineRows.map((item) => [
+        item.fleet,
+        item.machineType,
+        item.frontsLabel || "-",
+        formatNumber(item.averagePerDay),
+        formatNumber(item.production),
+        String(item.dayCount)
+      ]);
+      const consistencyTable = data.machineIssues.slice(0, 8).map((item) => {
+        const status = machineProductionDisplayStatus(item);
+        return [
+          formatDate(item.date),
+          machineProductionBaseLabel(item),
+          item.machineType,
+          machineProductionRequiresDailyMatch(item) ? formatNumber(item.target) : "-",
+          formatNumber(item.production),
+          machineProductionRequiresDailyMatch(item) ? formatNumber(item.difference) : "-",
+          status.label
+        ];
+      });
+      const auditTable = data.auditRows.map((item) => [
+        item.date,
+        item.user,
+        item.type,
+        item.message
+      ]);
+
+      return `
+        <div class="analysis-board">
+          <div class="analysis-head">
+            <div class="analysis-status ${data.scoreTone}">
+              <span>Situação geral</span>
+              <strong>${escapeHtml(data.statusLabel)}</strong>
+              <small>Nota operacional ${data.score}/100 · ${data.criticalCount} crítico${data.criticalCount === 1 ? "" : "s"} · ${data.warningCount} atenção</small>
+              <small>Período ${rangeText(data.range)}</small>
+            </div>
+            <div class="advanced-metrics">
+              ${metricCards.map((item) => `
+                <div class="goal-metric">
+                  <span>${escapeHtml(item[0])}</span>
+                  <strong>${escapeHtml(item[1])}</strong>
+                  <small>${escapeHtml(item[2])}</small>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+
+          <div class="analysis-columns">
+            <div>
+              <div class="chart-row-head" style="margin-bottom: 10px;">
+                <strong>Alertas automáticos</strong>
+                <span>${data.alerts.length} item${data.alerts.length === 1 ? "" : "s"}</span>
+              </div>
+              <div class="alert-grid">
+                ${data.alerts.map((item) => `
+                  <div class="alert-item ${item.tone}">
+                    <strong>${escapeHtml(item.title)}</strong>
+                    <span>${escapeHtml(item.text)}</span>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+            <div>
+              <div class="chart-row-head" style="margin-bottom: 10px;">
+                <strong>Ações recomendadas</strong>
+                <span>Próximos passos</span>
+              </div>
+              <div class="compact-list">
+                ${data.recommendations.map((item, index) => `
+                  <div class="compact-row">
+                    <strong>${index + 1}. ${escapeHtml(item)}</strong>
+                    <span>Use os filtros e relatórios detalhados para conferir a origem.</span>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+          </div>
+
+          <div class="analysis-columns">
+            <div class="table-wrap">
+              <div class="chart-row-head" style="margin-bottom: 10px;"><strong>Meta por operação</strong><span>real x planejado</span></div>
+              ${renderAnalysisTable(["Operação", "Real", "Meta", "% meta", "Saldo"], targetTable, "Sem operação para comparar metas.")}
+            </div>
+            <div class="table-wrap">
+              <div class="chart-row-head" style="margin-bottom: 10px;"><strong>Ranking por frente</strong><span>origem da cana</span></div>
+              ${renderAnalysisTable(["Frente", "Produção", "Meta", "% meta", "Reg."], frontTable, "Sem produção por frente no período.")}
+            </div>
+          </div>
+
+          <div class="analysis-columns">
+            <div class="table-wrap">
+              <div class="chart-row-head" style="margin-bottom: 10px;"><strong>Melhores equipamentos</strong><span>produção detalhada</span></div>
+              ${renderAnalysisTable(["Equip.", "Tipo", "Base", "Produção", "Média/dia", "Dias"], machineTable, "Sem produção por equipamento no período.")}
+            </div>
+            <div class="table-wrap">
+              <div class="chart-row-head" style="margin-bottom: 10px;"><strong>Equipamentos para acompanhar</strong><span>menor média/dia</span></div>
+              ${renderAnalysisTable(["Equip.", "Tipo", "Base", "Média/dia", "Produção", "Dias"], weakMachineTable, "Sem média de equipamento para acompanhar.")}
+            </div>
+          </div>
+
+          <div class="analysis-columns">
+            <div class="table-wrap">
+              <div class="chart-row-head" style="margin-bottom: 10px;"><strong>Conferência de inconsistências</strong><span>máquinas x diário</span></div>
+              ${renderAnalysisTable(["Data", "Base", "Tipo", "Diário", "Máquinas", "Dif.", "Status"], consistencyTable, "Sem inconsistência de máquinas no período.")}
+            </div>
+            <div class="table-wrap">
+              <div class="chart-row-head" style="margin-bottom: 10px;"><strong>Auditoria recente</strong><span>histórico local</span></div>
+              ${renderAnalysisTable(["Quando", "Usuário", "Tipo", "Ação"], auditTable, "Sem auditoria registrada ainda.")}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderDashboardAnalysisCenter(range, selectedRecords, rows, options = {}) {
+      if (!els.dashboardAnalysisCenterWrap) return;
+      els.dashboardAnalysisCenterWrap.innerHTML = analysisCenterHtml(analysisCenterData(range, selectedRecords, rows, options));
+    }
+
+    function renderReportsAnalysisCenter(data) {
+      if (!els.reportsAnalysisCenterWrap) return;
+      els.reportsAnalysisCenterWrap.innerHTML = analysisCenterHtml(analysisCenterData(data.range, data.selectedRecords, data.baseRows, {
+        targetDays: data.targetContext.targetDays,
+        targetTotal: data.baseSummary.targetTotal
+      }));
+    }
+
     function renderDashboard() {
       const range = dashboardRange();
       setDashboardRange(range.start, range.end);
@@ -10245,6 +10688,7 @@
 
       setStats("dash", rows, { targetDays, targetTotal });
       renderAdvancedKpis(selectedRecords, rows, range, { targetDays, targetInfo, targetTotal });
+      renderDashboardAnalysisCenter(range, selectedRecords, rows, { targetDays, targetTotal });
       renderDashboardCharts(rows, { targetDays, targetTotal });
       renderDashboardPatioTimes(range);
       renderDashboardMachineProduction(range);
@@ -11626,6 +12070,7 @@
       renderReportFilterSummary(data);
       updateReportsPrintSubtitle(data);
       renderReportsKpis(baseSummary, summary, info, filteredRecords, rows, targetContext, range);
+      renderReportsAnalysisCenter(data);
       renderReportsExecutive(filteredRecords, rows, baseSummary, summary, info, filters);
       renderReportsInsights(filteredRecords, rows, baseSummary, filters);
       renderReportsParticipation(baseSummary, targetContext.targetDays);
@@ -13331,7 +13776,7 @@
 
     function exportManagementReportCsv() {
       const data = managementDataForRange();
-      const { range, filteredRecords, rows, baseSummary, summary, targetContext, filters } = data;
+      const { range, selectedRecords, filteredRecords, rows, baseRows, baseSummary, summary, targetContext, filters } = data;
       const dailyItems = dailyReportItems(filteredRecords, rows, filters);
       const accumulatedItems = chronologicalDailyReportItems(filteredRecords, rows, filters);
       let accumulatedReal = 0;
@@ -13387,6 +13832,10 @@
       const machineReportBaseRows = groupedMachineProductionRows(machineReportRows, (row) => machineProductionBaseLabel(row));
       const machineReportConsistencyRows = machineProductionConsistencyRows(machineReportRows);
       const machineReportLoads = machineReportRows.reduce((sum, row) => sum + (Number(row.loads) || 0), 0);
+      const analysis = analysisCenterData(range, selectedRecords, baseRows, {
+        targetDays: targetContext.targetDays,
+        targetTotal: baseSummary.targetTotal
+      });
       const lines = [
         ["Relatório Gerencial - Produção Diária da Cambuí"],
         ["Período", `${formatDate(range.start)} a ${formatDate(range.end)}`],
@@ -13409,6 +13858,42 @@
         ["Transporte total", formatNumber(baseSummary.transportTotal), formatPercent(baseSummary.transportPercent)],
         ["KM médio próprio", formatKm(baseSummary.ownTransportKmAvg), `${baseSummary.ownTransportKmRecords} dia${baseSummary.ownTransportKmRecords === 1 ? "" : "s"} com KM lançado`],
         ["KM médio terceiro", formatKm(baseSummary.thirdTransportKmAvg), `${baseSummary.thirdTransportKmRecords} dia${baseSummary.thirdTransportKmRecords === 1 ? "" : "s"} com KM lançado`],
+        [],
+        ["Central de Análise"],
+        ["Situação geral", analysis.statusLabel, `Nota ${analysis.score}/100`],
+        ["Alertas críticos", analysis.criticalCount],
+        ["Pontos de atenção", analysis.warningCount],
+        ["Média diária", formatNumber(analysis.averageDay)],
+        ["Melhor dia", analysis.bestDay ? formatDate(analysis.bestDay.date) : ""],
+        ["Dia mais crítico", analysis.worstDay ? formatDate(analysis.worstDay.date) : ""],
+        [],
+        ["Alertas automáticos"],
+        ["Tipo", "Título", "Descrição"],
+        ...analysis.alerts.map((item) => [item.tone || "info", item.title, item.text]),
+        [],
+        ["Ações recomendadas"],
+        ["Prioridade", "Ação"],
+        ...analysis.recommendations.map((item, index) => [index + 1, item]),
+        [],
+        ["Metas por operação"],
+        ["Operação", "Real", "Meta", "% meta", "Saldo", "Registros"],
+        ...analysis.targetRows.map((item) => [
+          item.type,
+          formatNumber(item.production),
+          formatNumber(item.target),
+          formatPercent(item.percent),
+          formatNumber(item.balance),
+          item.records
+        ]),
+        [],
+        ["Auditoria completa"],
+        ["Quando", "Usuário", "Tipo", "Ação"],
+        ...auditLog.map((item) => [
+          formatDateTime(item.createdAt),
+          "Usuário local",
+          item.type,
+          item.message
+        ]),
         [],
         ["Produção detalhada das máquinas"],
         ["Total detalhado", formatNumber(machineReportSummary.total)],
@@ -13621,6 +14106,262 @@
       const content = lines.map((line) => line.map(csvCell).join(";")).join("\n");
       downloadFile(`relatorio-gerencial-cambui-${range.start}-${range.end}.csv`, content, "text/csv;charset=utf-8");
       showToast("Relatório gerencial CSV exportado.");
+    }
+
+    function managementWorkbookTables(data = managementDataForRange()) {
+      const { range, selectedRecords, filteredRecords, rows, baseRows, baseSummary, summary, targetContext, filters } = data;
+      const analysis = analysisCenterData(range, selectedRecords, baseRows, {
+        targetDays: targetContext.targetDays,
+        targetTotal: baseSummary.targetTotal
+      });
+      const dailyItems = dailyReportItems(filteredRecords, rows, filters);
+      const targetRows = analysis.targetRows.map((item) => [
+        item.type,
+        formatNumber(item.production),
+        formatNumber(item.target),
+        formatPercent(item.percent),
+        formatNumber(item.balance),
+        item.records
+      ]);
+      const frontRows = analysis.frontRows.map((item) => [
+        item.name,
+        formatNumber(item.production),
+        formatNumber(item.target),
+        formatPercent(item.percent),
+        formatNumber(item.remaining),
+        item.records
+      ]);
+      const equipmentAverageRows = analysis.equipmentRows.map((item) => [
+        item.type,
+        item.origin,
+        formatNumber(item.production),
+        formatNumber(item.equipmentQuantity),
+        formatNumber(item.averagePerEquipment),
+        item.dayCount,
+        item.records
+      ]);
+      const machineEquipmentTableRows = analysis.machineEquipmentRows.map((item) => [
+        item.fleet,
+        item.machineType,
+        item.frontsLabel || "-",
+        formatNumber(item.production),
+        item.loads ? formatNumber(item.loads) : "",
+        item.averagePerLoad ? formatNumber(item.averagePerLoad) : "",
+        formatNumber(item.averagePerDay),
+        item.dayCount,
+        item.records
+      ]);
+      const machineConsistencyRows = analysis.machineConsistency.map((item) => {
+        const status = machineProductionDisplayStatus(item);
+        return [
+          formatDate(item.date),
+          machineProductionBaseLabel(item),
+          item.machineType,
+          machineProductionRequiresDailyMatch(item) ? formatNumber(item.target) : "",
+          formatNumber(item.production),
+          machineProductionRequiresDailyMatch(item) ? formatNumber(item.difference) : "",
+          status.label
+        ];
+      });
+      const machineDailyRows = machineProductionDailyManagementRows(analysis.machineRows).map((item) => [
+        formatDate(item.date),
+        item.machineType,
+        item.base,
+        formatNumber(item.production),
+        item.machineCount,
+        item.loads ? formatNumber(item.loads) : "",
+        formatNumber(item.averagePerMachine),
+        item.averagePerLoad ? formatNumber(item.averagePerLoad) : "",
+        item.records
+      ]);
+      const patioRows = patioRowsForRange(range);
+      const patioSummary = patioTimeSummary(patioRows);
+      const stoppageRows = stoppageRowsForRange(range);
+      const stoppageGrouped = groupedStoppageRows(stoppageRows, (row) => row.category);
+      const reductionRows = reductionTableRows(reductionReportItems(reductionRowsForRange(range)));
+      const auditRows = auditLog.map((item) => [
+        formatDateTime(item.createdAt),
+        "Usuário local",
+        item.type,
+        item.message
+      ]);
+
+      return [
+        {
+          title: "Resumo gerencial",
+          headers: ["Indicador", "Valor", "Detalhe"],
+          rows: [
+            ["Período", rangeText(range), PLANT],
+            ["Situação", analysis.statusLabel, `Nota ${analysis.score}/100`],
+            ["Moagem", formatNumber(baseSummary.total), `${formatPercent(baseSummary.targetPercent)} da meta`],
+            ["Meta", formatNumber(baseSummary.targetTotal), `${targetContext.targetDays} dia(s)`],
+            ["Falta/Sobra", formatNumber(baseSummary.total - baseSummary.targetTotal), "Real - meta"],
+            ["Moagem filtrada", formatNumber(summary.total), `${rows.length}/${baseRows.length} registro(s)`],
+            ["Transporte próprio", formatNumber(baseSummary.ownTransport), formatPercent(baseSummary.ownTransportPercent)],
+            ["Transporte terceiro", formatNumber(baseSummary.thirdTransport), formatPercent(baseSummary.thirdTransportPercent)],
+            ["Transporte total", formatNumber(baseSummary.transportTotal), formatPercent(baseSummary.transportPercent)],
+            ["Tempo palha médio", formatMinutes(patioSummary.avgPalha), `${patioSummary.trips} viagem(ns)`],
+            ["Paradas", formatHours(analysis.stoppageData.totalHours), `${analysis.stoppageData.records} lançamento(s)`],
+            ["Redução moagem", formatNumber(analysis.reductionData.reductionTons), "Toneladas estimadas"],
+            ["Máquinas detalhadas", formatNumber(analysis.machineSummary.total), `${analysis.machineSummary.machines} equipamento(s)`],
+            ["Média máquina/dia", formatNumber(analysis.machineSummary.averagePerMachineDay), `${analysis.machineSummary.machineDays} equipamento-dia`]
+          ]
+        },
+        {
+          title: "Alertas e ações",
+          headers: ["Tipo", "Título", "Descrição"],
+          rows: [
+            ...analysis.alerts.map((item) => [item.tone || "info", item.title, item.text]),
+            ...analysis.recommendations.map((item, index) => ["ação", `Ação ${index + 1}`, item])
+          ]
+        },
+        {
+          title: "Metas por operação",
+          headers: ["Operação", "Real", "Meta", "% meta", "Saldo", "Registros"],
+          rows: targetRows
+        },
+        {
+          title: "Ranking por frente",
+          headers: ["Frente", "Produção", "Meta", "% meta", "Falta", "Registros"],
+          rows: frontRows
+        },
+        {
+          title: "Médias por equipamentos",
+          headers: ["Operação", "Frente/origem", "Produção", "Qtd. equipamentos", "Média/equip.", "Dias", "Registros"],
+          rows: equipmentAverageRows
+        },
+        {
+          title: "Máquinas por equipamento",
+          headers: ["Equipamento", "Tipo", "Frentes/bases", "Produção", "Cargas", "Média/carga", "Média/dia", "Dias", "Registros"],
+          rows: machineEquipmentTableRows
+        },
+        {
+          title: "Máquinas por dia",
+          headers: ["Data", "Tipo", "Frente/base", "Produção", "Equipamentos", "Cargas", "Média/equip.", "Média/carga", "Registros"],
+          rows: machineDailyRows
+        },
+        {
+          title: "Conferência de máquinas",
+          headers: ["Data", "Frente/base", "Tipo", "Lançamento diário", "Máquinas", "Diferença", "Status"],
+          rows: machineConsistencyRows
+        },
+        {
+          title: "Relatório diário",
+          headers: ["Data", "Moagem", "Volume filtrado", "Meta", "% meta", "% própria", "% terceira", "% transp. próprio", "% transp. terceiro", "% transp. total", "Falta", "Registros"],
+          rows: dailyItems.map((item) => [
+            formatDate(item.date),
+            formatNumber(item.total),
+            formatNumber(item.filteredVolume),
+            formatNumber(item.targetTotal),
+            formatPercent(item.targetPercent),
+            formatPercent(item.ownHarvestPercent),
+            formatPercent(item.thirdHarvestPercent),
+            formatPercent(item.ownTransportPercent),
+            formatPercent(item.thirdTransportPercent),
+            formatPercent(item.transportPercent),
+            formatNumber(item.remaining),
+            `${item.filteredRows}/${item.records}`
+          ])
+        },
+        {
+          title: "Lançamentos filtrados",
+          headers: ["Data", "Operação", "Origem", "Qtd. equipamentos", "Produção", "Média/equip.", "% moagem", "Meta", "% meta", "Observação"],
+          rows: rows.map((row) => {
+            const target = targetForRow(row, targets, rowsForSameDate(row, rows));
+            return [
+              formatDate(row.date),
+              row.type,
+              reportOriginForRow(row),
+              usesEquipmentQuantity(row.type) ? formatNumber(row.equipmentQuantity) : "",
+              formatNumber(row.production),
+              usesEquipmentQuantity(row.type) ? formatNumber(productionAverageByEquipment(row)) : "",
+              formatPercent(progressFor(row.production, baseSummary.total)),
+              formatNumber(target),
+              formatPercent(progressFor(row.production, target)),
+              row.note || ""
+            ];
+          })
+        },
+        {
+          title: "Tempo de pátio",
+          headers: ["Indicador", "Valor", "Detalhe"],
+          rows: [
+            ["Viagens", patioSummary.trips, `${patioSummary.trucks} caminhão(ões)`],
+            ["Frentes", patioSummary.fronts, "Frentes com viagem"],
+            ["Média palha", formatMinutes(patioSummary.avgPalha), "Início até fim de carga"],
+            ["Maior palha", patioSummary.maxPalha ? formatMinutes(patioSummary.maxPalha.fieldMinutes) : "", patioSummary.maxPalha ? `${patioSummary.maxPalha.truck} · ${patioSummary.maxPalha.front}` : ""],
+            ["Alertas", patioSummary.palhaAlerts, "Palha acima de 90 min"]
+          ]
+        },
+        {
+          title: "Paradas da usina",
+          headers: ["Tipo do motivo", "Horas paradas", "% total", "Lançamentos", "Motivos"],
+          rows: stoppageGrouped.map((item) => [
+            item.label,
+            formatHours(item.hours),
+            formatPercent(progressFor(item.hours, analysis.stoppageData.totalHours)),
+            item.records,
+            [...item.reasons].slice(0, 8).join(", ") || "-"
+          ])
+        },
+        {
+          title: "Redução de moagem",
+          headers: ["Início", "Fim", "Horas", "Moagem (t)", "RPM", "Moagem estimada", "Redução (t)", "Ton/h reduzida"],
+          rows: reductionRows
+        },
+        {
+          title: "Auditoria completa",
+          headers: ["Quando", "Usuário", "Tipo", "Ação"],
+          rows: auditRows
+        }
+      ];
+    }
+
+    function excelTableHtml(table) {
+      const columns = Math.max(table.headers.length, 1);
+      const rows = table.rows.length ? table.rows : [[`Sem dados para ${table.title}`]];
+      return `
+        <h2>${escapeHtml(table.title)}</h2>
+        <table>
+          <thead>
+            <tr>${table.headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>
+          </thead>
+          <tbody>
+            ${rows.map((row) => `
+              <tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}${row.length < columns ? `<td colspan="${columns - row.length}"></td>` : ""}</tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function exportManagementReportExcel() {
+      const data = managementDataForRange();
+      const { range } = data;
+      const tables = managementWorkbookTables(data);
+      const html = `
+        <!doctype html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <style>
+              body { font-family: Arial, sans-serif; color: #111827; }
+              h1 { margin: 0 0 8px; }
+              h2 { margin: 24px 0 8px; color: #14532d; }
+              table { border-collapse: collapse; width: 100%; margin-bottom: 14px; }
+              th, td { border: 1px solid #cbd5e1; padding: 6px 8px; font-size: 12px; vertical-align: top; }
+              th { background: #dcfce7; font-weight: 700; }
+            </style>
+          </head>
+          <body>
+            <h1>Relatório Gerencial Completo - Produção Diária da Cambuí</h1>
+            <p>Período ${escapeHtml(rangeText(range))} · Gerado em ${escapeHtml(formatDateTime(new Date().toISOString()))}</p>
+            ${tables.map(excelTableHtml).join("")}
+          </body>
+        </html>
+      `;
+      downloadFile(`relatorio-gerencial-completo-cambui-${range.start}-${range.end}.xls`, html, "application/vnd.ms-excel;charset=utf-8");
+      showToast("Relatório gerencial Excel exportado.");
     }
 
     function reportOriginItems(rows, baseSummary) {
@@ -13961,6 +14702,41 @@
         ["Moagem efetiva/dia", formatNumber(reportStoppageEffective.effectiveAveragePerDay), `Desconto ${formatNumber(reportStoppageEffective.lossAveragePerDay)} t/dia`, reportStoppageEffective.lossAveragePerDay ? "warn" : ""],
         ["Dias exibidos", `${filteredRecords.length}`, `${dailyItems.length} no gráfico`, ""]
       ];
+      const analysis = analysisCenterData(range, filteredRecords, rows.length ? rows : rowsFromRecords(filteredRecords), {
+        targetDays: targetContext.targetDays,
+        targetTotal: baseSummary.targetTotal
+      });
+      const analysisSummaryRows = [
+        ["Situação geral", analysis.statusLabel, `Nota ${analysis.score}/100`],
+        ["Alertas críticos", String(analysis.criticalCount), `${analysis.warningCount} ponto${analysis.warningCount === 1 ? "" : "s"} de atenção`],
+        ["Média diária", formatNumber(analysis.averageDay), `${analysis.daily.length} dia${analysis.daily.length === 1 ? "" : "s"} analisado${analysis.daily.length === 1 ? "" : "s"}`],
+        ["Máquinas detalhadas", formatNumber(analysis.machineSummary.total), `${analysis.machineSummary.machines} equipamento${analysis.machineSummary.machines === 1 ? "" : "s"}`],
+        ["Média máquina/dia", formatNumber(analysis.machineSummary.averagePerMachineDay), `${analysis.machineSummary.machineDays} equipamento-dia`],
+        ["Cargas", formatNumber(analysis.machineLoads), analysis.machineLoads ? `${formatNumber(analysis.machineSummary.total / analysis.machineLoads)} média/carga` : "Sem cargas"]
+      ];
+      const analysisAlertRows = analysis.alerts.map((item) => [
+        item.tone || "info",
+        item.title,
+        item.text
+      ]);
+      const analysisRecommendationRows = analysis.recommendations.map((item, index) => [
+        String(index + 1),
+        item
+      ]);
+      const analysisTargetRowsForPdf = analysis.targetRows.map((item) => [
+        item.type,
+        formatNumber(item.production),
+        formatNumber(item.target),
+        formatPercent(item.percent),
+        formatNumber(item.balance),
+        String(item.records)
+      ]);
+      const analysisAuditRows = analysis.auditRows.map((item) => [
+        item.date,
+        item.user,
+        item.type,
+        item.message
+      ]);
       const insightCards = [
         {
           label: "Situação da meta",
@@ -14051,7 +14827,7 @@
         ["Transbordos", formatNumber(machineReportSummary.transshipments), formatPercent(progressFor(machineReportSummary.transshipments, machineReportSummary.total))],
         ["Caminhões", formatNumber(machineReportSummary.trucks + machineReportSummary.thirdTrucks), "Próprios e terceiros"]
       ];
-      const machinePdfEquipmentRows = machineReportEquipmentRows.slice(0, 18).map((item) => [
+      const machinePdfEquipmentRows = machineReportEquipmentRows.map((item) => [
         item.fleet,
         item.machineType,
         item.frontsLabel || "-",
@@ -14061,7 +14837,7 @@
         formatNumber(item.averagePerDay),
         String(item.dayCount)
       ]);
-      const machinePdfDailyRows = machineReportDailyRows.slice(0, 24).map((item) => [
+      const machinePdfDailyRows = machineReportDailyRows.map((item) => [
         formatDate(item.date),
         item.machineType,
         item.base,
@@ -14293,6 +15069,16 @@
               `).join("")}
             </section>
             <section class="pdf-grid-2">
+              <div class="pdf-section full soft">
+                <div class="pdf-title"><h2>Central de Análise Gerencial</h2><span class="muted">Alertas, metas, equipamentos e auditoria</span></div>
+                ${pdfTable(["Indicador", "Valor", "Detalhe"], analysisSummaryRows)}
+                ${pdfTable(["Tipo", "Alerta", "Descrição"], analysisAlertRows)}
+                ${pdfTable(["Prioridade", "Ação recomendada"], analysisRecommendationRows)}
+                ${pdfTable(["Operação", "Real", "Meta", "% meta", "Saldo", "Reg."], analysisTargetRowsForPdf)}
+                ${pdfTable(["Quando", "Usuário", "Tipo", "Ação"], analysisAuditRows)}
+              </div>
+            </section>
+            <section class="pdf-grid-2">
               <div class="pdf-section">
                 <div class="pdf-title"><h2>Evolução diária</h2><span class="muted">Moagem x filtro x meta</span></div>
                 ${pdfDailyBarChart(dailyItems)}
@@ -14329,7 +15115,7 @@
                   ${pdfTable(pdfPatioTransportTable.headers, pdfPatioTransportTable.rows)}
                   ${pdfTable(pdfPatioShiftTable.headers, pdfPatioShiftTable.rows)}
                   ${pdfTable(patioShiftMatrix.headers, patioShiftMatrix.rows)}
-                  ${pdfTable(pdfPatioFrontTable.headers, pdfPatioFrontTable.rows, { limit: 12 })}
+                  ${pdfTable(pdfPatioFrontTable.headers, pdfPatioFrontTable.rows)}
                 ` : '<div class="pdf-empty">Sem lançamentos de tempo de pátio no período do relatório.</div>'}
               </div>
               <div class="pdf-section full soft">
@@ -14337,15 +15123,15 @@
                 ${pdfTable(["Indicador", "Valor", "Detalhe"], stoppageSummaryRows)}
                 ${reportStoppageRows.length ? `
                   ${pdfTable(["Tipo do motivo", "Horas paradas", "% total", "Lançamentos", "Motivos"], stoppageCategoryTableRows)}
-                  ${pdfTable(["Data", "Horas paradas", "Lançamentos", "Motivos"], stoppageDailyTableRows, { limit: 20 })}
-                  ${pdfTable(["Data", "Tipo", "Horas", "Motivo", "Observação"], stoppageDetailRows, { limit: 30 })}
+                  ${pdfTable(["Data", "Horas paradas", "Lançamentos", "Motivos"], stoppageDailyTableRows)}
+                  ${pdfTable(["Data", "Tipo", "Horas", "Motivo", "Observação"], stoppageDetailRows)}
                 ` : '<div class="pdf-empty">Sem paradas da usina lançadas no período do relatório.</div>'}
               </div>
               <div class="pdf-section full soft">
                 <div class="pdf-title"><h2>Redução de moagem</h2><span class="muted">Lançamentos individuais · jornada operacional 06:00 às 05:59</span></div>
                 ${reportReductionRows.length ? `
                   ${pdfTable(["Indicador", "Valor", "Detalhe"], reductionSummaryTableRows)}
-                  ${pdfTable(["Início", "Fim", "Horas", "Moagem (t)", "RPM", "Moagem estimada", "Redução (t)", "Ton/h reduzida"], reductionDetailTableRows, { limit: 30 })}
+                  ${pdfTable(["Início", "Fim", "Horas", "Moagem (t)", "RPM", "Moagem estimada", "Redução (t)", "Ton/h reduzida"], reductionDetailTableRows)}
                 ` : '<div class="pdf-empty">Sem reduções de moagem lançadas no período do relatório.</div>'}
               </div>
               <div class="pdf-section">
@@ -14354,7 +15140,7 @@
               </div>
               <div class="pdf-section">
                 <div class="pdf-title"><h2>Detalhamento por operação</h2><span class="muted">Volume e meta cadastrada</span></div>
-                ${pdfTable(["Operação", "Volume", "% moagem", "Meta", "% meta", "Reg."], typeRows, { limit: 8 })}
+                ${pdfTable(["Operação", "Volume", "% moagem", "Meta", "% meta", "Reg."], typeRows)}
               </div>
               <div class="pdf-section full pdf-page-break">
                 <div class="pdf-title"><h2>Planejamento x real mensal</h2><span class="muted">Safra completa com filtros aplicados</span></div>
@@ -14362,11 +15148,11 @@
               </div>
               <div class="pdf-section full">
                 <div class="pdf-title"><h2>Relatório diário</h2><span class="muted">Base completa do período filtrado</span></div>
-                ${pdfTable(["Data", "Moagem", "Filtro", "Meta", "% meta", "% próp.", "% terc.", "% transp."], dailyRows, { limit: 40 })}
+                ${pdfTable(["Data", "Moagem", "Filtro", "Meta", "% meta", "% próp.", "% terc.", "% transp."], dailyRows)}
               </div>
               <div class="pdf-section full">
                 <div class="pdf-title"><h2>Origens da cana e transporte</h2><span class="muted">Ranking detalhado</span></div>
-                ${pdfTable(["Origem", "Tipo", "Volume", "% moagem", "Reg."], originRows, { limit: 30 })}
+                ${pdfTable(["Origem", "Tipo", "Volume", "% moagem", "Reg."], originRows)}
               </div>
             </section>
             <footer class="pdf-footer">
@@ -15153,6 +15939,7 @@
     });
 
     document.querySelector("#exportReportsCsvBtn").addEventListener("click", exportManagementReportCsv);
+    document.querySelector("#exportReportsExcelBtn").addEventListener("click", exportManagementReportExcel);
     document.querySelector("#printReportsBtn").addEventListener("click", printManagementReportPdf);
     document.querySelector("#patioTodayBtn").addEventListener("click", () => {
       const today = todayInputValue();
