@@ -389,7 +389,7 @@
 
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
       gap: 12px;
     }
 
@@ -419,6 +419,32 @@
 
     .stat small {
       color: var(--muted);
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
+      gap: 12px;
+    }
+
+    .summary-card {
+      display: grid;
+      gap: 6px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+
+    .summary-card small,
+    .summary-card span {
+      color: var(--muted);
+      font-weight: 750;
+    }
+
+    .summary-card strong {
+      font-size: clamp(1.2rem, 2vw, 1.7rem);
+      line-height: 1;
     }
 
     .dashboard-grid {
@@ -659,6 +685,28 @@
     .rank-list {
       display: grid;
       gap: 10px;
+    }
+
+    .rank-row,
+    .insight-item {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-3);
+    }
+
+    .insight-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .insight-item span {
+      color: var(--muted);
+      font-size: .88rem;
+      font-weight: 720;
+      line-height: 1.35;
     }
 
     .transport-ranking-grid {
@@ -1199,7 +1247,8 @@
     }
 
     @media (max-width: 1240px) {
-      .stats-grid {
+      .stats-grid,
+      .summary-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
       }
 
@@ -1288,7 +1337,8 @@
         grid-template-columns: 1fr;
       }
 
-      .stats-grid {
+      .stats-grid,
+      .summary-grid {
         grid-template-columns: 1fr;
       }
 
@@ -1406,6 +1456,7 @@
       <button class="nav-tab" type="button" data-view="patio" aria-selected="false">Tempo de Pátio</button>
       <button class="nav-tab" type="button" data-view="stoppages" aria-selected="false">Paradas da Usina</button>
       <button class="nav-tab" type="button" data-view="reductions" aria-selected="false">Redução de Moagem</button>
+      <button class="nav-tab" type="button" data-view="machineDashboard" aria-selected="false">Dashboard Máquinas</button>
       <button class="nav-tab" type="button" data-view="machines" aria-selected="false">Produção das Máquinas</button>
       <button class="nav-tab" type="button" data-view="entry" aria-selected="false">Lançamento Diário</button>
       <button class="nav-tab" type="button" data-view="targets" aria-selected="false">Metas Diárias</button>
@@ -1543,6 +1594,20 @@
           <h2>Tempo de pátio</h2>
         </div>
         <div class="panel-body" id="dashboardPatioTimesWrap"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Produção detalhada das máquinas</h2>
+        </div>
+        <div class="panel-body" id="dashboardMachineProductionWrap"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Média por equipamentos no lançamento diário</h2>
+        </div>
+        <div class="table-wrap" id="dashboardEquipmentAverageWrap"></div>
       </section>
 
       <section class="panel">
@@ -1769,6 +1834,20 @@
           <h2>Tempos de palha</h2>
         </div>
         <div class="panel-body" id="reportsPatioTimesWrap"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Produção detalhada das máquinas</h2>
+        </div>
+        <div class="panel-body" id="reportsMachineProductionWrap"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Média por equipamentos no lançamento diário</h2>
+        </div>
+        <div class="table-wrap" id="reportsEquipmentAverageWrap"></div>
       </section>
 
       <section class="panel">
@@ -2216,7 +2295,7 @@
       </section>
     </section>
 
-    <section class="view" id="machinesView" hidden>
+    <section class="view" id="machineDashboardView" hidden>
       <div class="filter-bar dashboard-filter">
         <div class="field">
           <label for="machineStartDate">Início do período</label>
@@ -2227,117 +2306,40 @@
           <input id="machineEndDate" type="date">
         </div>
         <div class="field">
-          <label for="machineFrontFilter">Frente</label>
+          <label for="machineFrontFilter">Frente / transporte</label>
           <select id="machineFrontFilter">
-            <option value="all">Todas as frentes próprias</option>
+            <option value="all">Todas as frentes e transportes</option>
             <option value="Frente 4001">Frente 4001</option>
             <option value="Frente 4002">Frente 4002</option>
             <option value="Frente 4003">Frente 4003</option>
+            <option value="Frente 4007">Frente 4007</option>
+            <option value="Frente 4009">Frente 4009</option>
+            <option value="Transporte Próprio">Transporte Próprio</option>
+            <option value="Transporte Terceiro">Transporte Terceiro</option>
           </select>
         </div>
         <div class="filter-note" id="machineSource">Nenhuma produção de máquina lançada no período.</div>
         <div class="actions">
           <button class="btn-secondary" id="machineTodayBtn" type="button">Hoje</button>
           <button class="btn-secondary" id="machineMonthBtn" type="button">Mês atual</button>
-          <button class="btn-primary" id="saveMachinesDbBtn" type="button">Salvar no banco</button>
-          <button class="btn-secondary" id="pullMachinesDbBtn" type="button">Atualizar do banco</button>
-          <button class="btn-secondary btn-danger" id="deleteMachineRangeBtn" type="button">Excluir período</button>
         </div>
+      </div>
+
+      <div class="rank-filter" id="machineModeTabs" aria-label="Páginas da produção das máquinas">
+        <button class="btn-secondary rank-filter-btn" type="button" data-machine-mode="harvesters">Colhedoras</button>
+        <button class="btn-secondary rank-filter-btn" type="button" data-machine-mode="transshipments">Transbordos</button>
+        <button class="btn-secondary rank-filter-btn" type="button" data-machine-mode="trucks">Caminhões</button>
       </div>
 
       <section class="stats-grid" id="machineKpiWrap" aria-label="Indicadores da produção das máquinas"></section>
 
       <section class="panel">
         <div class="panel-head">
-          <h2>Lançamento da produção da máquina</h2>
-          <span class="status-pill" id="machineEntryMode">Novo</span>
+          <h2>Dashboard da produção por máquina</h2>
+          <span class="status-pill" id="machineDashboardMode">Colhedoras</span>
         </div>
-        <input id="machineEntryId" type="hidden">
-        <div class="manual-grid">
-          <div class="field">
-            <label for="machineDate">Data</label>
-            <input id="machineDate" type="date">
-          </div>
-          <div class="field">
-            <label for="machineFront">Frente própria</label>
-            <select id="machineFront">
-              <option value="Frente 4001">Frente 4001</option>
-              <option value="Frente 4002">Frente 4002</option>
-              <option value="Frente 4003">Frente 4003</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="machineType">Tipo de máquina</label>
-            <select id="machineType">
-              <option value="Colhedora">Colhedora</option>
-              <option value="Transbordo">Transbordo</option>
-              <option value="Caminhão Próprio">Caminhão Próprio</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="machineFleet">Identificação da máquina</label>
-            <input id="machineFleet" list="machineFleetOptions" type="text" placeholder="Ex.: 4001-01, TB-01, 6700">
-          </div>
-          <div class="field">
-            <label for="machineProduction">Produção</label>
-            <input id="machineProduction" class="number-input" inputmode="decimal" type="text" placeholder="0">
-          </div>
-          <div class="field">
-            <label for="machineNote">Observação</label>
-            <input id="machineNote" type="text" placeholder="Opcional">
-          </div>
-          <button class="btn-primary" id="saveMachineEntryBtn" type="button">Adicionar produção</button>
-          <button class="btn-secondary" id="cancelMachineEditBtn" type="button" hidden>Cancelar edição</button>
-        </div>
-        <div class="workspace-actions">
-          <button class="btn-secondary" id="importMachineFileBtn" type="button">Importar foto ou PDF</button>
-          <input class="file-input" id="machineImportFile" type="file" accept="image/*,.pdf,application/pdf">
-          <span class="workspace-hint">Antes de escolher o arquivo, o sistema solicitará o dia, a frente própria e se o relatório é de colhedora, transbordo ou caminhão próprio.</span>
-        </div>
-        <div class="acceptance-controls">
-          <label class="check-control" for="machineAcceptDifference">
-            <input id="machineAcceptDifference" type="checkbox">
-            <span>Aceitar diferença pequena na conferência</span>
-          </label>
-          <div class="field">
-            <label for="machineDifferenceLimit">Limite aceito (t)</label>
-            <input id="machineDifferenceLimit" class="number-input" inputmode="decimal" type="text" value="1">
-          </div>
-        </div>
+        <div class="panel-body" id="machineDashboardWrap"></div>
       </section>
-
-      <dialog class="import-dialog" id="machineImportDialog">
-        <div class="panel-head">
-          <h2>Informações do arquivo</h2>
-          <button class="icon-button" id="closeMachineImportDialogBtn" type="button" title="Fechar">×</button>
-        </div>
-        <div class="manual-grid">
-          <div class="field">
-            <label for="machineImportDate">Dia da produção</label>
-            <input id="machineImportDate" type="date">
-          </div>
-          <div class="field">
-            <label for="machineImportFront">Frente própria</label>
-            <select id="machineImportFront">
-              <option value="Frente 4001">Frente 4001</option>
-              <option value="Frente 4002">Frente 4002</option>
-              <option value="Frente 4003">Frente 4003</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="machineImportType">Tipo do arquivo</label>
-            <select id="machineImportType">
-              <option value="Colhedora">Colhedora</option>
-              <option value="Transbordo">Transbordo</option>
-              <option value="Caminhão Próprio">Caminhão Próprio</option>
-            </select>
-          </div>
-        </div>
-        <div class="import-dialog-actions">
-          <button class="btn-secondary" id="cancelMachineImportBtn" type="button">Cancelar</button>
-          <button class="btn-primary" id="chooseMachineImportFileBtn" type="button">Escolher foto ou PDF</button>
-        </div>
-      </dialog>
 
       <section class="dashboard-grid">
         <section class="panel">
@@ -2365,11 +2367,128 @@
 
         <section class="panel">
           <div class="panel-head">
-            <h2>Resumo por frente própria</h2>
+            <h2>Resumo por frente / transporte</h2>
           </div>
           <div class="table-wrap" id="machineFrontWrap"></div>
         </section>
       </section>
+    </section>
+
+    <section class="view" id="machinesView" hidden>
+      <div class="filter-bar dashboard-filter">
+        <div class="field">
+          <label for="machineEntryFilterDate">Data do lançamento</label>
+          <input id="machineEntryFilterDate" type="date">
+        </div>
+        <div class="filter-note">Tela exclusiva para lançar, importar, editar, salvar ou excluir produções das máquinas.</div>
+        <div class="actions">
+          <button class="btn-primary" id="saveMachinesDbBtn" type="button">Salvar no banco</button>
+          <button class="btn-secondary" id="pullMachinesDbBtn" type="button">Atualizar do banco</button>
+          <button class="btn-secondary btn-danger" id="deleteMachineDayBtn" type="button">Excluir data</button>
+        </div>
+      </div>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Lançamento da produção da máquina</h2>
+          <span class="status-pill" id="machineEntryMode">Novo</span>
+        </div>
+        <input id="machineEntryId" type="hidden">
+        <div class="manual-grid">
+          <div class="field">
+            <label for="machineDate">Data</label>
+            <input id="machineDate" type="date">
+          </div>
+          <div class="field">
+            <label for="machineFront">Frente / transporte</label>
+            <select id="machineFront">
+              <option value="Frente 4001">Frente 4001</option>
+              <option value="Frente 4002">Frente 4002</option>
+              <option value="Frente 4003">Frente 4003</option>
+              <option value="Frente 4007">Frente 4007</option>
+              <option value="Frente 4009">Frente 4009</option>
+              <option value="Transporte Próprio">Transporte Próprio</option>
+              <option value="Transporte Terceiro">Transporte Terceiro</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="machineType">Tipo de máquina</label>
+            <select id="machineType">
+              <option value="Colhedora">Colhedora</option>
+              <option value="Transbordo">Transbordo</option>
+              <option value="Caminhão Próprio">Caminhão Próprio</option>
+              <option value="Caminhão Terceiro">Caminhão Terceiro</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="machineFleet">Identificação da máquina</label>
+            <input id="machineFleet" list="machineFleetOptions" type="text" placeholder="Ex.: 4001-01, TB-01, 6700">
+          </div>
+          <div class="field">
+            <label for="machineProduction">Produção</label>
+            <input id="machineProduction" class="number-input" inputmode="decimal" type="text" placeholder="0">
+          </div>
+          <div class="field">
+            <label for="machineNote">Observação</label>
+            <input id="machineNote" type="text" placeholder="Opcional">
+          </div>
+          <button class="btn-primary" id="saveMachineEntryBtn" type="button">Adicionar produção</button>
+          <button class="btn-secondary" id="cancelMachineEditBtn" type="button" hidden>Cancelar edição</button>
+        </div>
+        <div class="workspace-actions">
+          <button class="btn-secondary" id="importMachineFileBtn" type="button">Importar foto ou PDF</button>
+          <input class="file-input" id="machineImportFile" type="file" accept="image/*,.pdf,application/pdf">
+          <span class="workspace-hint">Antes de escolher o arquivo, o sistema solicitará o dia, a frente/transporte e se o relatório é de colhedora, transbordo ou caminhão.</span>
+        </div>
+        <div class="acceptance-controls">
+          <label class="check-control" for="machineAcceptDifference">
+            <input id="machineAcceptDifference" type="checkbox">
+            <span>Aceitar diferença pequena na conferência</span>
+          </label>
+          <div class="field">
+            <label for="machineDifferenceLimit">Limite aceito (t)</label>
+            <input id="machineDifferenceLimit" class="number-input" inputmode="decimal" type="text" value="1">
+          </div>
+        </div>
+      </section>
+
+      <dialog class="import-dialog" id="machineImportDialog">
+        <div class="panel-head">
+          <h2>Informações do arquivo</h2>
+          <button class="icon-button" id="closeMachineImportDialogBtn" type="button" title="Fechar">×</button>
+        </div>
+        <div class="manual-grid">
+          <div class="field">
+            <label for="machineImportDate">Dia da produção</label>
+            <input id="machineImportDate" type="date">
+          </div>
+          <div class="field">
+            <label for="machineImportFront">Frente / transporte</label>
+            <select id="machineImportFront">
+              <option value="Frente 4001">Frente 4001</option>
+              <option value="Frente 4002">Frente 4002</option>
+              <option value="Frente 4003">Frente 4003</option>
+              <option value="Frente 4007">Frente 4007</option>
+              <option value="Frente 4009">Frente 4009</option>
+              <option value="Transporte Próprio">Transporte Próprio</option>
+              <option value="Transporte Terceiro">Transporte Terceiro</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="machineImportType">Tipo do arquivo</label>
+            <select id="machineImportType">
+              <option value="Colhedora">Colhedora</option>
+              <option value="Transbordo">Transbordo</option>
+              <option value="Caminhão Próprio">Caminhão Próprio</option>
+              <option value="Caminhão Terceiro">Caminhão Terceiro</option>
+            </select>
+          </div>
+        </div>
+        <div class="import-dialog-actions">
+          <button class="btn-secondary" id="cancelMachineImportBtn" type="button">Cancelar</button>
+          <button class="btn-primary" id="chooseMachineImportFileBtn" type="button">Escolher foto ou PDF</button>
+        </div>
+      </dialog>
 
       <section class="panel">
         <div class="panel-head">
@@ -2541,9 +2660,10 @@
               <tr>
                 <th>Tipo</th>
                 <th>Frente</th>
-                <th>Identificação</th>
+                <th>Qtd. equip.</th>
                 <th>Meta diária</th>
                 <th>Produção diária</th>
+                <th>Média/equip.</th>
                 <th>KM médio</th>
                 <th>% Meta</th>
                 <th>Observação</th>
@@ -2849,7 +2969,12 @@
     const typeOptions = Object.values(TYPES);
     const stoppageCategories = ["Motivo industrial", "Motivo agrícola", "Motivo fatores climáticos"];
     const EFFECTIVE_MILLING_TONS_PER_HOUR = 500;
-    const machineProductionTypes = ["Colhedora", "Transbordo", "Caminhão Próprio"];
+    const machineProductionTypes = ["Colhedora", "Transbordo", "Caminhão Próprio", "Caminhão Terceiro"];
+    const machineProductionModes = {
+      harvesters: ["Colhedora"],
+      transshipments: ["Transbordo"],
+      trucks: ["Caminhão Próprio", "Caminhão Terceiro"]
+    };
     const MACHINE_PRODUCTION_TOLERANCE = 0.01;
     const ownHarvestFronts = ["Frente 4001", "Frente 4002", "Frente 4003"];
     const thirdHarvestFronts = ["Frente 4007", "Frente 4009"];
@@ -2903,6 +3028,7 @@
       patioView: document.querySelector("#patioView"),
       stoppagesView: document.querySelector("#stoppagesView"),
       reductionsView: document.querySelector("#reductionsView"),
+      machineDashboardView: document.querySelector("#machineDashboardView"),
       machinesView: document.querySelector("#machinesView"),
       entryView: document.querySelector("#entryView"),
       targetsView: document.querySelector("#targetsView"),
@@ -3010,8 +3136,11 @@
       machineStartDate: document.querySelector("#machineStartDate"),
       machineEndDate: document.querySelector("#machineEndDate"),
       machineFrontFilter: document.querySelector("#machineFrontFilter"),
+      machineModeTabs: document.querySelector("#machineModeTabs"),
       machineSource: document.querySelector("#machineSource"),
       machineKpiWrap: document.querySelector("#machineKpiWrap"),
+      machineDashboardMode: document.querySelector("#machineDashboardMode"),
+      machineDashboardWrap: document.querySelector("#machineDashboardWrap"),
       machineEntryMode: document.querySelector("#machineEntryMode"),
       machineEntryId: document.querySelector("#machineEntryId"),
       machineDate: document.querySelector("#machineDate"),
@@ -3032,6 +3161,11 @@
       machineTypeWrap: document.querySelector("#machineTypeWrap"),
       machineFrontWrap: document.querySelector("#machineFrontWrap"),
       machineRowsWrap: document.querySelector("#machineRowsWrap"),
+      machineEntryFilterDate: document.querySelector("#machineEntryFilterDate"),
+      dashboardMachineProductionWrap: document.querySelector("#dashboardMachineProductionWrap"),
+      reportsMachineProductionWrap: document.querySelector("#reportsMachineProductionWrap"),
+      dashboardEquipmentAverageWrap: document.querySelector("#dashboardEquipmentAverageWrap"),
+      reportsEquipmentAverageWrap: document.querySelector("#reportsEquipmentAverageWrap"),
       entryDate: document.querySelector("#entryDate"),
       frontCards: [...document.querySelectorAll(".front-card")],
       frontWorkspace: document.querySelector("#frontWorkspace"),
@@ -3148,6 +3282,7 @@
     let pendingSyncQueue = loadPendingSyncQueue();
     let currentTheme = loadTheme();
     let transportRankingPeriod = "week";
+    let machineProductionMode = "harvesters";
     let selectedPatioFront = "";
     let selectedPatioTruck = "";
     let patioImportWarnings = [];
@@ -3494,6 +3629,26 @@
 
     function requiresFleet(type) {
       return false;
+    }
+
+    function usesEquipmentQuantity(type) {
+      const normalized = normalizeType(type);
+      return normalized === TYPES.THIRD_HARVEST
+        || normalized === TYPES.FLORESTA_CANE
+        || normalized === TYPES.VALE_CANE;
+    }
+
+    function equipmentQuantityLabelForType(type) {
+      const normalized = normalizeType(type);
+      if (normalized === TYPES.THIRD_HARVEST) return "Qtd. equipamentos da frente";
+      if (normalized === TYPES.FLORESTA_CANE) return "Qtd. equipamentos Floresta";
+      if (normalized === TYPES.VALE_CANE) return "Qtd. equipamentos Vale";
+      return "Qtd. equipamentos";
+    }
+
+    function productionAverageByEquipment(row) {
+      const quantity = Math.max(0, parseNumber(row.equipmentQuantity));
+      return quantity ? parseNumber(row.production) / quantity : 0;
     }
 
     function needsFront(type) {
@@ -5036,6 +5191,9 @@
       const rawFront = row.front || "";
       const rawFleet = row.fleet || row.truck || row.caminhao || row["caminhão"] || row.equipment || "";
       const production = parseNumber(row.production ?? row.actual ?? row.effective ?? 0);
+      const equipmentQuantity = usesEquipmentQuantity(type)
+        ? Math.max(0, parseNumber(row.equipmentQuantity ?? row.quantidadeEquipamentos ?? row.quantidade_equipamentos ?? row.qtdEquipamentos ?? row.qtd_equipamentos ?? row.machines ?? row.maquinas ?? row.equipmentCount ?? 0))
+        : 0;
       const averageKm = isTransport(type)
         ? Math.max(0, parseNumber(row.averageKm ?? row.kmMedio ?? row.km_medio ?? row.km ?? row.distanceAverage ?? 0))
         : 0;
@@ -5046,6 +5204,7 @@
         front: needsFront(type) ? rawFront || defaultFrontFor(type) : "",
         fleet: requiresFleet(type) ? rawFleet : "",
         production,
+        equipmentQuantity,
         averageKm,
         note: row.note || ""
       };
@@ -5074,6 +5233,7 @@
         const rowProduction = parseNumber(row.production);
         const currentKm = parseNumber(current.averageKm);
         const rowKm = parseNumber(row.averageKm);
+        current.equipmentQuantity = Math.max(0, parseNumber(current.equipmentQuantity)) + Math.max(0, parseNumber(row.equipmentQuantity));
         current.production = currentProduction + rowProduction;
         if (isTransport(current.type)) {
           if (currentKm && rowKm) {
@@ -5100,6 +5260,7 @@
           front: needsFront(row.type) ? String(row.front || "").trim() : "",
           fleet: requiresFleet(row.type) ? String(row.fleet || "").trim() : "",
           production: Math.max(0, parseNumber(row.production)),
+          equipmentQuantity: usesEquipmentQuantity(row.type) ? Math.max(0, parseNumber(row.equipmentQuantity)) : 0,
           averageKm: isTransport(row.type) ? Math.max(0, parseNumber(row.averageKm)) : 0,
           note: String(row.note || "").trim()
         }))
@@ -6540,15 +6701,30 @@
       const key = normalizeKey(value);
       if (key.includes("colhed")) return "Colhedora";
       if (key.includes("transbord")) return "Transbordo";
+      if ((key.includes("caminh") || key.includes("camiao") || key.includes("truck")) && key.includes("terce")) return "Caminhão Terceiro";
       if (key.includes("caminh") || key.includes("camiao") || key.includes("truck")) return "Caminhão Próprio";
       return machineProductionTypes.includes(value) ? value : "Colhedora";
     }
 
+    function isMachineTruckType(type) {
+      const normalized = normalizeMachineProductionType(type);
+      return normalized === "Caminhão Próprio" || normalized === "Caminhão Terceiro";
+    }
+
+    function defaultMachineProductionFrontForType(type) {
+      const normalized = normalizeMachineProductionType(type);
+      if (normalized === "Caminhão Terceiro") return TYPES.THIRD_TRANSPORT;
+      if (normalized === "Caminhão Próprio") return TYPES.OWN_TRANSPORT;
+      return ownHarvestFronts[0];
+    }
+
     function normalizeMachineProductionRecord(row) {
       const date = normalizeRecordDate(row.date || row.data || row.day);
-      const frontValue = String(row.front || row.frente || "").trim();
-      const front = ownHarvestFronts.find((item) => sameText(item, frontValue)) || "";
       const machineType = normalizeMachineProductionType(row.machineType || row.type || row.tipo || row.equipmentType);
+      const frontValue = String(row.front || row.frente || "").trim();
+      const front = isMachineTruckType(machineType)
+        ? defaultMachineProductionFrontForType(machineType)
+        : frontOptions.find((item) => sameText(item, frontValue)) || "";
       const fleet = String(row.fleet || row.frota || row.machine || row.maquina || row.equipment || row.caminhao || "").trim();
       const production = Math.max(0, parseNumber(row.production ?? row.producao ?? row.toneladas ?? row.total ?? 0));
       const note = String(row.note || row.observacao || row.obs || "").trim();
@@ -6632,20 +6808,95 @@
       els.machineEndDate.value = range.end;
     }
 
+    function machineModeForType(type) {
+      const normalized = normalizeMachineProductionType(type);
+      if (normalized === "Transbordo") return "transshipments";
+      if (normalized === "Caminhão Próprio" || normalized === "Caminhão Terceiro") return "trucks";
+      return "harvesters";
+    }
+
+    function machineTypesForMode(mode = machineProductionMode) {
+      return machineProductionModes[mode] || machineProductionModes.harvesters;
+    }
+
+    function primaryMachineTypeForMode(mode = machineProductionMode) {
+      return machineTypesForMode(mode)[0] || "Colhedora";
+    }
+
+    function machineModeLabel(mode = machineProductionMode) {
+      if (mode === "transshipments") return "Transbordos das frentes";
+      if (mode === "trucks") return "Caminhões próprios e terceiros";
+      return "Colhedoras próprias e terceiras";
+    }
+
+    function setMachineProductionMode(mode, options = {}) {
+      machineProductionMode = machineProductionModes[mode] ? mode : "harvesters";
+      if (options.syncType !== false) {
+        els.machineType.value = primaryMachineTypeForMode(machineProductionMode);
+      }
+      if (isMachineTruckType(els.machineType.value)) {
+        els.machineFront.value = defaultMachineProductionFrontForType(els.machineType.value);
+      } else if (!frontOptions.includes(els.machineFront.value)) {
+        els.machineFront.value = ownHarvestFronts[0];
+      }
+      updateMachineProductionFormContext();
+      renderMachineModeTabs();
+      if (options.render !== false) {
+        renderMachineProductionDashboardPage();
+        renderMachineProductions();
+      }
+    }
+
+    function renderMachineModeTabs() {
+      if (!els.machineModeTabs) return;
+      els.machineModeTabs.querySelectorAll("button[data-machine-mode]").forEach((button) => {
+        const active = button.dataset.machineMode === machineProductionMode;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-pressed", String(active));
+      });
+    }
+
+    function updateMachineProductionFormContext() {
+      const isTruck = isMachineTruckType(els.machineType.value);
+      const frontField = els.machineFront.closest(".field");
+      const frontLabel = frontField ? frontField.querySelector("label") : null;
+      if (isTruck) {
+        els.machineFront.value = defaultMachineProductionFrontForType(els.machineType.value);
+        els.machineFront.disabled = true;
+        if (frontLabel) frontLabel.textContent = "Base automática do transporte";
+      } else {
+        els.machineFront.disabled = false;
+        if (!frontOptions.includes(els.machineFront.value)) els.machineFront.value = ownHarvestFronts[0];
+        if (frontLabel) frontLabel.textContent = "Frente";
+      }
+    }
+
     function machineProductionRowsForRange(range = machineProductionRange()) {
       const normalized = normalizeDateRange(range.start, range.end);
       const front = els.machineFrontFilter.value || "all";
+      const activeTypes = machineTypesForMode();
       return getCleanMachineProductionRecords(machineProductionRecords)
         .filter((record) => record.date >= normalized.start && record.date <= normalized.end)
+        .filter((record) => activeTypes.includes(record.machineType))
         .filter((record) => front === "all" || record.front === front);
     }
 
-    function dailyOwnFrontProduction(date, front) {
+    function dailyFrontHarvestProduction(date, front) {
       const record = recordForDate(date);
       if (!record) return 0;
+      const harvestType = ownHarvestFronts.some((item) => sameText(item, front)) ? TYPES.OWN_HARVEST : TYPES.THIRD_HARVEST;
       return rowsFromRecords([record])
-        .filter((row) => row.type === TYPES.OWN_HARVEST && sameText(row.front, front))
+        .filter((row) => row.type === harvestType && sameText(row.front, front))
         .reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+    }
+
+    function dailyMachineProductionTarget(item) {
+      if (!item || item.machineType === "Caminhão Próprio" || item.machineType === "Caminhão Terceiro") return 0;
+      return dailyFrontHarvestProduction(item.date, item.front);
+    }
+
+    function machineProductionRequiresDailyMatch(group) {
+      return Boolean(group && group.machineType !== "Caminhão Próprio" && group.machineType !== "Caminhão Terceiro");
     }
 
     function machineProductionGroupKey(row) {
@@ -6661,6 +6912,11 @@
         normalizeKey(row.machineType),
         normalizeKey(row.fleet)
       ].join("|");
+    }
+
+    function machineProductionBaseLabel(row) {
+      if (isMachineTruckType(row.machineType)) return row.machineType === "Caminhão Terceiro" ? TYPES.THIRD_TRANSPORT : TYPES.OWN_TRANSPORT;
+      return row.front;
     }
 
     function machineProductionConsistencyRows(rows = getCleanMachineProductionRecords(machineProductionRecords)) {
@@ -6694,7 +6950,7 @@
 
       return [...grouped.values()]
         .map((item) => {
-          const target = dailyOwnFrontProduction(item.date, item.front);
+          const target = dailyMachineProductionTarget(item);
           const difference = item.production - target;
           return {
             ...item,
@@ -6726,7 +6982,9 @@
     }
 
     function machineProductionDifferenceAllowed(group) {
-      if (!group || group.target <= 0) return false;
+      if (!group) return false;
+      if (!machineProductionRequiresDailyMatch(group)) return true;
+      if (group.target <= 0) return false;
       const diff = Math.abs(Number(group.difference) || 0);
       if (diff <= MACHINE_PRODUCTION_TOLERANCE) return true;
       if (machineProductionStoredDifferenceAccepted(group)) return true;
@@ -6734,6 +6992,7 @@
     }
 
     function machineProductionDisplayStatus(group) {
+      if (!machineProductionRequiresDailyMatch(group)) return { label: "Controle de transporte", tone: "good" };
       if (!group || group.target <= 0) return { label: "Sem lançamento diário", tone: "alert" };
       const diff = Math.abs(Number(group.difference) || 0);
       if (diff <= MACHINE_PRODUCTION_TOLERANCE) return { label: "Batendo", tone: "good" };
@@ -6766,7 +7025,8 @@
       if (!isMachineProductionDifferenceOverrideOn()) return [];
       return machineProductionConsistencyRows(rows).filter((group) => {
         const diff = Math.abs(Number(group.difference) || 0);
-        return group.target > 0
+        return machineProductionRequiresDailyMatch(group)
+          && group.target > 0
           && diff > MACHINE_PRODUCTION_TOLERANCE
           && diff <= machineProductionDifferenceLimit()
           && !machineProductionStoredDifferenceAccepted(group);
@@ -6780,7 +7040,9 @@
     }
 
     function invalidMachineProductionGroups(rows = getCleanMachineProductionRecords(machineProductionRecords)) {
-      return machineProductionConsistencyRows(rows).filter((item) => !machineProductionDifferenceAllowed(item));
+      return machineProductionConsistencyRows(rows)
+        .filter((item) => machineProductionRequiresDailyMatch(item))
+        .filter((item) => !machineProductionDifferenceAllowed(item));
     }
 
     function machineProductionGroupAfterSave(record, editingId = "") {
@@ -6811,6 +7073,9 @@
 
     function machineProductionMismatchMessage(group) {
       if (!group) return "Conferência da produção não localizada.";
+      if (!machineProductionRequiresDailyMatch(group)) {
+        return `${group.machineType} em ${group.front} lançado para média geral transportada.`;
+      }
       if (group.target <= 0) {
         return `Lance primeiro a produção diária de ${group.front} em ${formatDate(group.date)}.`;
       }
@@ -6838,7 +7103,7 @@
           <thead>
             <tr>
               <th>Data</th>
-              <th>Frente</th>
+              <th>Frente / base</th>
               <th>Tipo</th>
               <th>Lançamento diário</th>
               <th>Máquinas</th>
@@ -6852,11 +7117,11 @@
               return `
                 <tr>
                   <td>${formatDate(item.date)}</td>
-                  <td>${escapeHtml(item.front)}</td>
+                  <td>${escapeHtml(machineProductionBaseLabel(item))}</td>
                   <td>${escapeHtml(item.machineType)}</td>
-                  <td>${formatNumber(item.target)}</td>
+                  <td>${machineProductionRequiresDailyMatch(item) ? formatNumber(item.target) : "-"}</td>
                   <td>${formatNumber(item.production)}</td>
-                  <td>${formatNumber(item.difference)}</td>
+                  <td>${machineProductionRequiresDailyMatch(item) ? formatNumber(item.difference) : "-"}</td>
                   <td><span class="status-pill ${escapeHtml(status.tone)}">${escapeHtml(status.label)}</span></td>
                 </tr>
               `;
@@ -6870,12 +7135,25 @@
       const productionFor = (type) => rows
         .filter((row) => row.machineType === type)
         .reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+      const machineDays = new Set(rows.map((row) => `${row.machineType}|${normalizeKey(row.fleet)}|${row.date}`)).size;
+      const truckRows = rows.filter((row) => row.machineType === "Caminhão Próprio" || row.machineType === "Caminhão Terceiro");
+      const truckDays = new Set(truckRows.map((row) => `${normalizeKey(row.fleet)}|${row.date}`)).size;
+      const truckMachines = new Set(truckRows.map((row) => `${row.machineType}|${normalizeKey(row.fleet)}`)).size;
+      const truckTotal = truckRows.reduce((sum, row) => sum + (Number(row.production) || 0), 0);
       return {
         total: rows.reduce((sum, row) => sum + (Number(row.production) || 0), 0),
         harvesters: productionFor("Colhedora"),
         transshipments: productionFor("Transbordo"),
         trucks: productionFor("Caminhão Próprio"),
+        thirdTrucks: productionFor("Caminhão Terceiro"),
+        truckTotal,
         machines: new Set(rows.map((row) => `${row.machineType}|${normalizeKey(row.fleet)}`)).size,
+        truckMachines,
+        machineDays,
+        truckDays,
+        averagePerMachineDay: machineDays ? rows.reduce((sum, row) => sum + (Number(row.production) || 0), 0) / machineDays : 0,
+        averageTruckPerDay: truckDays ? truckTotal / truckDays : 0,
+        averageTruck: truckMachines ? truckTotal / truckMachines : 0,
         days: new Set(rows.map((row) => row.date)).size,
         records: rows.length
       };
@@ -6885,14 +7163,22 @@
       const grouped = new Map();
       rows.forEach((row) => {
         const key = groupGetter(row) || "Sem identificação";
-        if (!grouped.has(key)) grouped.set(key, { label: key, production: 0, records: 0, machines: new Set() });
+        if (!grouped.has(key)) grouped.set(key, { label: key, production: 0, records: 0, machines: new Set(), machineDays: new Set(), days: new Set() });
         const item = grouped.get(key);
         item.production += Number(row.production) || 0;
         item.records += 1;
         item.machines.add(`${row.machineType}|${normalizeKey(row.fleet)}`);
+        item.machineDays.add(`${row.machineType}|${normalizeKey(row.fleet)}|${row.date}`);
+        item.days.add(row.date);
       });
       return [...grouped.values()]
-        .map((item) => ({ ...item, machineCount: item.machines.size }))
+        .map((item) => ({
+          ...item,
+          machineCount: item.machines.size,
+          machineDayCount: item.machineDays.size,
+          dayCount: item.days.size,
+          averagePerMachineDay: item.machineDays.size ? item.production / item.machineDays.size : 0
+        }))
         .sort((a, b) => b.production - a.production || a.label.localeCompare(b.label, "pt-BR", { numeric: true }));
     }
 
@@ -6907,20 +7193,24 @@
             production: 0,
             records: 0,
             fronts: new Set(),
-            days: new Set()
+            days: new Set(),
+            machineDays: new Set()
           });
         }
         const item = grouped.get(key);
         item.production += Number(row.production) || 0;
         item.records += 1;
-        item.fronts.add(row.front);
+        item.fronts.add(machineProductionBaseLabel(row));
         item.days.add(row.date);
+        item.machineDays.add(`${row.machineType}|${normalizeKey(row.fleet)}|${row.date}`);
       });
       return [...grouped.values()]
         .map((item) => ({
           ...item,
           frontsLabel: [...item.fronts].sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true })).join(", "),
-          dayCount: item.days.size
+          dayCount: item.days.size,
+          machineDayCount: item.machineDays.size,
+          averagePerDay: item.days.size ? item.production / item.days.size : 0
         }))
         .sort((a, b) => b.production - a.production || a.fleet.localeCompare(b.fleet, "pt-BR", { numeric: true }));
     }
@@ -6934,7 +7224,7 @@
 
       els.machineEquipmentWrap.innerHTML = `
         <table>
-          <thead><tr><th>Equipamento</th><th>Tipo</th><th>Frentes trabalhadas</th><th>Produção total</th><th>Dias</th><th>Registros</th></tr></thead>
+          <thead><tr><th>Equipamento</th><th>Tipo</th><th>Frentes / bases</th><th>Produção total</th><th>Média/dia</th><th>Dias</th><th>Registros</th></tr></thead>
           <tbody>
             ${items.map((item) => `
               <tr>
@@ -6942,6 +7232,7 @@
                 <td>${escapeHtml(item.machineType)}</td>
                 <td>${escapeHtml(item.frontsLabel || "-")}</td>
                 <td>${formatNumber(item.production)}</td>
+                <td>${formatNumber(item.averagePerDay)}</td>
                 <td>${item.dayCount}</td>
                 <td>${item.records}</td>
               </tr>
@@ -6954,15 +7245,33 @@
     function renderMachineProductionKpis(rows) {
       const summary = machineProductionSummary(rows);
       const pending = invalidMachineProductionGroups(rows).length;
-      const kpis = [
-        ["Produção lançada", formatNumber(summary.total), `${summary.records} registro${summary.records === 1 ? "" : "s"}`],
-        ["Colhedoras", formatNumber(summary.harvesters), `${formatPercent(progressFor(summary.harvesters, summary.total))} do lançado`],
-        ["Transbordos", formatNumber(summary.transshipments), `${formatPercent(progressFor(summary.transshipments, summary.total))} do lançado`],
-        ["Caminhões próprios", formatNumber(summary.trucks), `${formatPercent(progressFor(summary.trucks, summary.total))} do lançado`],
-        ["Máquinas", String(summary.machines), "Equipamentos identificados"],
-        ["Dias lançados", String(summary.days), "Dias com produção"],
-        ["Conferências pendentes", String(pending), pending ? "Ajuste antes de salvar no banco" : "Tudo batendo"]
-      ];
+      let kpis = [];
+      if (machineProductionMode === "trucks") {
+        kpis = [
+          ["Total transportado", formatNumber(summary.truckTotal), `${summary.records} registro${summary.records === 1 ? "" : "s"}`],
+          ["Caminhões próprios", formatNumber(summary.trucks), `${formatPercent(progressFor(summary.trucks, summary.truckTotal))} do transportado`],
+          ["Caminhões terceiros", formatNumber(summary.thirdTrucks), `${formatPercent(progressFor(summary.thirdTrucks, summary.truckTotal))} do transportado`],
+          ["Caminhões", String(summary.truckMachines), "Frotas identificadas"],
+          ["Média caminhão/dia", formatNumber(summary.averageTruckPerDay), `${summary.truckDays} caminhão-dia`],
+          ["Dias lançados", String(summary.days), "Dias com transporte"]
+        ];
+      } else if (machineProductionMode === "transshipments") {
+        kpis = [
+          ["Produção transbordos", formatNumber(summary.transshipments), `${summary.records} registro${summary.records === 1 ? "" : "s"}`],
+          ["Transbordos", String(summary.machines), "Equipamentos identificados"],
+          ["Média transbordo/dia", formatNumber(summary.averagePerMachineDay), `${summary.machineDays} transbordo-dia`],
+          ["Dias lançados", String(summary.days), "Dias com produção"],
+          ["Conferências pendentes", String(pending), pending ? "Ajuste antes de salvar no banco" : "Tudo batendo"]
+        ];
+      } else {
+        kpis = [
+          ["Produção colhedoras", formatNumber(summary.harvesters), `${summary.records} registro${summary.records === 1 ? "" : "s"}`],
+          ["Colhedoras", String(summary.machines), "Equipamentos identificados"],
+          ["Média colhedora/dia", formatNumber(summary.averagePerMachineDay), `${summary.machineDays} colhedora-dia`],
+          ["Dias lançados", String(summary.days), "Dias com produção"],
+          ["Conferências pendentes", String(pending), pending ? "Ajuste antes de salvar no banco" : "Tudo batendo"]
+        ];
+      }
       els.machineKpiWrap.innerHTML = kpis.map(([label, value, detail]) => `
         <article class="stat">
           <span>${escapeHtml(label)}</span>
@@ -6972,12 +7281,175 @@
       `).join("");
     }
 
+    function machineProductionDailyRows(rows) {
+      const grouped = new Map();
+      rows.forEach((row) => {
+        const key = row.date;
+        if (!grouped.has(key)) {
+          grouped.set(key, {
+            date: row.date,
+            production: 0,
+            records: 0,
+            machines: new Set(),
+            bases: new Set()
+          });
+        }
+        const item = grouped.get(key);
+        item.production += Number(row.production) || 0;
+        item.records += 1;
+        item.machines.add(`${row.machineType}|${normalizeKey(row.fleet)}`);
+        item.bases.add(machineProductionBaseLabel(row));
+      });
+      return [...grouped.values()]
+        .map((item) => ({
+          ...item,
+          machineCount: item.machines.size,
+          basesLabel: [...item.bases].sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true })).join(", ")
+        }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+    }
+
+    function machineDashboardCard(label, value, detail = "") {
+      return `
+        <div class="summary-card">
+          <small>${escapeHtml(label)}</small>
+          <strong>${escapeHtml(value)}</strong>
+          <span>${escapeHtml(detail)}</span>
+        </div>
+      `;
+    }
+
+    function machineRankingList(items, total, emptyMessage) {
+      if (!items.length) return `<div class="empty-state">${escapeHtml(emptyMessage)}</div>`;
+      return `
+        <div class="rank-list">
+          ${items.map((item) => {
+            const width = Math.min(100, progressFor(item.production, total));
+            return `
+              <div class="rank-row">
+                <div class="chart-row-head">
+                  <strong>${escapeHtml(item.fleet || item.label || "-")}</strong>
+                  <span>${formatNumber(item.production)} · ${formatNumber(item.averagePerDay || item.averagePerMachineDay || 0)} média/dia</span>
+                </div>
+                <div class="rank-track" aria-label="${escapeHtml(item.fleet || item.label || "-")} ${formatPercent(width)}">
+                  <div class="rank-fill" style="width: ${width}%"></div>
+                </div>
+                <div class="summary-line">
+                  <span>${item.dayCount || 0} dia${(item.dayCount || 0) === 1 ? "" : "s"}</span>
+                  <span>${item.records || 0} registro${(item.records || 0) === 1 ? "" : "s"}</span>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function machineDailyEvolutionHtml(rows, total) {
+      const items = machineProductionDailyRows(rows);
+      if (!items.length) return '<div class="empty-state">Sem dias para montar evolução.</div>';
+      const peak = Math.max(...items.map((item) => item.production), 1);
+      let accumulated = 0;
+      return `
+        <div class="report-evolution-list">
+          ${items.map((item) => {
+            accumulated += item.production;
+            const width = Math.min(100, progressFor(item.production, peak));
+            return `
+              <div class="report-evolution-row">
+                <div class="chart-row-head">
+                  <strong>${formatDate(item.date)}</strong>
+                  <span>${formatNumber(item.production)} produzido · ${item.machineCount} equipamento${item.machineCount === 1 ? "" : "s"}</span>
+                </div>
+                <div class="chart-track" aria-label="${formatDate(item.date)} ${formatNumber(item.production)}">
+                  <div class="chart-fill" style="width: ${width}%"></div>
+                </div>
+                <div class="report-evolution-meta">
+                  <span>Acum. ${formatNumber(accumulated)}</span>
+                  <span>${formatPercent(progressFor(item.production, total))} do período</span>
+                  <span>${item.records} registro${item.records === 1 ? "" : "s"}</span>
+                  <span>${escapeHtml(item.basesLabel || "-")}</span>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function renderMachineProductionDashboard(rows) {
+      if (!els.machineDashboardWrap) return;
+      const summary = machineProductionSummary(rows);
+      const equipmentRows = machineEquipmentRows(rows);
+      const baseRows = groupedMachineProductionRows(rows, (row) => machineProductionBaseLabel(row));
+      const dailyRows = machineProductionDailyRows(rows);
+      const pending = invalidMachineProductionGroups(rows);
+      const topEquipment = equipmentRows[0] || null;
+      const topBase = baseRows[0] || null;
+      const lastDay = dailyRows[dailyRows.length - 1] || null;
+      const previousDay = dailyRows[dailyRows.length - 2] || null;
+      const dayDelta = lastDay && previousDay ? lastDay.production - previousDay.production : 0;
+      const modeLabel = machineModeLabel();
+
+      if (els.machineDashboardMode) els.machineDashboardMode.textContent = modeLabel;
+      if (!rows.length) {
+        els.machineDashboardWrap.innerHTML = '<div class="empty-state">Sem dados no período e filtro selecionados para montar o dashboard.</div>';
+        return;
+      }
+
+      els.machineDashboardWrap.innerHTML = `
+        <div class="summary-grid">
+          ${machineDashboardCard("Total do filtro", formatNumber(summary.total), `${summary.records} registro${summary.records === 1 ? "" : "s"} em ${summary.days} dia${summary.days === 1 ? "" : "s"}`)}
+          ${machineDashboardCard("Equipamentos", String(summary.machines), `${summary.machineDays} equipamento-dia`)}
+          ${machineDashboardCard("Média por equipamento/dia", formatNumber(summary.averagePerMachineDay), modeLabel)}
+          ${machineDashboardCard("Melhor equipamento", topEquipment ? topEquipment.fleet : "-", topEquipment ? `${formatNumber(topEquipment.production)} no período` : "Sem ranking")}
+          ${machineDashboardCard("Melhor frente/base", topBase ? topBase.label : "-", topBase ? `${formatNumber(topBase.averagePerMachineDay)} média máquina/dia` : "Sem base")}
+          ${machineDashboardCard("Último dia", lastDay ? formatNumber(lastDay.production) : "-", lastDay ? `${formatDate(lastDay.date)} · ${dayDelta ? `${dayDelta > 0 ? "+" : ""}${formatNumber(dayDelta)} vs dia anterior` : "sem variação"}` : "Sem dia")}
+          ${machineDashboardCard("Conferências", String(pending.length), pending.length ? "Existem diferenças para revisar" : "Tudo batendo")}
+          ${machineDashboardCard("Filtro ativo", els.machineFrontFilter.value === "all" ? "Todas" : els.machineFrontFilter.value, modeLabel)}
+        </div>
+        <div class="dashboard-grid" style="margin-top: 14px;">
+          <section>
+            <h3>Ranking por equipamento</h3>
+            ${machineRankingList(equipmentRows.slice(0, 8), summary.total, "Sem equipamento para ranquear.")}
+          </section>
+          <section>
+            <h3>Ranking por frente/base</h3>
+            ${machineRankingList(baseRows.slice(0, 8), summary.total, "Sem frente/base para ranquear.")}
+          </section>
+        </div>
+        <div class="dashboard-grid" style="margin-top: 14px;">
+          <section>
+            <h3>Evolução diária</h3>
+            ${machineDailyEvolutionHtml(rows, summary.total)}
+          </section>
+          <section>
+            <h3>Leitura operacional</h3>
+            <div class="insight-list">
+              <div class="insight-item">
+                <strong>${topEquipment ? `Prioridade: acompanhar ${topEquipment.fleet}` : "Sem equipamento destaque"}</strong>
+                <span>${topEquipment ? `${formatNumber(topEquipment.production)} produzido, média ${formatNumber(topEquipment.averagePerDay)} por dia.` : "Ainda não há produção suficiente no filtro."}</span>
+              </div>
+              <div class="insight-item">
+                <strong>${topBase ? `Base mais forte: ${topBase.label}` : "Sem base destaque"}</strong>
+                <span>${topBase ? `${topBase.machineCount} equipamento${topBase.machineCount === 1 ? "" : "s"} e ${formatNumber(topBase.production)} no período.` : "Selecione uma frente/base com lançamentos."}</span>
+              </div>
+              <div class="insight-item">
+                <strong>${pending.length ? "Conferência pendente" : "Conferência limpa"}</strong>
+                <span>${pending.length ? machineProductionMismatchMessage(pending[0]) : "Nenhuma diferença bloqueando o envio ao banco."}</span>
+              </div>
+            </div>
+          </section>
+        </div>
+      `;
+    }
+
     function renderMachineProductionGroups(rows) {
       const total = machineProductionSummary(rows).total;
       const typeRows = groupedMachineProductionRows(rows, (row) => row.machineType);
       els.machineTypeWrap.innerHTML = typeRows.length ? `
         <table>
-          <thead><tr><th>Tipo</th><th>Produção</th><th>% total</th><th>Máquinas</th><th>Registros</th></tr></thead>
+          <thead><tr><th>Tipo</th><th>Produção</th><th>% total</th><th>Máquinas</th><th>Média máquina/dia</th><th>Dias</th><th>Registros</th></tr></thead>
           <tbody>
             ${typeRows.map((item) => `
               <tr>
@@ -6985,6 +7457,8 @@
                 <td>${formatNumber(item.production)}</td>
                 <td>${formatPercent(progressFor(item.production, total))}</td>
                 <td>${item.machineCount}</td>
+                <td>${formatNumber(item.averagePerMachineDay)}</td>
+                <td>${item.dayCount}</td>
                 <td>${item.records}</td>
               </tr>
             `).join("")}
@@ -6992,10 +7466,10 @@
         </table>
       ` : '<div class="empty-state">Sem produção por tipo no período.</div>';
 
-      const frontRows = groupedMachineProductionRows(rows, (row) => row.front);
+      const frontRows = groupedMachineProductionRows(rows, (row) => machineProductionBaseLabel(row));
       els.machineFrontWrap.innerHTML = frontRows.length ? `
         <table>
-          <thead><tr><th>Frente</th><th>Produção</th><th>% total</th><th>Máquinas</th><th>Registros</th></tr></thead>
+          <thead><tr><th>Frente / base</th><th>Produção</th><th>% total</th><th>Máquinas</th><th>Média máquina/dia</th><th>Dias</th><th>Registros</th></tr></thead>
           <tbody>
             ${frontRows.map((item) => `
               <tr>
@@ -7003,6 +7477,8 @@
                 <td>${formatNumber(item.production)}</td>
                 <td>${formatPercent(progressFor(item.production, total))}</td>
                 <td>${item.machineCount}</td>
+                <td>${formatNumber(item.averagePerMachineDay)}</td>
+                <td>${item.dayCount}</td>
                 <td>${item.records}</td>
               </tr>
             `).join("")}
@@ -7021,7 +7497,7 @@
           <thead>
             <tr>
               <th>Data</th>
-              <th>Frente</th>
+              <th>Frente / base</th>
               <th>Tipo</th>
               <th>Máquina</th>
               <th>Produção</th>
@@ -7033,7 +7509,7 @@
             ${[...rows].sort((a, b) => b.date.localeCompare(a.date) || a.front.localeCompare(b.front, "pt-BR", { numeric: true })).map((row) => `
               <tr>
                 <td>${formatDate(row.date)}</td>
-                <td>${escapeHtml(row.front)}</td>
+                <td>${escapeHtml(machineProductionBaseLabel(row))}</td>
                 <td>${escapeHtml(row.machineType)}</td>
                 <td>${escapeHtml(row.fleet)}</td>
                 <td>${formatNumber(row.production)}</td>
@@ -7051,21 +7527,49 @@
       `;
     }
 
-    function renderMachineProductions() {
-      if (!els.machinesView) return;
+    function renderMachineProductionDashboardPage() {
+      if (!els.machineDashboardView) return;
       const range = machineProductionRange();
       setMachineProductionRange(range.start, range.end);
       const rows = machineProductionRowsForRange(range);
       const rangeLabel = range.start === range.end ? formatDate(range.start) : `${formatDate(range.start)} a ${formatDate(range.end)}`;
-      const frontLabel = els.machineFrontFilter.value === "all" ? "todas as frentes próprias" : els.machineFrontFilter.value;
+      const frontLabel = els.machineFrontFilter.value === "all" ? "todas as frentes e transportes" : els.machineFrontFilter.value;
       els.machineSource.textContent = rows.length
-        ? `${rows.length} lançamento${rows.length === 1 ? "" : "s"} em ${frontLabel}, de ${rangeLabel}.`
-        : `Nenhuma produção de máquina em ${frontLabel}, de ${rangeLabel}.`;
+        ? `${machineModeLabel()}: ${rows.length} lançamento${rows.length === 1 ? "" : "s"} em ${frontLabel}, de ${rangeLabel}.`
+        : `${machineModeLabel()}: nenhuma produção em ${frontLabel}, de ${rangeLabel}.`;
       renderOptions();
+      renderMachineModeTabs();
+      updateMachineProductionFormContext();
       renderMachineProductionKpis(rows);
+      renderMachineProductionDashboard(rows);
       renderMachineProductionConsistency(rows);
       renderMachineEquipmentSummary(rows);
       renderMachineProductionGroups(rows);
+    }
+
+    function machineProductionEntryDate() {
+      return normalizeRecordDate((els.machineEntryFilterDate && els.machineEntryFilterDate.value) || els.machineDate.value || todayInputValue()) || todayInputValue();
+    }
+
+    function setMachineProductionEntryDate(date) {
+      const normalized = normalizeRecordDate(date) || todayInputValue();
+      if (els.machineEntryFilterDate) els.machineEntryFilterDate.value = normalized;
+      if (els.machineDate && !els.machineDate.value) els.machineDate.value = normalized;
+      return normalized;
+    }
+
+    function machineProductionRowsForEntryDate(date = machineProductionEntryDate()) {
+      const normalized = normalizeRecordDate(date) || todayInputValue();
+      return getCleanMachineProductionRecords(machineProductionRecords)
+        .filter((record) => record.date === normalized);
+    }
+
+    function renderMachineProductions() {
+      if (!els.machinesView) return;
+      const date = setMachineProductionEntryDate(machineProductionEntryDate());
+      const rows = machineProductionRowsForEntryDate(date);
+      renderOptions();
+      updateMachineProductionFormContext();
       renderMachineProductionRows(rows);
     }
 
@@ -7073,7 +7577,8 @@
       els.machineEntryId.value = "";
       els.machineDate.value = date;
       els.machineFront.value = ownHarvestFronts[0];
-      els.machineType.value = "Colhedora";
+      els.machineType.value = primaryMachineTypeForMode();
+      updateMachineProductionFormContext();
       els.machineFleet.value = "";
       els.machineProduction.value = "";
       els.machineNote.value = "";
@@ -7086,10 +7591,13 @@
     function editMachineProduction(id) {
       const record = machineProductionRecords.find((item) => item.id === id);
       if (!record) return;
+      setMachineProductionMode(machineModeForType(record.machineType), { syncType: false, render: false });
+      setMachineProductionEntryDate(record.date);
       els.machineEntryId.value = record.id;
       els.machineDate.value = record.date;
       els.machineFront.value = record.front;
       els.machineType.value = record.machineType;
+      updateMachineProductionFormContext();
       els.machineFleet.value = record.fleet;
       els.machineProduction.value = formatNumber(record.production);
       els.machineNote.value = record.note || "";
@@ -7106,8 +7614,8 @@
       const record = normalizeMachineProductionRecord({
         id: editingId || makeId(),
         date: els.machineDate.value,
-        front: els.machineFront.value,
         machineType: els.machineType.value,
+        front: isMachineTruckType(els.machineType.value) ? defaultMachineProductionFrontForType(els.machineType.value) : els.machineFront.value,
         fleet: els.machineFleet.value,
         production: els.machineProduction.value,
         note: els.machineNote.value,
@@ -7120,15 +7628,15 @@
       }
 
       let { nextRecord, nextRows, group, merged } = machineProductionGroupAfterSave(record, editingId);
-      if (!group || group.target <= 0) {
+      if (!group || (machineProductionRequiresDailyMatch(group) && group.target <= 0)) {
         showToast(machineProductionMismatchMessage(group));
         return;
       }
-      if (group.difference > MACHINE_PRODUCTION_TOLERANCE && !machineProductionDifferenceAllowed(group)) {
+      if (machineProductionRequiresDailyMatch(group) && group.difference > MACHINE_PRODUCTION_TOLERANCE && !machineProductionDifferenceAllowed(group)) {
         showToast(machineProductionMismatchMessage(group));
         return;
       }
-      if (machineProductionDifferenceAllowed(group) && Math.abs(group.difference) > MACHINE_PRODUCTION_TOLERANCE && !machineProductionStoredDifferenceAccepted(group)) {
+      if (machineProductionRequiresDailyMatch(group) && machineProductionDifferenceAllowed(group) && Math.abs(group.difference) > MACHINE_PRODUCTION_TOLERANCE && !machineProductionStoredDifferenceAccepted(group)) {
         nextRows = applyMachineProductionDifferenceAcceptance(nextRows, group);
         group = machineProductionConsistencyRows(nextRows).find((item) => item.key === machineProductionGroupKey(nextRecord)) || group;
       }
@@ -7136,6 +7644,7 @@
       machineProductionRecords = nextRows;
       persistMachineProductionRecords();
       setMachineProductionRange(nextRecord.date, nextRecord.date);
+      setMachineProductionEntryDate(nextRecord.date);
       resetMachineProductionForm(nextRecord.date);
       renderMachineProductions();
       addAuditEntry("maquinas", `${nextRecord.machineType} ${nextRecord.fleet} lançada em ${nextRecord.front} no dia ${formatDate(nextRecord.date)}.`);
@@ -7175,6 +7684,7 @@
       machineProductionRecords = getCleanMachineProductionRecords(machineProductionRecords.filter((item) => item.id !== id));
       persistMachineProductionRecords();
       if (els.machineEntryId.value === id) resetMachineProductionForm(record.date);
+      setMachineProductionEntryDate(record.date);
       renderMachineProductions();
       addAuditEntry("exclusao", `Produção da máquina ${record.fleet} removida de ${formatDate(record.date)}.`);
       const rowsForSync = prepareMachineProductionRowsForSync(machineProductionRecords);
@@ -7198,10 +7708,12 @@
     async function deleteMachineProductionRange() {
       const range = machineProductionRange();
       const front = els.machineFrontFilter.value || "all";
+      const activeTypes = machineTypesForMode();
       const before = getCleanMachineProductionRecords(machineProductionRecords);
       const selected = before.filter((row) => (
         row.date >= range.start
         && row.date <= range.end
+        && activeTypes.includes(row.machineType)
         && (front === "all" || row.front === front)
       ));
       if (!selected.length) {
@@ -7223,6 +7735,41 @@
       persistMachineProductionRecords();
       renderMachineProductions();
       const syncState = await syncOrQueue("machine-production-sync", { source: "machine-range-delete", start: range.start, end: range.end, front }, () => syncMachineProductionRecordsToFirebase({
+        silent: true,
+        pendingMessage: "Salvando exclusão das produções no banco...",
+        successStatus: "Exclusão das produções sincronizada.",
+        errorStatus: "Produções removidas localmente, mas a sincronização falhou."
+      }));
+      showToast(syncState === "synced"
+        ? `${selected.length} produção${selected.length === 1 ? "" : "ões"} removida${selected.length === 1 ? "" : "s"} e banco atualizado.`
+        : `${selected.length} produção${selected.length === 1 ? "" : "ões"} removida${selected.length === 1 ? "" : "s"}.`);
+    }
+
+    async function deleteMachineProductionEntryDate() {
+      const date = machineProductionEntryDate();
+      const before = getCleanMachineProductionRecords(machineProductionRecords);
+      const selected = before.filter((row) => row.date === date);
+      if (!selected.length) {
+        showToast(`Não há produções de máquinas em ${formatDate(date)}.`);
+        return;
+      }
+      machineProductionRecords = before.filter((row) => row.date !== date);
+      persistMachineProductionRecords();
+      resetMachineProductionForm(date);
+      setMachineProductionEntryDate(date);
+      renderMachineProductions();
+      renderMachineProductionDashboardPage();
+      addAuditEntry("exclusao", `${selected.length} produção${selected.length === 1 ? "" : "ões"} de máquinas removida${selected.length === 1 ? "" : "s"} em ${formatDate(date)}.`);
+      const rowsForSync = prepareMachineProductionRowsForSync(machineProductionRecords);
+      const invalid = invalidMachineProductionGroups(rowsForSync);
+      if (invalid.length) {
+        showToast(`Produções removidas localmente. ${machineProductionMismatchMessage(invalid[0])} Banco não enviado ainda.`);
+        return;
+      }
+      machineProductionRecords = rowsForSync;
+      persistMachineProductionRecords();
+      renderMachineProductions();
+      const syncState = await syncOrQueue("machine-production-sync", { source: "machine-date-delete", date }, () => syncMachineProductionRecordsToFirebase({
         silent: true,
         pendingMessage: "Salvando exclusão das produções no banco...",
         successStatus: "Exclusão das produções sincronizada.",
@@ -8183,6 +8730,7 @@
         patio: els.patioView,
         stoppages: els.stoppagesView,
         reductions: els.reductionsView,
+        machineDashboard: els.machineDashboardView,
         machines: els.machinesView,
         entry: els.entryView,
         targets: els.targetsView,
@@ -8199,6 +8747,7 @@
       if (name === "patio") renderPatio();
       if (name === "stoppages") renderStoppages();
       if (name === "reductions") renderReductions();
+      if (name === "machineDashboard") renderMachineProductionDashboardPage();
       if (name === "machines") renderMachineProductions();
       if (name === "entry") renderEntry();
       if (name === "targets") renderTargets();
@@ -9241,6 +9790,193 @@
       `;
     }
 
+    function machineProductionRowsForDateRange(range) {
+      const normalized = normalizeDateRange(range.start, range.end);
+      return getCleanMachineProductionRecords(machineProductionRecords)
+        .filter((record) => record.date >= normalized.start && record.date <= normalized.end);
+    }
+
+    function machineProductionDashboardHtml(range) {
+      const rows = machineProductionRowsForDateRange(range);
+      if (!rows.length) {
+        return '<div class="empty-state">Sem produção detalhada de máquinas no período.</div>';
+      }
+
+      const summary = machineProductionSummary(rows);
+      const typeRows = groupedMachineProductionRows(rows, (row) => row.machineType);
+      const frontRows = groupedMachineProductionRows(rows, (row) => machineProductionBaseLabel(row)).slice(0, 8);
+      const equipmentRows = machineEquipmentRows(rows).slice(0, 12);
+      const truckRows = rows.filter((row) => row.machineType === "Caminhão Próprio" || row.machineType === "Caminhão Terceiro");
+      const truckSummary = machineProductionSummary(truckRows);
+
+      return `
+        <div class="summary-grid">
+          <div class="summary-card">
+            <small>Total detalhado</small>
+            <strong>${formatNumber(summary.total)}</strong>
+            <span>${summary.machines} equipamento${summary.machines === 1 ? "" : "s"} · ${summary.days} dia${summary.days === 1 ? "" : "s"}</span>
+          </div>
+          <div class="summary-card">
+            <small>Média máquina/dia</small>
+            <strong>${formatNumber(summary.averagePerMachineDay)}</strong>
+            <span>${summary.machineDays} máquina-dia</span>
+          </div>
+          <div class="summary-card">
+            <small>Caminhões transportado</small>
+            <strong>${formatNumber(truckSummary.truckTotal)}</strong>
+            <span>Média ${formatNumber(truckSummary.averageTruckPerDay)} por caminhão/dia</span>
+          </div>
+          <div class="summary-card">
+            <small>Terceiros</small>
+            <strong>${formatNumber(summary.thirdTrucks)}</strong>
+            <span>Caminhões terceiros no detalhe</span>
+          </div>
+        </div>
+        <div class="dashboard-grid" style="margin-top: 14px;">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Tipo</th><th>Produção</th><th>Máquinas</th><th>Média máquina/dia</th><th>Dias</th></tr></thead>
+              <tbody>
+                ${typeRows.map((item) => `
+                  <tr>
+                    <td>${escapeHtml(item.label)}</td>
+                    <td>${formatNumber(item.production)}</td>
+                    <td>${item.machineCount}</td>
+                    <td>${formatNumber(item.averagePerMachineDay)}</td>
+                    <td>${item.dayCount}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Frente / base</th><th>Produção</th><th>Máquinas</th><th>Média máquina/dia</th><th>Dias</th></tr></thead>
+              <tbody>
+                ${frontRows.map((item) => `
+                  <tr>
+                    <td>${escapeHtml(item.label)}</td>
+                    <td>${formatNumber(item.production)}</td>
+                    <td>${item.machineCount}</td>
+                    <td>${formatNumber(item.averagePerMachineDay)}</td>
+                    <td>${item.dayCount}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Equipamento / frota</th><th>Tipo</th><th>Produção</th><th>Média/dia</th><th>Dias</th></tr></thead>
+              <tbody>
+                ${equipmentRows.map((item) => `
+                  <tr>
+                    <td>${escapeHtml(item.fleet)}</td>
+                    <td>${escapeHtml(item.machineType)}</td>
+                    <td>${formatNumber(item.production)}</td>
+                    <td>${formatNumber(item.averagePerDay)}</td>
+                    <td>${item.dayCount}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderDashboardMachineProduction(range) {
+      if (els.dashboardMachineProductionWrap) {
+        els.dashboardMachineProductionWrap.innerHTML = machineProductionDashboardHtml(range);
+      }
+    }
+
+    function renderReportsMachineProduction(range) {
+      if (els.reportsMachineProductionWrap) {
+        els.reportsMachineProductionWrap.innerHTML = machineProductionDashboardHtml(range);
+      }
+    }
+
+    function equipmentAverageRowsFromRecords(recordsList) {
+      const grouped = new Map();
+      rowsFromRecords(recordsList)
+        .filter((row) => usesEquipmentQuantity(row.type))
+        .forEach((row) => {
+          const origin = row.front || row.type;
+          const key = `${row.type}|${normalizeKey(origin)}`;
+          if (!grouped.has(key)) {
+            grouped.set(key, {
+              type: row.type,
+              origin,
+              production: 0,
+              equipmentQuantity: 0,
+              records: 0,
+              days: new Set()
+            });
+          }
+          const item = grouped.get(key);
+          item.production += parseNumber(row.production);
+          item.equipmentQuantity += Math.max(0, parseNumber(row.equipmentQuantity));
+          item.records += 1;
+          if (row.date) item.days.add(row.date);
+        });
+
+      return [...grouped.values()]
+        .map((item) => ({
+          ...item,
+          dayCount: item.days.size,
+          averagePerEquipment: item.equipmentQuantity ? item.production / item.equipmentQuantity : 0
+        }))
+        .sort((a, b) => b.production - a.production || a.origin.localeCompare(b.origin, "pt-BR", { numeric: true }));
+    }
+
+    function equipmentAverageHtml(recordsList) {
+      const rows = equipmentAverageRowsFromRecords(recordsList);
+      if (!rows.length) {
+        return '<div class="empty-state">Sem quantidade de equipamentos lançada para frentes terceiras, Floresta ou Vale.</div>';
+      }
+      return `
+        <table>
+          <thead>
+            <tr>
+              <th>Operação</th>
+              <th>Frente / origem</th>
+              <th>Produção</th>
+              <th>Qtd. equipamentos</th>
+              <th>Média/equip.</th>
+              <th>Dias</th>
+              <th>Registros</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((row) => `
+              <tr>
+                <td>${escapeHtml(row.type)}</td>
+                <td>${escapeHtml(row.origin)}</td>
+                <td>${formatNumber(row.production)}</td>
+                <td>${formatNumber(row.equipmentQuantity)}</td>
+                <td>${formatNumber(row.averagePerEquipment)}</td>
+                <td>${row.dayCount}</td>
+                <td>${row.records}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderDashboardEquipmentAverages(recordsList) {
+      if (els.dashboardEquipmentAverageWrap) {
+        els.dashboardEquipmentAverageWrap.innerHTML = equipmentAverageHtml(recordsList);
+      }
+    }
+
+    function renderReportsEquipmentAverages(recordsList) {
+      if (els.reportsEquipmentAverageWrap) {
+        els.reportsEquipmentAverageWrap.innerHTML = equipmentAverageHtml(recordsList);
+      }
+    }
+
     function renderDashboard() {
       const range = dashboardRange();
       setDashboardRange(range.start, range.end);
@@ -9287,6 +10023,8 @@
       renderAdvancedKpis(selectedRecords, rows, range, { targetDays, targetInfo, targetTotal });
       renderDashboardCharts(rows, { targetDays, targetTotal });
       renderDashboardPatioTimes(range);
+      renderDashboardMachineProduction(range);
+      renderDashboardEquipmentAverages(selectedRecords);
       renderDailyTrend(selectedRecords);
       renderOperationMix(rows, { targetDays, targetTotal });
       renderDashboardAlerts(selectedRecords, rows, { targetDays, targetTotal });
@@ -9381,9 +10119,10 @@
               <th>Data</th>
               <th>Tipo</th>
               <th>Frente</th>
-              <th>Frota</th>
+              <th>Qtd. equip.</th>
               <th>Meta</th>
               <th>Produção</th>
+              <th>Média/equip.</th>
               <th>% Meta</th>
               <th>Falta</th>
               <th>Observação</th>
@@ -9397,9 +10136,10 @@
                   <td>${formatDate(row.date)}</td>
                   <td>${escapeHtml(row.type)}</td>
                   <td>${escapeHtml(row.front || "-")}</td>
-                  <td>${escapeHtml(row.fleet || "-")}</td>
+                  <td>${usesEquipmentQuantity(row.type) ? formatNumber(row.equipmentQuantity) : "-"}</td>
                   <td>${formatNumber(target)}</td>
                   <td>${formatNumber(row.production)}</td>
+                  <td>${usesEquipmentQuantity(row.type) ? formatNumber(productionAverageByEquipment(row)) : "-"}</td>
                   <td>${formatPercent(progressFor(row.production, target))}</td>
                   <td>${formatNumber(Math.max(target - row.production, 0))}</td>
                   <td>${escapeHtml(row.note || "")}</td>
@@ -10600,7 +11340,9 @@
               <th>Data</th>
               <th>Operação</th>
               <th>Origem</th>
+              <th>Qtd. equip.</th>
               <th>Produção</th>
+              <th>Média/equip.</th>
               <th>% moagem</th>
               <th>Meta cad.</th>
               <th>% meta</th>
@@ -10615,7 +11357,9 @@
                   <td>${formatDate(row.date)}</td>
                   <td>${escapeHtml(row.type)}</td>
                   <td>${escapeHtml(reportOriginForRow(row))}</td>
+                  <td>${usesEquipmentQuantity(row.type) ? formatNumber(row.equipmentQuantity) : "-"}</td>
                   <td>${formatNumber(row.production)}</td>
+                  <td>${usesEquipmentQuantity(row.type) ? formatNumber(productionAverageByEquipment(row)) : "-"}</td>
                   <td>${formatPercent(progressFor(row.production, baseSummary.total))}</td>
                   <td>${formatNumber(target)}</td>
                   <td>${formatPercent(progressFor(row.production, target))}</td>
@@ -10663,6 +11407,8 @@
       renderReportsParticipation(baseSummary, targetContext.targetDays);
       renderReportsTransport(baseSummary, targetContext.targetDays);
       renderReportsPatioTimes(range);
+      renderReportsMachineProduction(range);
+      renderReportsEquipmentAverages(selectedRecords);
       renderReportsStoppages(range);
       renderReportsReductions(range);
       renderReportsFront(rows, baseSummary);
@@ -10689,6 +11435,8 @@
       els.activeFrontTitle.textContent = activeFront.front ? `${activeFront.front} · ${activeFront.type}` : activeFront.type;
       els.activeFrontHint.textContent = requiresFleet(activeFront.type)
         ? `Informe ${fleetLabel.toLowerCase()} e a produção, ou importe um arquivo do sistema.`
+        : usesEquipmentQuantity(activeFront.type)
+          ? "Informe a quantidade de equipamentos e a produção do dia para calcular a média."
         : isExternalCane(activeFront.type)
           ? "Informe o total de cana enviada para Cambuí, ou importe um arquivo do sistema."
         : isOwnTransport
@@ -10698,7 +11446,16 @@
           : "Informe a produção da frente, ou importe um arquivo do sistema.";
       els.manualFleetLabel.textContent = fleetLabel;
       els.manualFleet.placeholder = fleetPlaceholderForType(activeFront.type);
-      els.manualFleetField.hidden = !requiresFleet(activeFront.type);
+      els.manualFleetField.hidden = !requiresFleet(activeFront.type) && !usesEquipmentQuantity(activeFront.type);
+      if (usesEquipmentQuantity(activeFront.type)) {
+        els.manualFleetLabel.textContent = equipmentQuantityLabelForType(activeFront.type);
+        els.manualFleet.removeAttribute("list");
+        els.manualFleet.inputMode = "numeric";
+        els.manualFleet.placeholder = "Ex.: 4";
+      } else {
+        els.manualFleet.setAttribute("list", "fleetOptions");
+        els.manualFleet.inputMode = "text";
+      }
       els.manualAverageKmField.hidden = !isTransportEntry;
       els.manualFleet.value = "";
       els.manualProduction.value = "";
@@ -10709,7 +11466,7 @@
         card.setAttribute("aria-pressed", String(selected));
       });
       setTimeout(() => {
-        const target = requiresFleet(activeFront.type) ? els.manualFleet : els.manualProduction;
+        const target = requiresFleet(activeFront.type) || usesEquipmentQuantity(activeFront.type) ? els.manualFleet : els.manualProduction;
         target.focus();
       }, 0);
     }
@@ -10719,6 +11476,8 @@
       els.frontWorkspace.hidden = true;
       els.manualAverageKmField.hidden = true;
       els.manualAverageKm.value = "";
+      els.manualFleet.setAttribute("list", "fleetOptions");
+      els.manualFleet.inputMode = "text";
       els.frontCards.forEach((card) => card.setAttribute("aria-pressed", "false"));
     }
 
@@ -10741,6 +11500,9 @@
         const existingKm = parseNumber(existing.averageKm);
         const normalizedKm = parseNumber(normalized.averageKm);
         existing.production = existingProduction + normalizedProduction;
+        if (usesEquipmentQuantity(existing.type)) {
+          existing.equipmentQuantity = Math.max(0, parseNumber(existing.equipmentQuantity)) + Math.max(0, parseNumber(normalized.equipmentQuantity));
+        }
         if (isTransport(existing.type)) {
           if (existingKm && normalizedKm) {
             existing.averageKm = ((existingKm * existingProduction) + (normalizedKm * normalizedProduction)) / Math.max(existingProduction + normalizedProduction, 1);
@@ -10770,8 +11532,13 @@
       }
 
       const fleet = requiresFleet(activeFront.type) ? els.manualFleet.value.trim() : "";
+      const equipmentQuantity = usesEquipmentQuantity(activeFront.type) ? parseNumber(els.manualFleet.value) : 0;
       if (requiresFleet(activeFront.type) && !fleet) {
         showToast(`Informe ${fleetLabelForType(activeFront.type).toLowerCase()}.`);
+        return;
+      }
+      if (usesEquipmentQuantity(activeFront.type) && !equipmentQuantity) {
+        showToast("Informe a quantidade de equipamentos.");
         return;
       }
 
@@ -10780,6 +11547,7 @@
         front: activeFront.front,
         fleet,
         production,
+        equipmentQuantity,
         averageKm,
         note: els.manualNote.value
       });
@@ -11263,21 +12031,27 @@
 
     function openMachineImportDialog() {
       els.machineImportDate.value = els.machineDate.value || todayInputValue();
-      els.machineImportFront.value = els.machineFront.value || ownHarvestFronts[0];
       els.machineImportType.value = normalizeMachineProductionType(els.machineType.value);
+      els.machineImportFront.value = isMachineTruckType(els.machineImportType.value)
+        ? defaultMachineProductionFrontForType(els.machineImportType.value)
+        : els.machineFront.value || ownHarvestFronts[0];
+      els.machineImportFront.disabled = isMachineTruckType(els.machineImportType.value);
       pendingMachineImportContext = null;
       els.machineImportDialog.showModal();
     }
 
     function closeMachineImportDialog() {
       pendingMachineImportContext = null;
+      els.machineImportFront.disabled = false;
       if (els.machineImportDialog.open) els.machineImportDialog.close();
     }
 
     function chooseMachineImportFile() {
       const date = normalizeRecordDate(els.machineImportDate.value);
-      const front = ownHarvestFronts.find((item) => item === els.machineImportFront.value) || "";
       const machineType = normalizeMachineProductionType(els.machineImportType.value);
+      const front = isMachineTruckType(machineType)
+        ? defaultMachineProductionFrontForType(machineType)
+        : frontOptions.find((item) => item === els.machineImportFront.value) || "";
       if (!date || !front || !machineType) {
         showToast("Informe o dia, a frente e o tipo do arquivo.");
         return;
@@ -11292,6 +12066,7 @@
 
     function machineProductionTypeFromReport(text, fallback = "Colhedora") {
       const key = normalizeKey(text);
+      if ((key.includes("caminhoes") || key.includes("caminhao")) && key.includes("terce")) return "Caminhão Terceiro";
       if (key.includes("caminhoes e dias trabalhados") || key.includes("caminhao e dias trabalhados")) return "Caminhão Próprio";
       if (key.includes("transbordo") && key.includes("dias trabalhados")) return "Transbordo";
       if (key.includes("colhedora") && key.includes("dias trabalhados")) return "Colhedora";
@@ -11341,11 +12116,15 @@
         const payload = await machineProductionImportPayload(file);
         const importContext = pendingMachineImportContext || {
           date: els.machineDate.value || todayInputValue(),
-          front: els.machineFront.value || ownHarvestFronts[0],
-          machineType: els.machineType.value || "Colhedora"
+          machineType: els.machineType.value || "Colhedora",
+          front: isMachineTruckType(els.machineType.value)
+            ? defaultMachineProductionFrontForType(els.machineType.value)
+            : els.machineFront.value || ownHarvestFronts[0]
         };
-        const front = importContext.front;
         const machineType = normalizeMachineProductionType(importContext.machineType);
+        const front = isMachineTruckType(machineType)
+          ? defaultMachineProductionFrontForType(machineType)
+          : importContext.front;
         const reportDate = normalizeRecordDate(importContext.date) || todayInputValue();
         let added = 0;
         let updated = 0;
@@ -11417,11 +12196,11 @@
             && item.front === front
             && item.machineType === machineType
           ));
-        if (!importedGroup || !machineProductionDifferenceAllowed(importedGroup)) {
+        if (!importedGroup || (machineProductionRequiresDailyMatch(importedGroup) && !machineProductionDifferenceAllowed(importedGroup))) {
           showToast(`Arquivo não salvo: ${machineProductionMismatchMessage(importedGroup)}`);
           return;
         }
-        if (Math.abs(importedGroup.difference) > MACHINE_PRODUCTION_TOLERANCE && !machineProductionStoredDifferenceAccepted(importedGroup)) {
+        if (machineProductionRequiresDailyMatch(importedGroup) && Math.abs(importedGroup.difference) > MACHINE_PRODUCTION_TOLERANCE && !machineProductionStoredDifferenceAccepted(importedGroup)) {
           cleanNextRecords = applyMachineProductionDifferenceAcceptance(cleanNextRecords, importedGroup);
           importedGroup = machineProductionConsistencyRows(cleanNextRecords)
             .find((item) => item.date === reportDate && item.front === front && item.machineType === machineType) || importedGroup;
@@ -11430,6 +12209,7 @@
         machineProductionRecords = cleanNextRecords;
         persistMachineProductionRecords();
         els.machineDate.value = reportDate;
+        setMachineProductionEntryDate(reportDate);
         els.machineType.value = machineType;
         els.machineFront.value = front;
         setMachineProductionRange(reportDate, reportDate);
@@ -11522,11 +12302,25 @@
             "average km",
             "distance average"
           ])) : 0;
+          const equipmentQuantity = usesEquipmentQuantity(activeFront.type) ? parseNumber(valueFromRow(row, [
+            "quantidade de equipamentos",
+            "qtd equipamentos",
+            "qtd_equipamentos",
+            "quantidade equipamentos",
+            "equipamentos",
+            "maquinas",
+            "máquinas",
+            "qtd maquinas",
+            "qtd máquinas",
+            "machine count",
+            "equipment count"
+          ])) : 0;
           const ok = addOrMergeEntry({
             type: activeFront.type,
             front: activeFront.front,
             fleet: requiresFleet(activeFront.type) ? String(fleet || "").trim() : "",
             production,
+            equipmentQuantity,
             averageKm,
             note
           });
@@ -11559,6 +12353,19 @@
 
     function fleetInput(row) {
       const label = fleetLabelForType(row.type);
+      if (usesEquipmentQuantity(row.type)) {
+        return `
+          <input
+            class="number-input"
+            inputmode="numeric"
+            data-id="${row.id}"
+            data-field="equipmentQuantity"
+            value="${row.equipmentQuantity ? formatNumber(row.equipmentQuantity) : ""}"
+            placeholder="0"
+            aria-label="${escapeHtml(equipmentQuantityLabelForType(row.type))}"
+          >
+        `;
+      }
       if (!requiresFleet(row.type)) {
         return `<input value="Não se aplica" disabled aria-label="${escapeHtml(label)}">`;
       }
@@ -11593,9 +12400,15 @@
       `;
     }
 
+    function equipmentAverageCell(row) {
+      if (!usesEquipmentQuantity(row.type)) return '<span class="muted">-</span>';
+      const averageValue = productionAverageByEquipment(row);
+      return averageValue ? formatNumber(averageValue) : '<span class="muted">Informe qtd.</span>';
+    }
+
     function renderEntryRows() {
       if (!entries.length) {
-        els.entryBody.innerHTML = '<tr><td colspan="9" class="empty-state">Clique em uma frente de colheita, transporte próprio ou transporte terceiro para iniciar o lançamento.</td></tr>';
+        els.entryBody.innerHTML = '<tr><td colspan="10" class="empty-state">Clique em uma frente de colheita, transporte próprio ou transporte terceiro para iniciar o lançamento.</td></tr>';
         return;
       }
 
@@ -11608,6 +12421,7 @@
             <td>${fleetInput(row)}</td>
             <td>${formatNumber(target)}</td>
             <td>${productionInput(row)}</td>
+            <td>${equipmentAverageCell(row)}</td>
             <td>${averageKmInput(row)}</td>
             <td>${formatPercent(progressFor(row.production, target))}</td>
             <td><input class="note-input" data-id="${row.id}" data-field="note" value="${escapeHtml(row.note)}" aria-label="Observação"></td>
@@ -11729,15 +12543,15 @@
       const count = entries.filter((row) => row.type === type).length + 1;
       const suffix = String(count).padStart(2, "0");
       if (type === TYPES.OWN_HARVEST) {
-        return { type, front: ownHarvestFronts[(count - 1) % ownHarvestFronts.length], fleet: "", production: 0, averageKm: 0, note: "" };
+        return { type, front: ownHarvestFronts[(count - 1) % ownHarvestFronts.length], fleet: "", production: 0, equipmentQuantity: 0, averageKm: 0, note: "" };
       }
       if (type === TYPES.THIRD_HARVEST) {
-        return { type, front: thirdHarvestFronts[(count - 1) % thirdHarvestFronts.length], fleet: "", production: 0, averageKm: 0, note: "" };
+        return { type, front: thirdHarvestFronts[(count - 1) % thirdHarvestFronts.length], fleet: "", production: 0, equipmentQuantity: 0, averageKm: 0, note: "" };
       }
       if (type === TYPES.OWN_TRANSPORT) {
-        return { type, front: "", fleet: "", production: 0, averageKm: 0, note: "" };
+        return { type, front: "", fleet: "", production: 0, equipmentQuantity: 0, averageKm: 0, note: "" };
       }
-      return { type, front: "", fleet: "", production: 0, averageKm: 0, note: "" };
+      return { type, front: "", fleet: "", production: 0, equipmentQuantity: 0, averageKm: 0, note: "" };
     }
 
     function addEntry(type) {
@@ -11751,6 +12565,8 @@
 
       if (field === "production") {
         row.production = parseNumber(value);
+      } else if (field === "equipmentQuantity") {
+        row.equipmentQuantity = usesEquipmentQuantity(row.type) ? parseNumber(value) : 0;
       } else if (field === "averageKm") {
         row.averageKm = isTransport(row.type) ? parseNumber(value) : 0;
       } else if (field === "type") {
@@ -11758,6 +12574,7 @@
         row.type = next.type;
         row.front = next.front;
         row.fleet = next.fleet;
+        row.equipmentQuantity = next.equipmentQuantity || 0;
         row.averageKm = next.averageKm || 0;
         row.note = row.note || next.note;
         renderEntry();
@@ -11766,7 +12583,7 @@
         row[field] = value;
       }
 
-      if ((field === "front" || field === "fleet" || field === "production" || field === "averageKm") && parseNumber(row.production) > 0) {
+      if ((field === "front" || field === "fleet" || field === "production" || field === "equipmentQuantity" || field === "averageKm") && parseNumber(row.production) > 0) {
         ensureTargetForRow(row);
       }
       setStats("entry", getCleanEntries(entries));
@@ -11842,6 +12659,12 @@
       const missingFleet = entries.some((row) => requiresFleet(row.type) && parseNumber(row.production) > 0 && !String(row.fleet || "").trim());
       if (missingFleet) {
         showToast("Informe a identificação obrigatória antes de salvar.");
+        return;
+      }
+
+      const missingEquipmentQuantity = entries.some((row) => usesEquipmentQuantity(row.type) && parseNumber(row.production) > 0 && !parseNumber(row.equipmentQuantity));
+      if (missingEquipmentQuantity) {
+        showToast("Informe a quantidade de equipamentos para calcular a média.");
         return;
       }
 
@@ -12086,7 +12909,7 @@
         rows: getCleanEntries()
       }];
 
-      const header = ["data", "usina", "tipo", "frente", "frota_equipamento", "meta", "producao", "km_medio", "percentual_meta", "falta", "observacao"];
+      const header = ["data", "usina", "tipo", "frente", "frota_equipamento", "qtd_equipamentos", "media_por_equipamento", "meta", "producao", "km_medio", "percentual_meta", "falta", "observacao"];
       const lines = source.flatMap((record) => record.rows.map((row) => {
         const target = targetForRow(row, targets, record.rows);
         return [
@@ -12095,6 +12918,8 @@
           row.type,
           row.front,
           row.fleet,
+          row.equipmentQuantity || "",
+          productionAverageByEquipment(row) || "",
           target,
           row.production,
           row.averageKm || "",
@@ -12164,6 +12989,7 @@
       const reportReductionRows = reductionRowsForRange(range);
       const reportReductionItems = reductionReportItems(reportReductionRows);
       const reportReductionSummary = reductionSummary(reportReductionItems);
+      const equipmentAverageRows = equipmentAverageRowsFromRecords(selectedRecords);
       const lines = [
         ["Relatório Gerencial - Produção Diária da Cambuí"],
         ["Período", `${formatDate(range.start)} a ${formatDate(range.end)}`],
@@ -12186,6 +13012,18 @@
         ["Transporte total", formatNumber(baseSummary.transportTotal), formatPercent(baseSummary.transportPercent)],
         ["KM médio próprio", formatKm(baseSummary.ownTransportKmAvg), `${baseSummary.ownTransportKmRecords} dia${baseSummary.ownTransportKmRecords === 1 ? "" : "s"} com KM lançado`],
         ["KM médio terceiro", formatKm(baseSummary.thirdTransportKmAvg), `${baseSummary.thirdTransportKmRecords} dia${baseSummary.thirdTransportKmRecords === 1 ? "" : "s"} com KM lançado`],
+        [],
+        ["Média por equipamentos"],
+        ["Operação", "Frente / origem", "Produção", "Qtd. equipamentos", "Média/equip.", "Dias", "Registros"],
+        ...equipmentAverageRows.map((row) => [
+          row.type,
+          row.origin,
+          formatNumber(row.production),
+          formatNumber(row.equipmentQuantity),
+          formatNumber(row.averagePerEquipment),
+          row.dayCount,
+          row.records
+        ]),
         [],
         ["Tempos de palha"],
         ["Base do tempo de palha", "Início carga até fim carga quando disponível"],
@@ -12285,14 +13123,16 @@
         }),
         [],
         ["Lançamentos filtrados"],
-        ["Data", "Operação", "Origem", "Produção", "% moagem", "Meta cadastrada", "% meta", "Observação"],
+        ["Data", "Operação", "Origem", "Qtd. equipamentos", "Produção", "Média/equip.", "% moagem", "Meta cadastrada", "% meta", "Observação"],
         ...rows.map((row) => {
           const target = targetForRow(row, targets, rowsForSameDate(row, rows));
           return [
             formatDate(row.date),
             row.type,
             reportOriginForRow(row),
+            usesEquipmentQuantity(row.type) ? formatNumber(row.equipmentQuantity) : "",
             formatNumber(row.production),
+            usesEquipmentQuantity(row.type) ? formatNumber(productionAverageByEquipment(row)) : "",
             formatPercent(progressFor(row.production, baseSummary.total)),
             formatNumber(target),
             formatPercent(progressFor(row.production, target)),
@@ -13930,18 +14770,31 @@
       if (button.dataset.reductionAction === "delete") deleteReductionRecord(button.dataset.id);
     });
 
-    els.machineStartDate.addEventListener("change", renderMachineProductions);
-    els.machineEndDate.addEventListener("change", renderMachineProductions);
-    els.machineFrontFilter.addEventListener("change", renderMachineProductions);
+    els.machineStartDate.addEventListener("change", renderMachineProductionDashboardPage);
+    els.machineEndDate.addEventListener("change", renderMachineProductionDashboardPage);
+    els.machineFrontFilter.addEventListener("change", renderMachineProductionDashboardPage);
+    els.machineModeTabs.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-machine-mode]");
+      if (!button) return;
+      setMachineProductionMode(button.dataset.machineMode);
+    });
+    els.machineType.addEventListener("change", () => {
+      setMachineProductionMode(machineModeForType(els.machineType.value), { syncType: false });
+    });
     document.querySelector("#machineTodayBtn").addEventListener("click", () => {
       const today = todayInputValue();
       setMachineProductionRange(today, today);
-      renderMachineProductions();
+      renderMachineProductionDashboardPage();
     });
     document.querySelector("#machineMonthBtn").addEventListener("click", () => {
       const baseDate = els.machineEndDate.value || todayInputValue();
       const range = monthRangeFor(baseDate);
       setMachineProductionRange(range.start, baseDate);
+      renderMachineProductionDashboardPage();
+    });
+    els.machineEntryFilterDate.addEventListener("change", () => {
+      const date = setMachineProductionEntryDate(els.machineEntryFilterDate.value);
+      els.machineDate.value = date;
       renderMachineProductions();
     });
     document.querySelector("#saveMachineEntryBtn").addEventListener("click", saveMachineProductionEntry);
@@ -13950,17 +14803,30 @@
     document.querySelector("#closeMachineImportDialogBtn").addEventListener("click", closeMachineImportDialog);
     document.querySelector("#cancelMachineImportBtn").addEventListener("click", closeMachineImportDialog);
     document.querySelector("#chooseMachineImportFileBtn").addEventListener("click", chooseMachineImportFile);
+    els.machineImportType.addEventListener("change", () => {
+      const machineType = normalizeMachineProductionType(els.machineImportType.value);
+      els.machineImportFront.disabled = isMachineTruckType(machineType);
+      els.machineImportFront.value = isMachineTruckType(machineType)
+        ? defaultMachineProductionFrontForType(machineType)
+        : frontOptions.includes(els.machineImportFront.value)
+          ? els.machineImportFront.value
+          : ownHarvestFronts[0];
+    });
     els.machineImportFile.addEventListener("change", (event) => importMachineProductionFile(event.target.files[0]));
     document.querySelector("#saveMachinesDbBtn").addEventListener("click", saveMachineProductionsDatabase);
     document.querySelector("#pullMachinesDbBtn").addEventListener("click", pullMachineProductionsDatabase);
-    document.querySelector("#deleteMachineRangeBtn").addEventListener("click", deleteMachineProductionRange);
+    document.querySelector("#deleteMachineDayBtn").addEventListener("click", deleteMachineProductionEntryDate);
     els.machineProduction.addEventListener("change", () => {
       els.machineProduction.value = formatNumber(parseNumber(els.machineProduction.value));
     });
-    els.machineAcceptDifference.addEventListener("change", renderMachineProductions);
+    els.machineAcceptDifference.addEventListener("change", () => {
+      renderMachineProductionDashboardPage();
+      renderMachineProductions();
+    });
     els.machineDifferenceLimit.addEventListener("change", () => {
       const limit = machineProductionDifferenceLimit();
       els.machineDifferenceLimit.value = limit ? formatNumber(limit) : "";
+      renderMachineProductionDashboardPage();
       renderMachineProductions();
     });
     els.machineRowsWrap.addEventListener("click", (event) => {
@@ -14022,13 +14888,13 @@
       const id = target.dataset.id;
       const field = target.dataset.field;
       if (!id || !field) return;
-      if (field === "production" || field === "averageKm") {
+      if (field === "production" || field === "averageKm" || field === "equipmentQuantity") {
         target.value = formatNumber(parseNumber(target.value));
       }
       if (field === "type") {
         updateEntry(id, field, target.value);
       }
-      if (field === "front" || field === "fleet") {
+      if (field === "front" || field === "fleet" || field === "production" || field === "equipmentQuantity") {
         renderEntry();
       }
     });
@@ -14173,6 +15039,7 @@
     setStoppageRange(initialReportRange.start, initialDate);
     setReductionRange(initialReportRange.start, initialDate);
     setMachineProductionRange(initialReportRange.start, initialDate);
+    setMachineProductionEntryDate(initialDate);
     resetPatioEntryForm({ date: initialPatioDate });
     resetStoppageForm(initialDate);
     resetReductionForm(initialDate);
