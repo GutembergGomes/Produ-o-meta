@@ -6749,6 +6749,8 @@
         : frontOptions.find((item) => sameText(item, frontValue)) || "";
       const fleet = String(row.fleet || row.frota || row.machine || row.maquina || row.equipment || row.caminhao || "").trim();
       const production = Math.max(0, parseNumber(row.production ?? row.producao ?? row.toneladas ?? row.total ?? 0));
+      const loads = Math.max(0, parseNumber(row.loads ?? row.cargas ?? row.carregamentos ?? row.trips ?? row.viagens ?? 0));
+      const averageYield = Math.max(0, parseNumber(row.averageYield ?? row.media ?? row.média ?? row.mediaToneladas ?? row.media_t ?? 0)) || (loads ? production / loads : 0);
       const note = String(row.note || row.observacao || row.obs || "").trim();
       const differenceAccepted = row.differenceAccepted === true || row.acceptedDifference === true || row.acceptDifference === true;
       const differenceAcceptedLimit = Math.max(0, parseNumber(row.differenceAcceptedLimit ?? row.acceptedDifferenceLimit ?? 0));
@@ -6762,6 +6764,8 @@
         machineType,
         fleet,
         production,
+        loads,
+        averageYield,
         note,
         differenceAccepted,
         differenceAcceptedAt: differenceAccepted ? String(row.differenceAcceptedAt || row.acceptedDifferenceAt || "") : "",
@@ -7213,6 +7217,7 @@
             machineType: row.machineType,
             fleet: row.fleet,
             production: 0,
+            loads: 0,
             records: 0,
             fronts: new Set(),
             days: new Set(),
@@ -7221,6 +7226,7 @@
         }
         const item = grouped.get(key);
         item.production += Number(row.production) || 0;
+        item.loads += Number(row.loads) || 0;
         item.records += 1;
         item.fronts.add(machineProductionBaseLabel(row));
         item.days.add(row.date);
@@ -7232,7 +7238,8 @@
           frontsLabel: [...item.fronts].sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true })).join(", "),
           dayCount: item.days.size,
           machineDayCount: item.machineDays.size,
-          averagePerDay: item.days.size ? item.production / item.days.size : 0
+          averagePerDay: item.days.size ? item.production / item.days.size : 0,
+          averagePerLoad: item.loads ? item.production / item.loads : 0
         }))
         .sort((a, b) => b.production - a.production || a.fleet.localeCompare(b.fleet, "pt-BR", { numeric: true }));
     }
@@ -7246,7 +7253,7 @@
 
       els.machineEquipmentWrap.innerHTML = `
         <table>
-          <thead><tr><th>Equipamento</th><th>Tipo</th><th>Frentes / bases</th><th>Produção total</th><th>Média/dia</th><th>Dias</th><th>Registros</th></tr></thead>
+          <thead><tr><th>Equipamento</th><th>Tipo</th><th>Frentes / bases</th><th>Produção total</th><th>Cargas</th><th>Média/carga</th><th>Média/dia</th><th>Dias</th><th>Registros</th></tr></thead>
           <tbody>
             ${items.map((item) => `
               <tr>
@@ -7254,6 +7261,8 @@
                 <td>${escapeHtml(item.machineType)}</td>
                 <td>${escapeHtml(item.frontsLabel || "-")}</td>
                 <td>${formatNumber(item.production)}</td>
+                <td>${item.loads ? formatNumber(item.loads) : "-"}</td>
+                <td>${item.averagePerLoad ? formatNumber(item.averagePerLoad) : "-"}</td>
                 <td>${formatNumber(item.averagePerDay)}</td>
                 <td>${item.dayCount}</td>
                 <td>${item.records}</td>
@@ -9907,6 +9916,199 @@
       `;
     }
 
+    function machineProductionDailyManagementRows(rows) {
+      const grouped = new Map();
+      rows.forEach((row) => {
+        const key = `${row.date}|${row.machineType}|${machineProductionBaseLabel(row)}`;
+        if (!grouped.has(key)) {
+          grouped.set(key, {
+            date: row.date,
+            machineType: row.machineType,
+            base: machineProductionBaseLabel(row),
+            production: 0,
+            loads: 0,
+            records: 0,
+            machines: new Set()
+          });
+        }
+        const item = grouped.get(key);
+        item.production += Number(row.production) || 0;
+        item.loads += Number(row.loads) || 0;
+        item.records += 1;
+        item.machines.add(`${row.machineType}|${normalizeKey(row.fleet)}`);
+      });
+      return [...grouped.values()]
+        .map((item) => ({
+          ...item,
+          machineCount: item.machines.size,
+          averagePerMachine: item.machines.size ? item.production / item.machines.size : 0,
+          averagePerLoad: item.loads ? item.production / item.loads : 0
+        }))
+        .sort((a, b) => a.date.localeCompare(b.date) || a.machineType.localeCompare(b.machineType) || a.base.localeCompare(b.base, "pt-BR", { numeric: true }));
+    }
+
+    function machineProductionManagementReportHtml(range) {
+      const rows = machineProductionRowsForDateRange(range);
+      if (!rows.length) {
+        return '<div class="empty-state">Sem produção detalhada de máquinas no período gerencial.</div>';
+      }
+
+      const summary = machineProductionSummary(rows);
+      const equipmentRows = machineEquipmentRows(rows);
+      const typeRows = groupedMachineProductionRows(rows, (row) => row.machineType);
+      const baseRows = groupedMachineProductionRows(rows, (row) => machineProductionBaseLabel(row));
+      const dailyRows = machineProductionDailyManagementRows(rows);
+      const consistencyRows = machineProductionConsistencyRows(rows);
+      const totalLoads = rows.reduce((sum, row) => sum + (Number(row.loads) || 0), 0);
+      const pending = consistencyRows.filter((row) => !machineProductionDifferenceAllowed(row));
+
+      return `
+        <div class="summary-grid">
+          <div class="summary-card">
+            <small>Total detalhado</small>
+            <strong>${formatNumber(summary.total)}</strong>
+            <span>${summary.records} lançamento${summary.records === 1 ? "" : "s"} · ${summary.days} dia${summary.days === 1 ? "" : "s"}</span>
+          </div>
+          <div class="summary-card">
+            <small>Equipamentos</small>
+            <strong>${summary.machines}</strong>
+            <span>${summary.machineDays} equipamento-dia</span>
+          </div>
+          <div class="summary-card">
+            <small>Cargas reconhecidas</small>
+            <strong>${formatNumber(totalLoads)}</strong>
+            <span>${totalLoads ? `${formatNumber(summary.total / totalLoads)} média por carga` : "Sem cargas no arquivo"}</span>
+          </div>
+          <div class="summary-card">
+            <small>Média máquina/dia</small>
+            <strong>${formatNumber(summary.averagePerMachineDay)}</strong>
+            <span>Colhedoras, transbordos e caminhões</span>
+          </div>
+          <div class="summary-card">
+            <small>Colhedoras</small>
+            <strong>${formatNumber(summary.harvesters)}</strong>
+            <span>${formatPercent(progressFor(summary.harvesters, summary.total))} do detalhado</span>
+          </div>
+          <div class="summary-card">
+            <small>Transbordos</small>
+            <strong>${formatNumber(summary.transshipments)}</strong>
+            <span>${formatPercent(progressFor(summary.transshipments, summary.total))} do detalhado</span>
+          </div>
+          <div class="summary-card">
+            <small>Caminhões próprios</small>
+            <strong>${formatNumber(summary.trucks)}</strong>
+            <span>${formatPercent(progressFor(summary.trucks, summary.total))} do detalhado</span>
+          </div>
+          <div class="summary-card">
+            <small>Caminhões terceiros</small>
+            <strong>${formatNumber(summary.thirdTrucks)}</strong>
+            <span>${formatPercent(progressFor(summary.thirdTrucks, summary.total))} do detalhado</span>
+          </div>
+        </div>
+
+        <div class="dashboard-grid" style="margin-top: 14px;">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Equipamento</th><th>Tipo</th><th>Base</th><th>Produção</th><th>Cargas</th><th>Média/carga</th><th>Média/dia</th><th>Dias</th></tr></thead>
+              <tbody>
+                ${equipmentRows.map((item) => `
+                  <tr>
+                    <td>${escapeHtml(item.fleet)}</td>
+                    <td>${escapeHtml(item.machineType)}</td>
+                    <td>${escapeHtml(item.frontsLabel || "-")}</td>
+                    <td>${formatNumber(item.production)}</td>
+                    <td>${item.loads ? formatNumber(item.loads) : "-"}</td>
+                    <td>${item.averagePerLoad ? formatNumber(item.averagePerLoad) : "-"}</td>
+                    <td>${formatNumber(item.averagePerDay)}</td>
+                    <td>${item.dayCount}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Dia</th><th>Tipo</th><th>Frente/base</th><th>Produção</th><th>Equip.</th><th>Cargas</th><th>Média/equip.</th><th>Média/carga</th></tr></thead>
+              <tbody>
+                ${dailyRows.map((item) => `
+                  <tr>
+                    <td>${formatDate(item.date)}</td>
+                    <td>${escapeHtml(item.machineType)}</td>
+                    <td>${escapeHtml(item.base)}</td>
+                    <td>${formatNumber(item.production)}</td>
+                    <td>${item.machineCount}</td>
+                    <td>${item.loads ? formatNumber(item.loads) : "-"}</td>
+                    <td>${formatNumber(item.averagePerMachine)}</td>
+                    <td>${item.averagePerLoad ? formatNumber(item.averagePerLoad) : "-"}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="dashboard-grid" style="margin-top: 14px;">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Tipo</th><th>Produção</th><th>% total</th><th>Equip.</th><th>Média máquina/dia</th><th>Dias</th></tr></thead>
+              <tbody>
+                ${typeRows.map((item) => `
+                  <tr>
+                    <td>${escapeHtml(item.label)}</td>
+                    <td>${formatNumber(item.production)}</td>
+                    <td>${formatPercent(progressFor(item.production, summary.total))}</td>
+                    <td>${item.machineCount}</td>
+                    <td>${formatNumber(item.averagePerMachineDay)}</td>
+                    <td>${item.dayCount}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Frente/base</th><th>Produção</th><th>% total</th><th>Equip.</th><th>Média máquina/dia</th><th>Dias</th></tr></thead>
+              <tbody>
+                ${baseRows.map((item) => `
+                  <tr>
+                    <td>${escapeHtml(item.label)}</td>
+                    <td>${formatNumber(item.production)}</td>
+                    <td>${formatPercent(progressFor(item.production, summary.total))}</td>
+                    <td>${item.machineCount}</td>
+                    <td>${formatNumber(item.averagePerMachineDay)}</td>
+                    <td>${item.dayCount}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="table-wrap" style="margin-top: 14px;">
+          <table>
+            <thead><tr><th>Data</th><th>Frente/base</th><th>Tipo</th><th>Lançamento diário</th><th>Máquinas</th><th>Diferença</th><th>Status</th></tr></thead>
+            <tbody>
+              ${consistencyRows.map((item) => {
+                const status = machineProductionDisplayStatus(item);
+                return `
+                  <tr>
+                    <td>${formatDate(item.date)}</td>
+                    <td>${escapeHtml(machineProductionBaseLabel(item))}</td>
+                    <td>${escapeHtml(item.machineType)}</td>
+                    <td>${machineProductionRequiresDailyMatch(item) ? formatNumber(item.target) : "-"}</td>
+                    <td>${formatNumber(item.production)}</td>
+                    <td>${machineProductionRequiresDailyMatch(item) ? formatNumber(item.difference) : "-"}</td>
+                    <td><span class="status-pill ${escapeHtml(status.tone)}">${escapeHtml(status.label)}</span></td>
+                  </tr>
+                `;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+        ${pending.length ? `<div class="empty-state">Atenção: ${pending.length} conferência${pending.length === 1 ? "" : "s"} precisa${pending.length === 1 ? "" : "m"} de revisão antes de enviar ao banco.</div>` : ""}
+      `;
+    }
+
     function renderDashboardMachineProduction(range) {
       if (els.dashboardMachineProductionWrap) {
         els.dashboardMachineProductionWrap.innerHTML = machineProductionDashboardHtml(range);
@@ -9915,7 +10117,7 @@
 
     function renderReportsMachineProduction(range) {
       if (els.reportsMachineProductionWrap) {
-        els.reportsMachineProductionWrap.innerHTML = machineProductionDashboardHtml(range);
+        els.reportsMachineProductionWrap.innerHTML = machineProductionManagementReportHtml(range);
       }
     }
 
@@ -13177,6 +13379,14 @@
       const reportReductionItems = reductionReportItems(reportReductionRows);
       const reportReductionSummary = reductionSummary(reportReductionItems);
       const equipmentAverageRows = equipmentAverageRowsFromRecords(selectedRecords);
+      const machineReportRows = machineProductionRowsForDateRange(range);
+      const machineReportSummary = machineProductionSummary(machineReportRows);
+      const machineReportEquipmentRows = machineEquipmentRows(machineReportRows);
+      const machineReportDailyRows = machineProductionDailyManagementRows(machineReportRows);
+      const machineReportTypeRows = groupedMachineProductionRows(machineReportRows, (row) => row.machineType);
+      const machineReportBaseRows = groupedMachineProductionRows(machineReportRows, (row) => machineProductionBaseLabel(row));
+      const machineReportConsistencyRows = machineProductionConsistencyRows(machineReportRows);
+      const machineReportLoads = machineReportRows.reduce((sum, row) => sum + (Number(row.loads) || 0), 0);
       const lines = [
         ["Relatório Gerencial - Produção Diária da Cambuí"],
         ["Período", `${formatDate(range.start)} a ${formatDate(range.end)}`],
@@ -13199,6 +13409,86 @@
         ["Transporte total", formatNumber(baseSummary.transportTotal), formatPercent(baseSummary.transportPercent)],
         ["KM médio próprio", formatKm(baseSummary.ownTransportKmAvg), `${baseSummary.ownTransportKmRecords} dia${baseSummary.ownTransportKmRecords === 1 ? "" : "s"} com KM lançado`],
         ["KM médio terceiro", formatKm(baseSummary.thirdTransportKmAvg), `${baseSummary.thirdTransportKmRecords} dia${baseSummary.thirdTransportKmRecords === 1 ? "" : "s"} com KM lançado`],
+        [],
+        ["Produção detalhada das máquinas"],
+        ["Total detalhado", formatNumber(machineReportSummary.total)],
+        ["Equipamentos", machineReportSummary.machines],
+        ["Dias com produção", machineReportSummary.days],
+        ["Registros", machineReportSummary.records],
+        ["Média máquina/dia", formatNumber(machineReportSummary.averagePerMachineDay)],
+        ["Cargas reconhecidas", formatNumber(machineReportLoads)],
+        ["Média por carga", machineReportLoads ? formatNumber(machineReportSummary.total / machineReportLoads) : ""],
+        ["Colhedoras", formatNumber(machineReportSummary.harvesters)],
+        ["Transbordos", formatNumber(machineReportSummary.transshipments)],
+        ["Caminhões próprios", formatNumber(machineReportSummary.trucks)],
+        ["Caminhões terceiros", formatNumber(machineReportSummary.thirdTrucks)],
+        [],
+        ["Máquinas por equipamento"],
+        ["Equipamento", "Tipo", "Frentes / bases", "Produção", "Cargas", "Média/carga", "Média/dia", "Dias", "Registros"],
+        ...machineReportEquipmentRows.map((row) => [
+          row.fleet,
+          row.machineType,
+          row.frontsLabel,
+          formatNumber(row.production),
+          row.loads ? formatNumber(row.loads) : "",
+          row.averagePerLoad ? formatNumber(row.averagePerLoad) : "",
+          formatNumber(row.averagePerDay),
+          row.dayCount,
+          row.records
+        ]),
+        [],
+        ["Máquinas por dia"],
+        ["Data", "Tipo", "Frente/base", "Produção", "Equipamentos", "Cargas", "Média/equip.", "Média/carga", "Registros"],
+        ...machineReportDailyRows.map((row) => [
+          formatDate(row.date),
+          row.machineType,
+          row.base,
+          formatNumber(row.production),
+          row.machineCount,
+          row.loads ? formatNumber(row.loads) : "",
+          formatNumber(row.averagePerMachine),
+          row.averagePerLoad ? formatNumber(row.averagePerLoad) : "",
+          row.records
+        ]),
+        [],
+        ["Máquinas por tipo"],
+        ["Tipo", "Produção", "% total", "Equipamentos", "Média máquina/dia", "Dias", "Registros"],
+        ...machineReportTypeRows.map((row) => [
+          row.label,
+          formatNumber(row.production),
+          formatPercent(progressFor(row.production, machineReportSummary.total)),
+          row.machineCount,
+          formatNumber(row.averagePerMachineDay),
+          row.dayCount,
+          row.records
+        ]),
+        [],
+        ["Máquinas por frente/base"],
+        ["Frente/base", "Produção", "% total", "Equipamentos", "Média máquina/dia", "Dias", "Registros"],
+        ...machineReportBaseRows.map((row) => [
+          row.label,
+          formatNumber(row.production),
+          formatPercent(progressFor(row.production, machineReportSummary.total)),
+          row.machineCount,
+          formatNumber(row.averagePerMachineDay),
+          row.dayCount,
+          row.records
+        ]),
+        [],
+        ["Conferência das máquinas"],
+        ["Data", "Frente/base", "Tipo", "Lançamento diário", "Máquinas", "Diferença", "Status"],
+        ...machineReportConsistencyRows.map((row) => {
+          const status = machineProductionDisplayStatus(row);
+          return [
+            formatDate(row.date),
+            machineProductionBaseLabel(row),
+            row.machineType,
+            machineProductionRequiresDailyMatch(row) ? formatNumber(row.target) : "",
+            formatNumber(row.production),
+            machineProductionRequiresDailyMatch(row) ? formatNumber(row.difference) : "",
+            status.label
+          ];
+        }),
         [],
         ["Média por equipamentos"],
         ["Operação", "Frente / origem", "Produção", "Qtd. equipamentos", "Média/equip.", "Dias", "Registros"],
@@ -13556,17 +13846,16 @@
     }
 
     function pdfTable(headers, rows, options = {}) {
-      const limitedRows = options.limit ? rows.slice(0, options.limit) : rows;
+      const tableRows = Array.isArray(rows) ? rows : [];
       return `
         <table class="pdf-table">
           <thead>
             <tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>
           </thead>
           <tbody>
-            ${limitedRows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("")}
+            ${tableRows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("")}
           </tbody>
         </table>
-        ${options.limit && rows.length > options.limit ? `<div class="pdf-note">Exibindo ${options.limit} de ${rows.length} linhas neste PDF. O CSV mantém todas.</div>` : ""}
       `;
     }
 
@@ -13618,6 +13907,12 @@
       const reportReductionRows = reductionRowsForRange(range);
       const reportReductionItems = reductionReportItems(reportReductionRows);
       const reportReductionSummary = reductionSummary(reportReductionItems);
+      const machineReportRows = machineProductionRowsForDateRange(range);
+      const machineReportSummary = machineProductionSummary(machineReportRows);
+      const machineReportEquipmentRows = machineEquipmentRows(machineReportRows);
+      const machineReportDailyRows = machineProductionDailyManagementRows(machineReportRows);
+      const machineReportTypeRows = groupedMachineProductionRows(machineReportRows, (row) => row.machineType);
+      const machineReportLoads = machineReportRows.reduce((sum, row) => sum + (Number(row.loads) || 0), 0);
       const trendStats = reportEvolutionStats(dailyItems);
       const externalCane = baseSummary.florestaCane + baseSummary.valeCane;
       const filteredVolume = rowProductionTotal(rows);
@@ -13659,6 +13954,9 @@
         ["Média palha", formatMinutes(patioSummary.avgPalha), `${patioSummary.trips} viagem${patioSummary.trips === 1 ? "" : "s"}`, patioSummary.palhaAlerts ? "warn" : ""],
         ["Paradas usina", formatHours(reportStoppageSummary.totalHours), `${reportStoppageSummary.records} lançamento${reportStoppageSummary.records === 1 ? "" : "s"}`, reportStoppageSummary.totalHours ? "warn" : ""],
         ["Redução moagem", formatNumber(reportReductionSummary.reductionTons), `${reportReductionSummary.days} lançamento${reportReductionSummary.days === 1 ? "" : "s"} · ${formatNumberFixed(reportReductionSummary.reducedPerHour)} t/h`, reportReductionSummary.reductionTons ? "warn" : ""],
+        ["Máquinas detalhadas", formatNumber(machineReportSummary.total), `${machineReportSummary.machines} equipamento${machineReportSummary.machines === 1 ? "" : "s"}`, ""],
+        ["Cargas máquinas", formatNumber(machineReportLoads), machineReportLoads ? `${formatNumber(machineReportSummary.total / machineReportLoads)} média/carga` : "Sem cargas", ""],
+        ["Média maq./dia", formatNumber(machineReportSummary.averagePerMachineDay), `${machineReportSummary.machineDays} equipamento-dia`, ""],
         ["Dias efetivos", formatNumber(reportStoppageEffective.effectiveDays), `Parada ${formatNumber(reportStoppageEffective.stoppedDays)} dia`, reportStoppageEffective.stoppedDays ? "warn" : ""],
         ["Moagem efetiva/dia", formatNumber(reportStoppageEffective.effectiveAveragePerDay), `Desconto ${formatNumber(reportStoppageEffective.lossAveragePerDay)} t/dia`, reportStoppageEffective.lossAveragePerDay ? "warn" : ""],
         ["Dias exibidos", `${filteredRecords.length}`, `${dailyItems.length} no gráfico`, ""]
@@ -13744,6 +14042,34 @@
         formatNumber(item.target),
         formatPercent(item.targetPercent),
         String(item.records)
+      ]);
+      const machinePdfSummaryRows = [
+        ["Total detalhado", formatNumber(machineReportSummary.total), `${machineReportSummary.records} lançamento${machineReportSummary.records === 1 ? "" : "s"}`],
+        ["Equipamentos", String(machineReportSummary.machines), `${machineReportSummary.machineDays} equipamento-dia`],
+        ["Cargas", formatNumber(machineReportLoads), machineReportLoads ? `${formatNumber(machineReportSummary.total / machineReportLoads)} média/carga` : "Sem cargas reconhecidas"],
+        ["Colhedoras", formatNumber(machineReportSummary.harvesters), formatPercent(progressFor(machineReportSummary.harvesters, machineReportSummary.total))],
+        ["Transbordos", formatNumber(machineReportSummary.transshipments), formatPercent(progressFor(machineReportSummary.transshipments, machineReportSummary.total))],
+        ["Caminhões", formatNumber(machineReportSummary.trucks + machineReportSummary.thirdTrucks), "Próprios e terceiros"]
+      ];
+      const machinePdfEquipmentRows = machineReportEquipmentRows.slice(0, 18).map((item) => [
+        item.fleet,
+        item.machineType,
+        item.frontsLabel || "-",
+        formatNumber(item.production),
+        item.loads ? formatNumber(item.loads) : "-",
+        item.averagePerLoad ? formatNumber(item.averagePerLoad) : "-",
+        formatNumber(item.averagePerDay),
+        String(item.dayCount)
+      ]);
+      const machinePdfDailyRows = machineReportDailyRows.slice(0, 24).map((item) => [
+        formatDate(item.date),
+        item.machineType,
+        item.base,
+        formatNumber(item.production),
+        String(item.machineCount),
+        item.loads ? formatNumber(item.loads) : "-",
+        formatNumber(item.averagePerMachine),
+        item.averagePerLoad ? formatNumber(item.averagePerLoad) : "-"
       ]);
       const patioSummaryRows = [
         ["Viagens", String(patioSummary.trips), `${patioSummary.trucks} caminhão${patioSummary.trucks === 1 ? "" : "ões"} · ${patioSummary.fronts} frente${patioSummary.fronts === 1 ? "" : "s"}`],
@@ -13987,6 +14313,14 @@
               <div class="pdf-section">
                 <div class="pdf-title"><h2>Transporte sobre moagem</h2><span class="muted">Próprio e terceiro</span></div>
                 ${pdfHorizontalBars(transportItems, { total: baseSummary.total })}
+              </div>
+              <div class="pdf-section full soft">
+                <div class="pdf-title"><h2>Produção detalhada das máquinas</h2><span class="muted">Equipamentos, cargas, médias e evolução diária</span></div>
+                ${machineReportRows.length ? `
+                  ${pdfTable(["Indicador", "Valor", "Detalhe"], machinePdfSummaryRows)}
+                  ${pdfTable(["Equipamento", "Tipo", "Base", "Produção", "Cargas", "Média/carga", "Média/dia", "Dias"], machinePdfEquipmentRows)}
+                  ${pdfTable(["Data", "Tipo", "Frente/base", "Produção", "Equip.", "Cargas", "Média/equip.", "Média/carga"], machinePdfDailyRows)}
+                ` : '<div class="pdf-empty">Sem produção detalhada das máquinas no período do relatório.</div>'}
               </div>
               <div class="pdf-section full soft">
                 <div class="pdf-title"><h2>Tempos de palha</h2><span class="muted">Base do tempo de pátio no período</span></div>
