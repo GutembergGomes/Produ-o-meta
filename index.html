@@ -2484,9 +2484,26 @@
             </select>
           </div>
         </div>
+        <label class="check-control" for="machineImportMultiDay">
+          <input id="machineImportMultiDay" type="checkbox">
+          <span>Reconhecer vários dias do arquivo antes de salvar</span>
+        </label>
         <div class="import-dialog-actions">
           <button class="btn-secondary" id="cancelMachineImportBtn" type="button">Cancelar</button>
           <button class="btn-primary" id="chooseMachineImportFileBtn" type="button">Escolher foto ou PDF</button>
+        </div>
+      </dialog>
+
+      <dialog class="import-dialog" id="machineImportPreviewDialog">
+        <div class="panel-head">
+          <h2>Prévia da importação</h2>
+          <button class="icon-button" id="closeMachineImportPreviewBtn" type="button" title="Fechar">×</button>
+        </div>
+        <div class="filter-note" id="machineImportPreviewSummary">Confira os dias e rendimentos antes de salvar.</div>
+        <div class="table-wrap" id="machineImportPreviewWrap"></div>
+        <div class="import-dialog-actions">
+          <button class="btn-secondary" id="cancelMachineImportPreviewBtn" type="button">Cancelar</button>
+          <button class="btn-primary" id="confirmMachineImportPreviewBtn" type="button">Confirmar e salvar</button>
         </div>
       </dialog>
 
@@ -3156,6 +3173,10 @@
       machineImportDate: document.querySelector("#machineImportDate"),
       machineImportFront: document.querySelector("#machineImportFront"),
       machineImportType: document.querySelector("#machineImportType"),
+      machineImportMultiDay: document.querySelector("#machineImportMultiDay"),
+      machineImportPreviewDialog: document.querySelector("#machineImportPreviewDialog"),
+      machineImportPreviewSummary: document.querySelector("#machineImportPreviewSummary"),
+      machineImportPreviewWrap: document.querySelector("#machineImportPreviewWrap"),
       machineConsistencyWrap: document.querySelector("#machineConsistencyWrap"),
       machineEquipmentWrap: document.querySelector("#machineEquipmentWrap"),
       machineTypeWrap: document.querySelector("#machineTypeWrap"),
@@ -3288,6 +3309,7 @@
     let patioImportWarnings = [];
     let patioSeparatedImportSession = null;
     let pendingMachineImportContext = null;
+    let pendingMachineImportPreview = null;
     let entries = cloneEntries(defaultEntries);
     let activeFront = null;
     const firebaseState = {
@@ -11671,6 +11693,37 @@
       }, []);
     }
 
+    function parseMachineDailyReport(text) {
+      const cleaned = stripHtml(text);
+      const lines = cleaned
+        .split(/\r?\n/)
+        .map((line) => line.replace(/\s+/g, " ").trim())
+        .filter(Boolean);
+
+      const hasDailyHeader = lines.some((line) => {
+        const key = normalizeHeader(line);
+        return key.includes("codigo") && key.includes("data") && key.includes("toneladas");
+      });
+      if (!hasDailyHeader) return [];
+
+      return lines.reduce((rows, line) => {
+        if (/^total\b|^c[oó]digo\b/i.test(line)) return rows;
+        const match = line.match(/^(\d{3,})\s+(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})\s+(\d+)\s+(\d[\d.,]*)\s+(\d[\d.,]*)/);
+        if (!match) return rows;
+        rows.push({
+          codigo: normalizeFleetCode(match[1]),
+          frota: normalizeFleetCode(match[1]),
+          data: match[2],
+          cargas: match[3],
+          toneladas: normalizeReportNumber(match[4]),
+          producao: normalizeReportNumber(match[4]),
+          media: normalizeReportNumber(match[5]),
+          observacao: `Cargas: ${match[3]} · Média: ${normalizeReportNumber(match[5])}`
+        });
+        return rows;
+      }, []);
+    }
+
     function normalizeReportNumber(value) {
       const text = String(value || "").trim();
       if (/^\d+\.\d{3}$/.test(text)) return text.replace(".", ",");
@@ -11740,10 +11793,13 @@
       const text = data.text || words.map((word) => word.text).join(" ");
       const looksLikeReport = /(colhedora|caminh[oõ]es?|transbordos?)\s+e\s+dias\s+trabalhados/i.test(text)
         || /toneladas\s+(colhidas|transp(?:ortadas?)?\.?)/i.test(text)
+        || /c[oó]digo\s+data\s+n[ºo]?\s*cargas\s+toneladas/i.test(text)
         || words.some((word) => normalizeHeader(word.text).includes("toneladas"));
       if (!looksLikeReport) return [];
 
       const tonX = reportColumnX(words, ["toneladas", "colhidas", "transp", "transportadas"]);
+      const loadsX = reportColumnX(words, ["cargas"]);
+      const averageX = reportColumnX(words, ["média", "media"]);
       const lines = groupOcrWordsIntoLines(words);
 
       return lines.reduce((rows, line) => {
@@ -11753,6 +11809,7 @@
         if (!codeWord) return rows;
 
         const code = normalizeFleetCode(codeWord.text);
+        const dateWord = line.words.find((word) => /\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}/.test(word.text));
         const numericWords = line.words
           .filter((word) => word.center.x > codeWord.center.x + 10)
           .map((word) => ({ ...word, normalized: normalizeReportNumber(word.text) }))
@@ -11766,6 +11823,12 @@
             return Math.abs(word.center.x - tonX) < Math.abs(best.center.x - tonX) ? word : best;
           }, numericWords[0]);
         }
+        const loadsWord = loadsX === null ? null : numericWords.reduce((best, word) => {
+          return !best || Math.abs(word.center.x - loadsX) < Math.abs(best.center.x - loadsX) ? word : best;
+        }, null);
+        const averageWord = averageX === null ? null : numericWords.reduce((best, word) => {
+          return !best || Math.abs(word.center.x - averageX) < Math.abs(best.center.x - averageX) ? word : best;
+        }, null);
 
         const modelWords = line.words
           .filter((word) => word.center.x > codeWord.center.x && word.center.x < productionWord.center.x - 8)
@@ -11777,6 +11840,9 @@
         rows.push({
           codigo: code,
           frota: code,
+          data: dateWord ? dateWord.text : "",
+          cargas: loadsWord ? loadsWord.normalized : "",
+          media: averageWord ? averageWord.normalized : "",
           modelo: modelWords,
           toneladas_colhidas: productionWord.normalized,
           producao: productionWord.normalized,
@@ -11820,6 +11886,8 @@
       if (looksJson) {
         return rowsFromJson(JSON.parse(text));
       }
+      const dailyMachineRows = parseMachineDailyReport(text);
+      if (dailyMachineRows.length) return dailyMachineRows;
       const harvesterRows = parseHarvesterReport(text);
       if (harvesterRows.length) return harvesterRows;
       return parseDelimited(stripHtml(text));
@@ -12036,6 +12104,7 @@
         ? defaultMachineProductionFrontForType(els.machineImportType.value)
         : els.machineFront.value || ownHarvestFronts[0];
       els.machineImportFront.disabled = isMachineTruckType(els.machineImportType.value);
+      els.machineImportMultiDay.checked = false;
       pendingMachineImportContext = null;
       els.machineImportDialog.showModal();
     }
@@ -12049,15 +12118,16 @@
     function chooseMachineImportFile() {
       const date = normalizeRecordDate(els.machineImportDate.value);
       const machineType = normalizeMachineProductionType(els.machineImportType.value);
+      const multiDay = Boolean(els.machineImportMultiDay && els.machineImportMultiDay.checked);
       const front = isMachineTruckType(machineType)
         ? defaultMachineProductionFrontForType(machineType)
         : frontOptions.find((item) => item === els.machineImportFront.value) || "";
-      if (!date || !front || !machineType) {
-        showToast("Informe o dia, a frente e o tipo do arquivo.");
+      if ((!multiDay && !date) || !front || !machineType) {
+        showToast(multiDay ? "Informe a frente e o tipo do arquivo." : "Informe o dia, a frente e o tipo do arquivo.");
         return;
       }
-      pendingMachineImportContext = { date, front, machineType };
-      els.machineDate.value = date;
+      pendingMachineImportContext = { date, front, machineType, multiDay };
+      if (date) els.machineDate.value = date;
       els.machineFront.value = front;
       els.machineType.value = machineType;
       els.machineImportDialog.close();
@@ -12109,133 +12179,250 @@
       return { rows: extractRowsFromText(text, name), text };
     }
 
+    function machineProductionDateFromImportRow(row, fallback = "") {
+      return normalizeRecordDate(valueFromRow(row, [
+        "data",
+        "date",
+        "dia",
+        "dia produção",
+        "dia producao",
+        "production date"
+      ]) || fallback);
+    }
+
+    function machineProductionImportPreviewFromPayload(payload, importContext) {
+      const machineType = normalizeMachineProductionType(importContext.machineType);
+      const front = isMachineTruckType(machineType)
+        ? defaultMachineProductionFrontForType(machineType)
+        : importContext.front;
+      const fallbackDate = normalizeRecordDate(importContext.date) || todayInputValue();
+      const hasRowDates = (payload.rows || []).some((row) => machineProductionDateFromImportRow(row, ""));
+      const useRowDates = Boolean(importContext.multiDay || hasRowDates);
+      const rows = [];
+
+      (payload.rows || []).forEach((row) => {
+        const fleet = String(valueFromRow(row, [
+          "codigo",
+          "código",
+          "cod",
+          "frota",
+          "máquina",
+          "maquina",
+          "equipamento",
+          "caminhão",
+          "caminhao"
+        ]) || "").trim();
+        const date = useRowDates
+          ? machineProductionDateFromImportRow(row, "")
+          : fallbackDate;
+        const production = parseNumber(valueFromRow(row, [
+          "produção",
+          "producao",
+          "toneladas colhidas",
+          "toneladas_colhidas",
+          "toneladas transp",
+          "toneladas transportadas",
+          "toneladas",
+          "total"
+        ]));
+        const loads = parseNumber(valueFromRow(row, [
+          "nº cargas",
+          "n cargas",
+          "n_cargas",
+          "cargas",
+          "numero cargas",
+          "número cargas"
+        ]));
+        const averageYield = parseNumber(valueFromRow(row, [
+          "média",
+          "media",
+          "média t",
+          "media t",
+          "média (t)",
+          "media (t)"
+        ])) || (loads ? production / loads : 0);
+        const note = String(valueFromRow(row, ["modelo", "observação", "observacao", "obs", "note"]) || "").trim();
+
+        if (!fleet || !date || !production || normalizeKey(fleet).startsWith("total")) return;
+        rows.push({
+          id: makeId(),
+          date,
+          front,
+          machineType,
+          fleet: normalizeFleetCode(fleet),
+          production,
+          loads,
+          averageYield,
+          note: note || (loads || averageYield ? `Cargas: ${formatNumber(loads)} · Média: ${formatNumber(averageYield)}` : ""),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      });
+
+      const records = rows
+        .map((row) => normalizeMachineProductionRecord(row))
+        .filter(Boolean)
+        .sort((a, b) => a.date.localeCompare(b.date) || a.fleet.localeCompare(b.fleet, "pt-BR", { numeric: true }));
+      const dates = new Set(records.map((row) => row.date));
+      const fleets = new Set(records.map((row) => normalizeKey(row.fleet)));
+
+      return {
+        context: { ...importContext, front, machineType, multiDay: useRowDates },
+        rows,
+        records,
+        days: dates.size,
+        fleets: fleets.size,
+        totalProduction: records.reduce((sum, row) => sum + (Number(row.production) || 0), 0)
+      };
+    }
+
+    function closeMachineImportPreviewDialog() {
+      pendingMachineImportPreview = null;
+      if (els.machineImportPreviewDialog.open) els.machineImportPreviewDialog.close();
+    }
+
+    function renderMachineImportPreview(preview) {
+      pendingMachineImportPreview = preview;
+      if (!preview.records.length) {
+        showToast("Nenhum dia válido foi reconhecido no arquivo.");
+        return;
+      }
+
+      els.machineImportPreviewSummary.textContent = `${preview.records.length} linha${preview.records.length === 1 ? "" : "s"} reconhecida${preview.records.length === 1 ? "" : "s"} · ${preview.days} dia${preview.days === 1 ? "" : "s"} · ${preview.fleets} equipamento${preview.fleets === 1 ? "" : "s"} · Total ${formatNumber(preview.totalProduction)}.`;
+      els.machineImportPreviewWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Frente / base</th>
+              <th>Tipo</th>
+              <th>Equipamento</th>
+              <th>Cargas</th>
+              <th>Produção</th>
+              <th>Média (t)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${preview.rows.map((row) => `
+              <tr>
+                <td>${formatDate(row.date)}</td>
+                <td>${escapeHtml(machineProductionBaseLabel(row))}</td>
+                <td>${escapeHtml(row.machineType)}</td>
+                <td>${escapeHtml(row.fleet)}</td>
+                <td>${row.loads ? formatNumber(row.loads) : "-"}</td>
+                <td>${formatNumber(row.production)}</td>
+                <td>${row.averageYield ? formatNumber(row.averageYield) : "-"}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+      els.machineImportPreviewDialog.showModal();
+    }
+
+    async function confirmMachineImportPreview() {
+      const preview = pendingMachineImportPreview;
+      if (!preview || !preview.records.length) {
+        showToast("Nenhuma prévia disponível para salvar.");
+        return;
+      }
+
+      let added = 0;
+      let updated = 0;
+      const affectedKeys = new Set();
+      const nextRecords = [...machineProductionRecords];
+      preview.records.forEach((record) => {
+        affectedKeys.add(machineProductionGroupKey(record));
+        const existingIndex = nextRecords.findIndex((item) => (
+          item.date === record.date
+          && item.front === record.front
+          && item.machineType === record.machineType
+          && sameText(item.fleet, record.fleet)
+        ));
+        const existing = existingIndex >= 0 ? nextRecords[existingIndex] : null;
+        const nextRecord = {
+          ...record,
+          id: existing ? existing.id : record.id,
+          createdAt: existing ? existing.createdAt : record.createdAt,
+          updatedAt: new Date().toISOString()
+        };
+        if (existingIndex >= 0) {
+          nextRecords[existingIndex] = nextRecord;
+          updated += 1;
+        } else {
+          nextRecords.push(nextRecord);
+          added += 1;
+        }
+      });
+
+      let cleanNextRecords = getCleanMachineProductionRecords(nextRecords);
+      let affectedGroups = machineProductionConsistencyRows(cleanNextRecords)
+        .filter((group) => affectedKeys.has(group.key));
+      const invalidAffected = affectedGroups
+        .filter((group) => machineProductionRequiresDailyMatch(group))
+        .filter((group) => !machineProductionDifferenceAllowed(group));
+      if (invalidAffected.length) {
+        showToast(`Arquivo não salvo: ${machineProductionMismatchMessage(invalidAffected[0])}`);
+        return;
+      }
+      const acceptableDifferences = affectedGroups
+        .filter((group) => machineProductionRequiresDailyMatch(group))
+        .filter((group) => Math.abs(group.difference) > MACHINE_PRODUCTION_TOLERANCE && !machineProductionStoredDifferenceAccepted(group));
+      if (acceptableDifferences.length) {
+        cleanNextRecords = applyMachineProductionDifferenceAcceptance(cleanNextRecords, acceptableDifferences);
+        affectedGroups = machineProductionConsistencyRows(cleanNextRecords).filter((group) => affectedKeys.has(group.key));
+      }
+
+      machineProductionRecords = cleanNextRecords;
+      persistMachineProductionRecords();
+      const firstRecord = preview.records[0];
+      els.machineDate.value = firstRecord.date;
+      setMachineProductionEntryDate(firstRecord.date);
+      els.machineType.value = firstRecord.machineType;
+      els.machineFront.value = firstRecord.front;
+      setMachineProductionRange(firstRecord.date, preview.records[preview.records.length - 1].date);
+      renderMachineProductions();
+      renderMachineProductionDashboardPage();
+      addAuditEntry("importacao", `Produção importada para ${preview.context.machineType}: ${added} nova${added === 1 ? "" : "s"}, ${updated} atualizada${updated === 1 ? "" : "s"}, ${preview.days} dia${preview.days === 1 ? "" : "s"}.`);
+      closeMachineImportPreviewDialog();
+
+      const rowsForSync = prepareMachineProductionRowsForSync(machineProductionRecords);
+      const invalid = invalidMachineProductionGroups(rowsForSync);
+      if (invalid.length) {
+        showToast(`Arquivo salvo localmente. Corrija antes de enviar ao banco: ${machineProductionMismatchMessage(invalid[0])}`);
+        return;
+      }
+      machineProductionRecords = rowsForSync;
+      persistMachineProductionRecords();
+      renderMachineProductions();
+
+      const syncState = await syncOrQueue("machine-production-sync", { source: "machine-file-import-preview", days: preview.days, machineType: preview.context.machineType }, () => syncMachineProductionRecordsToFirebase({
+        silent: true,
+        pendingMessage: "Enviando produção importada ao banco...",
+        successStatus: "Produção importada e sincronizada.",
+        errorStatus: "Produção importada localmente, mas a sincronização falhou."
+      }));
+      const summary = `${added} nova${added === 1 ? "" : "s"} e ${updated} atualizada${updated === 1 ? "" : "s"}.`;
+      showToast(syncState === "synced" ? `${summary} Banco atualizado.` : summary);
+    }
+
     async function importMachineProductionFile(file) {
       if (!file) return;
       try {
-        showToast("Lendo foto ou PDF da produção das máquinas...");
+        showToast("Lendo arquivo da produção das máquinas...");
         const payload = await machineProductionImportPayload(file);
         const importContext = pendingMachineImportContext || {
           date: els.machineDate.value || todayInputValue(),
           machineType: els.machineType.value || "Colhedora",
+          multiDay: false,
           front: isMachineTruckType(els.machineType.value)
             ? defaultMachineProductionFrontForType(els.machineType.value)
             : els.machineFront.value || ownHarvestFronts[0]
         };
-        const machineType = normalizeMachineProductionType(importContext.machineType);
-        const front = isMachineTruckType(machineType)
-          ? defaultMachineProductionFrontForType(machineType)
-          : importContext.front;
-        const reportDate = normalizeRecordDate(importContext.date) || todayInputValue();
-        let added = 0;
-        let updated = 0;
-        const nextRecords = [...machineProductionRecords];
-
-        (payload.rows || []).forEach((row) => {
-          const fleet = String(valueFromRow(row, [
-            "codigo",
-            "código",
-            "cod",
-            "frota",
-            "máquina",
-            "maquina",
-            "equipamento",
-            "caminhão",
-            "caminhao"
-          ]) || "").trim();
-          const production = parseNumber(valueFromRow(row, [
-            "produção",
-            "producao",
-            "toneladas colhidas",
-            "toneladas_colhidas",
-            "toneladas transp",
-            "toneladas transportadas",
-            "toneladas",
-            "total"
-          ]));
-          const note = String(valueFromRow(row, ["modelo", "observação", "observacao", "obs", "note"]) || "").trim();
-          if (!fleet || !production || normalizeKey(fleet).startsWith("total")) return;
-
-          const existingIndex = nextRecords.findIndex((item) => (
-            item.date === reportDate
-            && item.front === front
-            && item.machineType === machineType
-            && sameText(item.fleet, fleet)
-          ));
-          const existing = existingIndex >= 0 ? nextRecords[existingIndex] : null;
-          const record = normalizeMachineProductionRecord({
-            id: existing ? existing.id : makeId(),
-            date: reportDate,
-            front,
-            machineType,
-            fleet,
-            production,
-            note,
-            createdAt: existing ? existing.createdAt : new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          });
-          if (!record) return;
-
-          if (existingIndex >= 0) {
-            nextRecords[existingIndex] = record;
-            updated += 1;
-          } else {
-            nextRecords.push(record);
-            added += 1;
-          }
-        });
-
-        if (!added && !updated) {
-          showToast("Nenhuma máquina válida foi encontrada no arquivo.");
-          return;
-        }
-
-        let cleanNextRecords = getCleanMachineProductionRecords(nextRecords);
-        let importedGroup = machineProductionConsistencyRows(cleanNextRecords)
-          .find((item) => (
-            item.date === reportDate
-            && item.front === front
-            && item.machineType === machineType
-          ));
-        if (!importedGroup || (machineProductionRequiresDailyMatch(importedGroup) && !machineProductionDifferenceAllowed(importedGroup))) {
-          showToast(`Arquivo não salvo: ${machineProductionMismatchMessage(importedGroup)}`);
-          return;
-        }
-        if (machineProductionRequiresDailyMatch(importedGroup) && Math.abs(importedGroup.difference) > MACHINE_PRODUCTION_TOLERANCE && !machineProductionStoredDifferenceAccepted(importedGroup)) {
-          cleanNextRecords = applyMachineProductionDifferenceAcceptance(cleanNextRecords, importedGroup);
-          importedGroup = machineProductionConsistencyRows(cleanNextRecords)
-            .find((item) => item.date === reportDate && item.front === front && item.machineType === machineType) || importedGroup;
-        }
-
-        machineProductionRecords = cleanNextRecords;
-        persistMachineProductionRecords();
-        els.machineDate.value = reportDate;
-        setMachineProductionEntryDate(reportDate);
-        els.machineType.value = machineType;
-        els.machineFront.value = front;
-        setMachineProductionRange(reportDate, reportDate);
-        renderMachineProductions();
-        addAuditEntry("importacao", `Produção de ${machineType.toLowerCase()} importada para ${front} em ${formatDate(reportDate)}: ${added} nova${added === 1 ? "" : "s"}, ${updated} atualizada${updated === 1 ? "" : "s"}.`);
-
-        const rowsForSync = prepareMachineProductionRowsForSync(machineProductionRecords);
-        const invalid = invalidMachineProductionGroups(rowsForSync);
-        if (invalid.length) {
-          showToast(`Arquivo salvo localmente. Corrija antes de enviar ao banco: ${machineProductionMismatchMessage(invalid[0])}`);
-          return;
-        }
-        machineProductionRecords = rowsForSync;
-        persistMachineProductionRecords();
-        renderMachineProductions();
-
-        const syncState = await syncOrQueue("machine-production-sync", { source: "machine-file-import", date: reportDate, front, machineType }, () => syncMachineProductionRecordsToFirebase({
-          silent: true,
-          pendingMessage: "Enviando produção importada ao banco...",
-          successStatus: "Produção importada e sincronizada.",
-          errorStatus: "Produção importada localmente, mas a sincronização falhou."
-        }));
-        const summary = `${added} nova${added === 1 ? "" : "s"} e ${updated} atualizada${updated === 1 ? "" : "s"}.`;
-        showToast(syncState === "synced" ? `${summary} Banco atualizado.` : summary);
+        const preview = machineProductionImportPreviewFromPayload(payload, importContext);
+        renderMachineImportPreview(preview);
       } catch {
-        showToast("Não foi possível ler a foto ou o PDF da produção.");
+        showToast("Não foi possível ler a foto, PDF ou arquivo da produção.");
       } finally {
         els.machineImportFile.value = "";
         pendingMachineImportContext = null;
@@ -14803,6 +14990,9 @@
     document.querySelector("#closeMachineImportDialogBtn").addEventListener("click", closeMachineImportDialog);
     document.querySelector("#cancelMachineImportBtn").addEventListener("click", closeMachineImportDialog);
     document.querySelector("#chooseMachineImportFileBtn").addEventListener("click", chooseMachineImportFile);
+    document.querySelector("#closeMachineImportPreviewBtn").addEventListener("click", closeMachineImportPreviewDialog);
+    document.querySelector("#cancelMachineImportPreviewBtn").addEventListener("click", closeMachineImportPreviewDialog);
+    document.querySelector("#confirmMachineImportPreviewBtn").addEventListener("click", confirmMachineImportPreview);
     els.machineImportType.addEventListener("change", () => {
       const machineType = normalizeMachineProductionType(els.machineImportType.value);
       els.machineImportFront.disabled = isMachineTruckType(machineType);
