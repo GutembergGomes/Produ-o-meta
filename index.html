@@ -520,6 +520,82 @@
       line-height: 1.35;
     }
 
+    .field-mode-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
+      gap: 12px;
+    }
+
+    .field-mode-card {
+      min-height: 124px;
+      display: grid;
+      gap: 8px;
+      align-content: center;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: calc(var(--radius) + 4px);
+      background: var(--surface-3);
+      color: var(--ink);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .field-mode-card:hover {
+      border-color: var(--green);
+      background: var(--card-hover-bg);
+    }
+
+    .field-mode-card strong {
+      font-size: clamp(1.05rem, 2vw, 1.35rem);
+    }
+
+    .field-mode-card span {
+      color: var(--muted);
+      font-weight: 780;
+      line-height: 1.35;
+    }
+
+    .heatmap-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+      gap: 8px;
+    }
+
+    .heatmap-cell {
+      display: grid;
+      gap: 4px;
+      min-height: 74px;
+      padding: 9px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-3);
+    }
+
+    .heatmap-cell.good {
+      border-color: var(--green);
+      background: var(--good-bg);
+    }
+
+    .heatmap-cell.warn {
+      border-color: var(--blue);
+    }
+
+    .heatmap-cell.alert {
+      border-color: var(--red);
+      background: var(--alert-bg);
+    }
+
+    .heatmap-cell strong {
+      font-size: .82rem;
+      overflow-wrap: anywhere;
+    }
+
+    .heatmap-cell span {
+      color: var(--muted);
+      font-size: .76rem;
+      font-weight: 760;
+    }
+
     .dashboard-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1545,6 +1621,8 @@
       <button class="nav-tab" type="button" data-view="reductions" aria-selected="false">Redução de Moagem</button>
       <button class="nav-tab" type="button" data-view="machineDashboard" aria-selected="false">Dashboard Máquinas</button>
       <button class="nav-tab" type="button" data-view="machines" aria-selected="false">Produção das Máquinas</button>
+      <button class="nav-tab" type="button" data-view="conference" aria-selected="false">Conferência Diária</button>
+      <button class="nav-tab" type="button" data-view="fieldMode" aria-selected="false">Modo Campo</button>
       <button class="nav-tab" type="button" data-view="entry" aria-selected="false">Lançamento Diário</button>
       <button class="nav-tab" type="button" data-view="targets" aria-selected="false">Metas Diárias</button>
       <button class="nav-tab" type="button" data-view="history" aria-selected="false">Histórico</button>
@@ -1659,6 +1737,22 @@
           <span class="status-pill">Gestão automática</span>
         </div>
         <div class="panel-body" id="dashboardAnalysisCenterWrap"></div>
+      </section>
+
+      <section class="dashboard-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Comparativo e previsão</h2>
+          </div>
+          <div class="panel-body" id="dashboardComparisonForecastWrap"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Mapa de calor operacional</h2>
+          </div>
+          <div class="panel-body" id="dashboardHeatmapWrap"></div>
+        </section>
       </section>
 
       <section class="dashboard-chart-grid" aria-label="Gráficos do dashboard">
@@ -2541,7 +2635,7 @@
         </div>
         <div class="workspace-actions">
           <button class="btn-secondary" id="importMachineFileBtn" type="button">Importar foto ou PDF</button>
-          <input class="file-input" id="machineImportFile" type="file" accept="image/*,.pdf,application/pdf">
+          <input class="file-input" id="machineImportFile" type="file" accept="image/*,.pdf,.csv,.txt,.html,.htm,.xls,.xlsx,application/pdf,text/csv,text/plain,text/html">
           <span class="workspace-hint">Antes de escolher o arquivo, o sistema solicitará o dia, a frente/transporte e se o relatório é de colhedora, transbordo ou caminhão.</span>
         </div>
         <div class="acceptance-controls">
@@ -2616,6 +2710,84 @@
           <h2>Produções lançadas</h2>
         </div>
         <div class="table-wrap" id="machineRowsWrap"></div>
+      </section>
+    </section>
+
+    <section class="view" id="conferenceView" hidden>
+      <div class="filter-bar dashboard-filter">
+        <div class="field">
+          <label for="conferenceDate">Dia para conferir</label>
+          <input id="conferenceDate" type="date">
+        </div>
+        <div class="filter-note" id="conferenceSource">Selecione um dia para conferir pendências, médias, transporte e máquinas.</div>
+        <div class="actions">
+          <button class="btn-secondary" id="conferenceTodayBtn" type="button">Hoje</button>
+          <button class="btn-secondary" id="conferenceLoadEntryBtn" type="button">Abrir lançamento</button>
+          <button class="btn-secondary" id="conferenceBackupBtn" type="button">Backup do dia</button>
+          <button class="btn-primary" id="approveConferenceBtn" type="button">Aprovar dia</button>
+          <button class="btn-secondary" id="reopenConferenceBtn" type="button">Reabrir</button>
+        </div>
+      </div>
+
+      <section class="stats-grid" id="conferenceKpiWrap" aria-label="Indicadores da conferência diária"></section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Checklist de inconsistências</h2>
+          <span class="status-pill" id="conferenceStatusPill">Em aberto</span>
+        </div>
+        <div class="panel-body" id="conferenceChecklistWrap"></div>
+      </section>
+
+      <section class="dashboard-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Comparativo do dia</h2>
+          </div>
+          <div class="panel-body" id="conferenceComparisonWrap"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Previsão de fechamento</h2>
+          </div>
+          <div class="panel-body" id="conferenceForecastWrap"></div>
+        </section>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Mapa de calor por operação</h2>
+        </div>
+        <div class="panel-body" id="conferenceHeatmapWrap"></div>
+      </section>
+    </section>
+
+    <section class="view" id="fieldModeView" hidden>
+      <div class="filter-bar dashboard-filter">
+        <div class="field">
+          <label for="fieldModeDate">Dia do campo</label>
+          <input id="fieldModeDate" type="date">
+        </div>
+        <div class="filter-note">Modo simplificado para uso rápido no campo, com botões grandes e atalhos.</div>
+        <div class="actions">
+          <button class="btn-secondary" id="fieldModeTodayBtn" type="button">Hoje</button>
+          <button class="btn-primary" id="fieldModeOpenEntryBtn" type="button">Abrir lançamento completo</button>
+        </div>
+      </div>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Atalhos rápidos</h2>
+        </div>
+        <div class="field-mode-grid" id="fieldModeCardsWrap"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Situação do dia</h2>
+        </div>
+        <div class="panel-body" id="fieldModeSummaryWrap"></div>
       </section>
     </section>
 
@@ -3066,6 +3238,7 @@
     const AUTO_BACKUPS_KEY = "cambui.daily.production.auto.backups.v1";
     const AUDIT_LOG_KEY = "cambui.daily.production.audit.v1";
     const PENDING_SYNC_KEY = "cambui.daily.production.pending.sync.v1";
+    const DAILY_APPROVALS_KEY = "cambui.daily.production.approvals.v1";
     const MAX_AUTO_BACKUPS = 12;
     const MAX_AUDIT_LOG = 80;
     const MAX_PENDING_SYNCS = 40;
@@ -3151,6 +3324,8 @@
       reductionsView: document.querySelector("#reductionsView"),
       machineDashboardView: document.querySelector("#machineDashboardView"),
       machinesView: document.querySelector("#machinesView"),
+      conferenceView: document.querySelector("#conferenceView"),
+      fieldModeView: document.querySelector("#fieldModeView"),
       entryView: document.querySelector("#entryView"),
       targetsView: document.querySelector("#targetsView"),
       historyView: document.querySelector("#historyView"),
@@ -3292,6 +3467,17 @@
       reportsMachineProductionWrap: document.querySelector("#reportsMachineProductionWrap"),
       dashboardEquipmentAverageWrap: document.querySelector("#dashboardEquipmentAverageWrap"),
       reportsEquipmentAverageWrap: document.querySelector("#reportsEquipmentAverageWrap"),
+      conferenceDate: document.querySelector("#conferenceDate"),
+      conferenceSource: document.querySelector("#conferenceSource"),
+      conferenceKpiWrap: document.querySelector("#conferenceKpiWrap"),
+      conferenceStatusPill: document.querySelector("#conferenceStatusPill"),
+      conferenceChecklistWrap: document.querySelector("#conferenceChecklistWrap"),
+      conferenceComparisonWrap: document.querySelector("#conferenceComparisonWrap"),
+      conferenceForecastWrap: document.querySelector("#conferenceForecastWrap"),
+      conferenceHeatmapWrap: document.querySelector("#conferenceHeatmapWrap"),
+      fieldModeDate: document.querySelector("#fieldModeDate"),
+      fieldModeCardsWrap: document.querySelector("#fieldModeCardsWrap"),
+      fieldModeSummaryWrap: document.querySelector("#fieldModeSummaryWrap"),
       entryDate: document.querySelector("#entryDate"),
       frontCards: [...document.querySelectorAll(".front-card")],
       frontWorkspace: document.querySelector("#frontWorkspace"),
@@ -3315,6 +3501,8 @@
       externalCaneTargetsBody: document.querySelector("#externalCaneTargetsBody"),
       advancedKpiWrap: document.querySelector("#advancedKpiWrap"),
       dashboardAnalysisCenterWrap: document.querySelector("#dashboardAnalysisCenterWrap"),
+      dashboardComparisonForecastWrap: document.querySelector("#dashboardComparisonForecastWrap"),
+      dashboardHeatmapWrap: document.querySelector("#dashboardHeatmapWrap"),
       goalOverviewWrap: document.querySelector("#goalOverviewWrap"),
       typeChartWrap: document.querySelector("#typeChartWrap"),
       frontChartWrap: document.querySelector("#frontChartWrap"),
@@ -3403,6 +3591,7 @@
     let reductionLocalUpdatedAt = loadReductionUpdatedAt();
     let machineProductionRecords = loadMachineProductionRecords();
     let machineProductionLocalUpdatedAt = loadMachineProductionUpdatedAt();
+    let dailyApprovals = loadDailyApprovals();
     let firebaseConfig = loadFirebaseConfig();
     let autoBackups = loadAutoBackups();
     let auditLog = loadAuditLog();
@@ -4725,7 +4914,8 @@
         reductionUpdatedAt: reductionLocalUpdatedAt,
         reductionRecords: getCleanReductionRecords(reductionRecords),
         machineProductionUpdatedAt: machineProductionLocalUpdatedAt,
-        machineProductionRecords: getCleanMachineProductionRecords(machineProductionRecords)
+        machineProductionRecords: getCleanMachineProductionRecords(machineProductionRecords),
+        dailyApprovals: getCleanDailyApprovals()
       };
 
       const cleanPatioRecords = getCleanPatioRecords(patioRecords);
@@ -4793,6 +4983,14 @@
         persistMachineProductionRecords({ updatedAt: payload.machineProductionUpdatedAt || payload.exportedAt || new Date().toISOString() });
       }
 
+      if (!Array.isArray(payload) && Array.isArray(payload.dailyApprovals)) {
+        const normalizedApprovals = getCleanDailyApprovals(payload.dailyApprovals);
+        dailyApprovals = mergeRecords
+          ? getCleanDailyApprovals([...dailyApprovals, ...normalizedApprovals])
+          : normalizedApprovals;
+        persistDailyApprovals();
+      }
+
       persistRecords();
       renderOptions();
       renderTargets();
@@ -4803,6 +5001,8 @@
       renderStoppages();
       renderReductions();
       renderMachineProductions();
+      renderConference();
+      renderFieldMode();
       renderHistory();
       return normalized.length;
     }
@@ -4900,6 +5100,182 @@
 
     function persistPendingSyncQueue() {
       localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(pendingSyncQueue.slice(0, MAX_PENDING_SYNCS)));
+    }
+
+    function getCleanDailyApprovals(source = dailyApprovals) {
+      const grouped = new Map();
+      (source || []).forEach((item) => {
+        const date = normalizeRecordDate(item && item.date);
+        if (!date) return;
+        const clean = {
+          id: item.id || `approval-${date}`,
+          date,
+          status: item.status === "approved" ? "approved" : "open",
+          note: String(item.note || "").trim(),
+          createdAt: item.createdAt || item.approvedAt || new Date().toISOString(),
+          approvedAt: item.approvedAt || "",
+          reopenedAt: item.reopenedAt || "",
+          updatedAt: item.updatedAt || item.approvedAt || item.reopenedAt || new Date().toISOString()
+        };
+        const existing = grouped.get(date);
+        if (!existing || String(clean.updatedAt).localeCompare(String(existing.updatedAt)) >= 0) {
+          grouped.set(date, clean);
+        }
+      });
+      return [...grouped.values()].sort((a, b) => b.date.localeCompare(a.date));
+    }
+
+    function loadDailyApprovals() {
+      return getCleanDailyApprovals(loadStoredList(DAILY_APPROVALS_KEY));
+    }
+
+    function persistDailyApprovals() {
+      dailyApprovals = getCleanDailyApprovals(dailyApprovals);
+      localStorage.setItem(DAILY_APPROVALS_KEY, JSON.stringify(dailyApprovals));
+    }
+
+    function approvalForDate(date) {
+      const cleanDate = normalizeRecordDate(date);
+      return dailyApprovals.find((item) => item.date === cleanDate) || null;
+    }
+
+    function isDayApproved(date) {
+      const approval = approvalForDate(date);
+      return approval && approval.status === "approved";
+    }
+
+    function setDailyApproval(date, status, note = "") {
+      const cleanDate = normalizeRecordDate(date);
+      if (!cleanDate) return null;
+      const now = new Date().toISOString();
+      const existing = approvalForDate(cleanDate);
+      const approval = {
+        id: existing ? existing.id : makeId(),
+        date: cleanDate,
+        status: status === "approved" ? "approved" : "open",
+        note: String(note || existing?.note || "").trim(),
+        createdAt: existing ? existing.createdAt : now,
+        approvedAt: status === "approved" ? now : existing?.approvedAt || "",
+        reopenedAt: status === "approved" ? existing?.reopenedAt || "" : now,
+        updatedAt: now
+      };
+      dailyApprovals = [approval, ...dailyApprovals.filter((item) => item.date !== cleanDate)];
+      persistDailyApprovals();
+      return approval;
+    }
+
+    function dayRecord(date) {
+      const cleanDate = normalizeRecordDate(date);
+      return getCleanRecords(records).find((record) => record.date === cleanDate) || null;
+    }
+
+    function dayRows(date) {
+      const record = dayRecord(date);
+      return record ? rowsFromRecords([record]) : [];
+    }
+
+    function compareDateShift(date, days) {
+      const cleanDate = normalizeRecordDate(date) || todayInputValue();
+      const [year, month, day] = cleanDate.split("-").map(Number);
+      const base = new Date(year, month - 1, day);
+      base.setDate(base.getDate() + days);
+      return dateInputFromDate(base);
+    }
+
+    function comparisonForDate(date) {
+      const cleanDate = normalizeRecordDate(date) || todayInputValue();
+      const currentRows = dayRows(cleanDate);
+      const previousDayRows = dayRows(compareDateShift(cleanDate, -1));
+      const previousWeekRows = dayRows(compareDateShift(cleanDate, -7));
+      const current = summarizeRows(currentRows, { targetDays: 1, targetTotal: plannedTargetForDate(cleanDate) });
+      const previousDay = summarizeRows(previousDayRows, { targetDays: 1, targetTotal: plannedTargetForDate(compareDateShift(cleanDate, -1)) });
+      const previousWeek = summarizeRows(previousWeekRows, { targetDays: 1, targetTotal: plannedTargetForDate(compareDateShift(cleanDate, -7)) });
+      return { current, previousDay, previousWeek };
+    }
+
+    function forecastForDate(date) {
+      const cleanDate = normalizeRecordDate(date) || todayInputValue();
+      const monthRange = monthRangeFor(cleanDate);
+      const today = todayInputValue();
+      const usableEnd = [cleanDate, monthRange.end, today].sort()[0];
+      const monthRecords = monthRange.start > usableEnd ? [] : recordsForRange(monthRange.start, usableEnd);
+      const monthRows = rowsFromRecords(monthRecords);
+      const monthSummary = summarizeRows(monthRows, {
+        targetDays: targetInfoForRange(monthRange.start, usableEnd).targetDays,
+        targetTotal: plannedTargetForRange(monthRange.start, usableEnd)
+      });
+      const elapsedDays = daysBetweenInclusive(monthRange.start, usableEnd);
+      const totalMonthDays = daysBetweenInclusive(monthRange.start, monthRange.end);
+      const projectedMonth = elapsedDays ? (monthSummary.total / elapsedDays) * totalMonthDays : 0;
+      const monthTarget = plannedTargetForRange(monthRange.start, monthRange.end);
+      const cleanRecords = getCleanRecords(records);
+      const allStart = cleanRecords[0]?.date || safraPlanMonths[0].start;
+      const allEnd = cleanDate;
+      const allRecords = recordsForRange(allStart, allEnd);
+      const allSummary = summarizeRows(rowsFromRecords(allRecords), {
+        targetDays: targetInfoForRange(allStart, allEnd).targetDays,
+        targetTotal: plannedTargetForRange(allStart, allEnd)
+      });
+      const elapsedSafraDays = daysBetweenInclusive(safraPlanMonths[0].start, cleanDate);
+      const totalSafraDays = daysBetweenInclusive(safraPlanMonths[0].start, safraPlanMonths[safraPlanMonths.length - 1].end);
+      const projectedSafra = elapsedSafraDays ? (allSummary.total / elapsedSafraDays) * totalSafraDays : 0;
+      const safraTarget = safraPlanMonths.reduce((sum, item) => sum + item.planned, 0);
+      return {
+        monthRange,
+        monthSummary,
+        projectedMonth,
+        monthTarget,
+        projectedSafra,
+        safraTarget
+      };
+    }
+
+    function dayInconsistencies(date) {
+      const cleanDate = normalizeRecordDate(date) || todayInputValue();
+      const rows = dayRows(cleanDate);
+      const record = dayRecord(cleanDate);
+      const summary = summarizeRows(rows, { targetDays: 1, targetTotal: plannedTargetForDate(cleanDate) });
+      const machineRows = machineProductionRowsForDateRange({ start: cleanDate, end: cleanDate });
+      const machineIssues = machineProductionConsistencyRows(machineRows).filter((item) => {
+        const status = machineProductionDisplayStatus(item);
+        return status.tone === "alert" || status.tone === "warn";
+      });
+      const issues = [];
+      if (!record) issues.push({ tone: "alert", title: "Dia sem lançamento", text: "Não existe lançamento diário salvo para esta data." });
+      if (record && !rows.length) issues.push({ tone: "alert", title: "Lançamento vazio", text: "O dia existe, mas não tem linhas válidas de produção." });
+      if (summary.targetTotal > 0 && summary.targetPercent < 85) issues.push({ tone: "alert", title: "Meta abaixo de 85%", text: `${formatPercent(summary.targetPercent)} realizado; faltam ${formatNumber(summary.remaining)}.` });
+      if (summary.total > 0 && summary.transportTotal <= 0) issues.push({ tone: "alert", title: "Sem transporte", text: "Há moagem lançada, mas nenhum transporte próprio ou terceiro." });
+      if (summary.total > 0 && summary.transportTotal > 0 && Math.abs(summary.transportTotal - summary.total) > Math.max(summary.total * 0.05, 50)) {
+        issues.push({ tone: "warn", title: "Transporte diferente da moagem", text: `Diferença de ${formatNumber(summary.transportTotal - summary.total)} t.` });
+      }
+      rows.filter((row) => usesEquipmentQuantity(row.type) && parseNumber(row.production) > 0 && !parseNumber(row.equipmentQuantity))
+        .forEach((row) => issues.push({ tone: "alert", title: "Qtd. equipamento faltando", text: `${row.type} · ${row.front || row.type}` }));
+      rows.filter((row) => !isExternalCane(row.type) && !isTransport(row.type) && targetForRow(row, targets, rowsForSameDate(row, rows)) <= 0)
+        .forEach((row) => issues.push({ tone: "warn", title: "Meta não cadastrada", text: `${row.type} · ${row.front || "sem frente"}` }));
+      if (summary.total > 0 && !machineRows.length) issues.push({ tone: "warn", title: "Sem produção por máquina", text: "Há produção diária, mas nenhum equipamento detalhado no dia." });
+      machineIssues.forEach((item) => {
+        const status = machineProductionDisplayStatus(item);
+        issues.push({ tone: status.tone === "alert" ? "alert" : "warn", title: `Máquinas: ${status.label}`, text: `${machineProductionBaseLabel(item)} · ${item.machineType} · Dif. ${formatNumber(item.difference)}` });
+      });
+      if (!issues.length) issues.push({ tone: "good", title: "Dia consistente", text: "Nenhuma inconsistência crítica encontrada para fechamento." });
+      return { date: cleanDate, rows, summary, machineRows, issues };
+    }
+
+    function exportDayBackupFile(date) {
+      const cleanDate = normalizeRecordDate(date) || todayInputValue();
+      const payload = {
+        ...currentDataPayload(),
+        backupType: "daily-closing",
+        backupDate: cleanDate,
+        records: getCleanRecords(records).filter((record) => record.date === cleanDate),
+        patioRecords: getCleanPatioRecords(patioRecords).filter((record) => record.date === cleanDate),
+        stoppageRecords: getCleanStoppageRecords(stoppageRecords).filter((record) => record.date === cleanDate),
+        reductionRecords: getCleanReductionRecords(reductionRecords).filter((record) => record.date === cleanDate),
+        machineProductionRecords: getCleanMachineProductionRecords(machineProductionRecords).filter((record) => record.date === cleanDate),
+        dailyApprovals: getCleanDailyApprovals(dailyApprovals).filter((item) => item.date === cleanDate)
+      };
+      downloadFile(`backup-fechamento-cambui-${cleanDate}.json`, JSON.stringify(payload, null, 2), "application/json");
+      addAuditEntry("backup", `Backup em arquivo gerado para ${formatDate(cleanDate)}.`);
     }
 
     function addAuditEntry(type, message) {
@@ -8869,6 +9245,8 @@
         reductions: els.reductionsView,
         machineDashboard: els.machineDashboardView,
         machines: els.machinesView,
+        conference: els.conferenceView,
+        fieldMode: els.fieldModeView,
         entry: els.entryView,
         targets: els.targetsView,
         history: els.historyView
@@ -8886,6 +9264,8 @@
       if (name === "reductions") renderReductions();
       if (name === "machineDashboard") renderMachineProductionDashboardPage();
       if (name === "machines") renderMachineProductions();
+      if (name === "conference") renderConference();
+      if (name === "fieldMode") renderFieldMode();
       if (name === "entry") renderEntry();
       if (name === "targets") renderTargets();
       if (name === "history") renderHistory();
@@ -10636,12 +11016,280 @@
       els.dashboardAnalysisCenterWrap.innerHTML = analysisCenterHtml(analysisCenterData(range, selectedRecords, rows, options));
     }
 
+    function rangeShift(range, days) {
+      return {
+        start: compareDateShift(range.start, days),
+        end: compareDateShift(range.end, days)
+      };
+    }
+
+    function renderDashboardComparisonForecast(range, rows, options = {}) {
+      if (!els.dashboardComparisonForecastWrap) return;
+      const days = daysBetweenInclusive(range.start, range.end);
+      const previousRange = rangeShift(range, -days);
+      const currentSummary = summarizeRows(rows, options);
+      const previousRows = rowsFromRecords(recordsForRange(previousRange.start, previousRange.end));
+      const previousTargetInfo = targetInfoForRange(previousRange.start, previousRange.end);
+      const previousSummary = summarizeRows(previousRows, {
+        targetDays: previousTargetInfo.targetDays,
+        targetTotal: plannedTargetForInfo(previousTargetInfo)
+      });
+      const delta = currentSummary.total - previousSummary.total;
+      const forecast = forecastForDate(range.end);
+      els.dashboardComparisonForecastWrap.innerHTML = `
+        <div class="summary-grid">
+          <div class="summary-card">
+            <small>Período atual</small>
+            <strong>${formatNumber(currentSummary.total)}</strong>
+            <span>${rangeText(range)}</span>
+          </div>
+          <div class="summary-card">
+            <small>Período anterior</small>
+            <strong>${formatNumber(previousSummary.total)}</strong>
+            <span>${rangeText(previousRange)}</span>
+          </div>
+          <div class="summary-card">
+            <small>Variação</small>
+            <strong>${delta >= 0 ? "+" : ""}${formatNumber(delta)}</strong>
+            <span>${formatPercent(previousSummary.total ? (delta / previousSummary.total) * 100 : currentSummary.total ? 100 : 0)}</span>
+          </div>
+          <div class="summary-card">
+            <small>Fechamento mês</small>
+            <strong>${formatNumber(forecast.projectedMonth)}</strong>
+            <span>${formatPercent(progressFor(forecast.projectedMonth, forecast.monthTarget))} da meta projetada</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderDashboardHeatmap(rows) {
+      if (!els.dashboardHeatmapWrap) return;
+      const targetDays = targetDaysForRows(rows);
+      const cells = typeOptions.map((type) => {
+        const production = productionByType(rows, type);
+        const target = targetForType(type) * targetDays;
+        const percent = progressFor(production, target);
+        const tone = !production && target > 0 ? "alert" : percent >= 100 ? "good" : percent >= 85 ? "warn" : production ? "alert" : "";
+        return { type, production, target, percent, tone };
+      });
+      els.dashboardHeatmapWrap.innerHTML = `
+        <div class="heatmap-grid">
+          ${cells.map((cell) => `
+            <div class="heatmap-cell ${cell.tone}">
+              <strong>${escapeHtml(cell.type)}</strong>
+              <span>${formatNumber(cell.production)} real</span>
+              <span>${formatPercent(cell.percent)} da meta</span>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
     function renderReportsAnalysisCenter(data) {
       if (!els.reportsAnalysisCenterWrap) return;
       els.reportsAnalysisCenterWrap.innerHTML = analysisCenterHtml(analysisCenterData(data.range, data.selectedRecords, data.baseRows, {
         targetDays: data.targetContext.targetDays,
         targetTotal: data.baseSummary.targetTotal
       }));
+    }
+
+    function comparisonCardHtml(label, current, comparison) {
+      const delta = current.total - comparison.total;
+      const percent = comparison.total ? (delta / comparison.total) * 100 : current.total ? 100 : 0;
+      const tone = delta >= 0 ? "good" : "alert";
+      return `
+        <div class="summary-card">
+          <small>${escapeHtml(label)}</small>
+          <strong>${delta >= 0 ? "+" : ""}${formatNumber(delta)}</strong>
+          <span>${formatPercent(percent)} · base ${formatNumber(comparison.total)}</span>
+          <span class="status-pill ${tone}">${delta >= 0 ? "Acima" : "Abaixo"}</span>
+        </div>
+      `;
+    }
+
+    function renderConferenceComparison(date) {
+      const comparison = comparisonForDate(date);
+      els.conferenceComparisonWrap.innerHTML = `
+        <div class="summary-grid">
+          <div class="summary-card">
+            <small>Dia atual</small>
+            <strong>${formatNumber(comparison.current.total)}</strong>
+            <span>${formatPercent(comparison.current.targetPercent)} da meta diária</span>
+          </div>
+          ${comparisonCardHtml("Contra ontem", comparison.current, comparison.previousDay)}
+          ${comparisonCardHtml("Contra há 7 dias", comparison.current, comparison.previousWeek)}
+          <div class="summary-card">
+            <small>Transporte/moagem</small>
+            <strong>${formatPercent(comparison.current.transportPercent)}</strong>
+            <span>${formatNumber(comparison.current.transportTotal)} transportado</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderConferenceForecast(date) {
+      const forecast = forecastForDate(date);
+      const monthBalance = forecast.projectedMonth - forecast.monthTarget;
+      const safraBalance = forecast.projectedSafra - forecast.safraTarget;
+      els.conferenceForecastWrap.innerHTML = `
+        <div class="summary-grid">
+          <div class="summary-card">
+            <small>Projeção mês</small>
+            <strong>${formatNumber(forecast.projectedMonth)}</strong>
+            <span>Meta ${formatNumber(forecast.monthTarget)} · ${monthBalance >= 0 ? "sobra" : "falta"} ${formatNumber(Math.abs(monthBalance))}</span>
+          </div>
+          <div class="summary-card">
+            <small>% projeção mês</small>
+            <strong>${formatPercent(progressFor(forecast.projectedMonth, forecast.monthTarget))}</strong>
+            <span>${formatMonth(forecast.monthRange.start)}</span>
+          </div>
+          <div class="summary-card">
+            <small>Projeção safra</small>
+            <strong>${formatNumber(forecast.projectedSafra)}</strong>
+            <span>Meta ${formatNumber(forecast.safraTarget)} · ${safraBalance >= 0 ? "sobra" : "falta"} ${formatNumber(Math.abs(safraBalance))}</span>
+          </div>
+          <div class="summary-card">
+            <small>% projeção safra</small>
+            <strong>${formatPercent(progressFor(forecast.projectedSafra, forecast.safraTarget))}</strong>
+            <span>Ritmo atual projetado</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderConferenceHeatmap(date) {
+      const rows = dayRows(date);
+      const cells = typeOptions.map((type) => {
+        const production = productionByType(rows, type);
+        const target = targetForType(type);
+        const percent = progressFor(production, target);
+        const tone = !production && target > 0 ? "alert" : percent >= 100 ? "good" : percent >= 85 ? "warn" : production ? "alert" : "";
+        return { type, production, target, percent, tone };
+      });
+      els.conferenceHeatmapWrap.innerHTML = `
+        <div class="heatmap-grid">
+          ${cells.map((cell) => `
+            <div class="heatmap-cell ${cell.tone}">
+              <strong>${escapeHtml(cell.type)}</strong>
+              <span>${formatNumber(cell.production)} / ${formatNumber(cell.target)}</span>
+              <span>${formatPercent(cell.percent)} da meta</span>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function renderConference() {
+      if (!els.conferenceDate) return;
+      const date = normalizeRecordDate(els.conferenceDate.value) || todayInputValue();
+      els.conferenceDate.value = date;
+      const data = dayInconsistencies(date);
+      const approval = approvalForDate(date);
+      const approved = approval && approval.status === "approved";
+      const critical = data.issues.filter((item) => item.tone === "alert").length;
+      const warnings = data.issues.filter((item) => item.tone === "warn").length;
+      const machineSummary = machineProductionSummary(data.machineRows);
+      const statusLabel = approved ? `Aprovado em ${formatDateTime(approval.approvedAt)}` : critical ? "Crítico" : warnings ? "Atenção" : "Pronto para aprovar";
+      const statusTone = approved ? "good" : critical ? "alert" : warnings ? "" : "good";
+      els.conferenceSource.textContent = `${formatDate(date)} · ${data.rows.length} lançamento${data.rows.length === 1 ? "" : "s"} · ${data.issues.length} item${data.issues.length === 1 ? "" : "s"} no checklist.`;
+      els.conferenceStatusPill.textContent = statusLabel;
+      els.conferenceStatusPill.className = `status-pill ${statusTone}`;
+      els.conferenceKpiWrap.innerHTML = [
+        ["Moagem", formatNumber(data.summary.total), `${formatPercent(data.summary.targetPercent)} da meta`],
+        ["Meta", formatNumber(data.summary.targetTotal), targetBalanceLabel(data.summary.total, data.summary.targetTotal)],
+        ["Transporte", formatNumber(data.summary.transportTotal), `${formatPercent(data.summary.transportPercent)} sobre moagem`],
+        ["Máquinas", formatNumber(machineSummary.total), `${machineSummary.machines} equipamento${machineSummary.machines === 1 ? "" : "s"}`],
+        ["Média maq./dia", formatNumber(machineSummary.averagePerMachineDay), `${machineSummary.machineDays} equipamento-dia`],
+        ["Checklist", `${critical} / ${warnings}`, "críticos / atenção"]
+      ].map((item) => `
+        <article class="stat">
+          <span>${escapeHtml(item[0])}</span>
+          <strong>${escapeHtml(item[1])}</strong>
+          <small>${escapeHtml(item[2])}</small>
+        </article>
+      `).join("");
+      els.conferenceChecklistWrap.innerHTML = `
+        <div class="alert-grid">
+          ${data.issues.map((item) => `
+            <div class="alert-item ${item.tone}">
+              <strong>${escapeHtml(item.title)}</strong>
+              <span>${escapeHtml(item.text)}</span>
+            </div>
+          `).join("")}
+        </div>
+      `;
+      renderConferenceComparison(date);
+      renderConferenceForecast(date);
+      renderConferenceHeatmap(date);
+    }
+
+    function approveConferenceDay() {
+      const date = normalizeRecordDate(els.conferenceDate.value) || todayInputValue();
+      const data = dayInconsistencies(date);
+      const critical = data.issues.filter((item) => item.tone === "alert").length;
+      if (critical && !window.confirm(`Existem ${critical} alerta${critical === 1 ? "" : "s"} crítico${critical === 1 ? "" : "s"}. Deseja aprovar mesmo assim?`)) return;
+      setDailyApproval(date, "approved");
+      createAutoBackup(`Dia aprovado em ${formatDate(date)}`, { skipAudit: true });
+      exportDayBackupFile(date);
+      addAuditEntry("fechamento", `Dia ${formatDate(date)} aprovado e backup em arquivo gerado.`);
+      renderConference();
+      renderDashboard();
+      renderManagementReports();
+      showToast(`Dia ${formatDate(date)} aprovado.`);
+    }
+
+    function reopenConferenceDay() {
+      const date = normalizeRecordDate(els.conferenceDate.value) || todayInputValue();
+      if (!isDayApproved(date)) {
+        showToast("Este dia já está em aberto.");
+        return;
+      }
+      if (!window.confirm(`Deseja reabrir ${formatDate(date)} para edição?`)) return;
+      setDailyApproval(date, "open");
+      addAuditEntry("fechamento", `Dia ${formatDate(date)} reaberto para edição.`);
+      renderConference();
+      renderDashboard();
+      renderManagementReports();
+      showToast(`Dia ${formatDate(date)} reaberto.`);
+    }
+
+    function openFieldShortcut(type, front = "") {
+      const date = normalizeRecordDate(els.fieldModeDate.value) || todayInputValue();
+      els.entryDate.value = date;
+      refreshEntryFromSelectedDate({ silent: true, clearWhenMissing: true });
+      switchView("entry");
+      setTimeout(() => openFrontWorkspace(front, type), 0);
+    }
+
+    function renderFieldMode() {
+      if (!els.fieldModeDate) return;
+      const date = normalizeRecordDate(els.fieldModeDate.value) || todayInputValue();
+      els.fieldModeDate.value = date;
+      const rows = dayRows(date);
+      const summary = summarizeRows(rows, { targetDays: 1, targetTotal: plannedTargetForDate(date) });
+      const shortcuts = [
+        ...ownHarvestFronts.map((front) => ({ label: front, type: TYPES.OWN_HARVEST, front, detail: "Colheita própria" })),
+        ...thirdHarvestFronts.map((front) => ({ label: front, type: TYPES.THIRD_HARVEST, front, detail: "Frente terceira" })),
+        { label: "Cana Floresta", type: TYPES.FLORESTA_CANE, front: "", detail: "Entrega da Floresta" },
+        { label: "Cana Vale", type: TYPES.VALE_CANE, front: "", detail: "Entrega da Vale" },
+        { label: "Transporte próprio", type: TYPES.OWN_TRANSPORT, front: "", detail: "Total transportado" },
+        { label: "Transporte terceiro", type: TYPES.THIRD_TRANSPORT, front: "", detail: "Total transportado" }
+      ];
+      els.fieldModeCardsWrap.innerHTML = shortcuts.map((item) => `
+        <button class="field-mode-card" type="button" data-field-type="${escapeHtml(item.type)}" data-field-front="${escapeHtml(item.front)}">
+          <strong>${escapeHtml(item.label)}</strong>
+          <span>${escapeHtml(item.detail)}</span>
+          <span>Toque para lançar produção</span>
+        </button>
+      `).join("");
+      els.fieldModeSummaryWrap.innerHTML = `
+        <div class="summary-grid">
+          <div class="summary-card"><small>Dia</small><strong>${formatDate(date)}</strong><span>${isDayApproved(date) ? "Aprovado" : "Em aberto"}</span></div>
+          <div class="summary-card"><small>Moagem</small><strong>${formatNumber(summary.total)}</strong><span>${formatPercent(summary.targetPercent)} da meta</span></div>
+          <div class="summary-card"><small>Transporte</small><strong>${formatNumber(summary.transportTotal)}</strong><span>${formatPercent(summary.transportPercent)} sobre moagem</span></div>
+          <div class="summary-card"><small>Registros</small><strong>${summary.records}</strong><span>linhas lançadas</span></div>
+        </div>
+      `;
     }
 
     function renderDashboard() {
@@ -10689,6 +11337,8 @@
       setStats("dash", rows, { targetDays, targetTotal });
       renderAdvancedKpis(selectedRecords, rows, range, { targetDays, targetInfo, targetTotal });
       renderDashboardAnalysisCenter(range, selectedRecords, rows, { targetDays, targetTotal });
+      renderDashboardComparisonForecast(range, rows, { targetDays, targetTotal });
+      renderDashboardHeatmap(rows);
       renderDashboardCharts(rows, { targetDays, targetTotal });
       renderDashboardPatioTimes(range);
       renderDashboardMachineProduction(range);
@@ -12801,6 +13451,12 @@
       const name = file.name || "";
       const isPdf = /\.pdf$/i.test(name) || file.type === "application/pdf";
       const isImage = /^image\//i.test(file.type);
+      const isExcel = /\.(xlsx|xls)$/i.test(name);
+
+      if (isExcel) {
+        const rows = await rowsFromExcelFile(file);
+        return { rows, text: rows.map((row) => Object.values(row || {}).join(" ")).join("\n") };
+      }
 
       if (isPdf) {
         let text = "";
@@ -13485,6 +14141,11 @@
 
       els.entryDate.value = date;
 
+      if (isDayApproved(date)) {
+        showToast("Dia aprovado. Reabra na Conferência Diária antes de alterar.");
+        return;
+      }
+
       if (!cleanRows.length) {
         showToast("Informe produção em pelo menos uma linha válida.");
         return;
@@ -13688,6 +14349,11 @@
       const record = recordForDate(date);
       if (!record) {
         showToast("Data sem lançamento salvo para excluir.");
+        return;
+      }
+
+      if (isDayApproved(date)) {
+        showToast("Dia aprovado. Reabra na Conferência Diária antes de excluir.");
         return;
       }
 
@@ -15850,6 +16516,41 @@
       });
     });
 
+    els.conferenceDate.addEventListener("change", renderConference);
+    document.querySelector("#conferenceTodayBtn").addEventListener("click", () => {
+      els.conferenceDate.value = todayInputValue();
+      renderConference();
+    });
+    document.querySelector("#conferenceLoadEntryBtn").addEventListener("click", () => {
+      const date = normalizeRecordDate(els.conferenceDate.value) || todayInputValue();
+      els.entryDate.value = date;
+      refreshEntryFromSelectedDate({ silent: true, clearWhenMissing: true });
+      switchView("entry");
+      showToast(`Lançamento de ${formatDate(date)} aberto.`);
+    });
+    document.querySelector("#conferenceBackupBtn").addEventListener("click", () => {
+      exportDayBackupFile(els.conferenceDate.value || todayInputValue());
+      showToast("Backup do dia exportado.");
+    });
+    document.querySelector("#approveConferenceBtn").addEventListener("click", approveConferenceDay);
+    document.querySelector("#reopenConferenceBtn").addEventListener("click", reopenConferenceDay);
+
+    els.fieldModeDate.addEventListener("change", renderFieldMode);
+    document.querySelector("#fieldModeTodayBtn").addEventListener("click", () => {
+      els.fieldModeDate.value = todayInputValue();
+      renderFieldMode();
+    });
+    document.querySelector("#fieldModeOpenEntryBtn").addEventListener("click", () => {
+      els.entryDate.value = normalizeRecordDate(els.fieldModeDate.value) || todayInputValue();
+      refreshEntryFromSelectedDate({ silent: true, clearWhenMissing: true });
+      switchView("entry");
+    });
+    els.fieldModeCardsWrap.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-field-type]");
+      if (!button) return;
+      openFieldShortcut(button.dataset.fieldType, button.dataset.fieldFront || "");
+    });
+
     els.dashboardStartDate.addEventListener("change", renderDashboard);
     els.dashboardEndDate.addEventListener("change", renderDashboard);
     els.reportsStartDate.addEventListener("change", renderManagementReports);
@@ -16356,6 +17057,8 @@
     resetReductionForm(initialDate);
     resetMachineProductionForm(initialDate);
     els.entryDate.value = initialDate;
+    els.conferenceDate.value = initialDate;
+    els.fieldModeDate.value = initialDate;
     renderTargets();
     refreshEntryFromSelectedDate({ clearWhenMissing: true, silent: true });
     renderDashboard();
@@ -16364,6 +17067,8 @@
     renderStoppages();
     renderReductions();
     renderMachineProductions();
+    renderConference();
+    renderFieldMode();
     renderHistory();
 
     ensureFirebaseReady({ silent: true }).then((ready) => {
