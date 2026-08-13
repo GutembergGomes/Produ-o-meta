@@ -2788,6 +2788,14 @@
         <div class="panel-body" id="conferenceChecklistWrap"></div>
       </section>
 
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Pendências por dia da safra</h2>
+          <span class="status-pill" id="conferenceSafraStatusPill">Desde 23/04/2026</span>
+        </div>
+        <div class="panel-body" id="conferenceSafraPendingWrap"></div>
+      </section>
+
       <section class="dashboard-grid">
         <section class="panel">
           <div class="panel-head">
@@ -3525,6 +3533,8 @@
       conferenceKpiWrap: document.querySelector("#conferenceKpiWrap"),
       conferenceStatusPill: document.querySelector("#conferenceStatusPill"),
       conferenceChecklistWrap: document.querySelector("#conferenceChecklistWrap"),
+      conferenceSafraStatusPill: document.querySelector("#conferenceSafraStatusPill"),
+      conferenceSafraPendingWrap: document.querySelector("#conferenceSafraPendingWrap"),
       conferenceComparisonWrap: document.querySelector("#conferenceComparisonWrap"),
       conferenceForecastWrap: document.querySelector("#conferenceForecastWrap"),
       conferenceHeatmapWrap: document.querySelector("#conferenceHeatmapWrap"),
@@ -5457,6 +5467,57 @@
       };
     }
 
+    function datesInRangeList(start, end) {
+      const cleanStart = normalizeRecordDate(start);
+      const cleanEnd = normalizeRecordDate(end);
+      if (!cleanStart || !cleanEnd || cleanStart > cleanEnd) return [];
+      const dates = [];
+      let current = cleanStart;
+      while (current <= cleanEnd && dates.length < 400) {
+        dates.push(current);
+        current = compareDateShift(current, 1);
+      }
+      return dates;
+    }
+
+    function expectedMachineDetailIssuesForDay(rows, machineRows) {
+      const expected = new Map();
+      const addExpected = (base, machineType, label) => {
+        const cleanBase = String(base || "").trim();
+        if (!cleanBase) return;
+        const key = `${normalizeKey(cleanBase)}|${normalizeKey(machineType)}`;
+        if (!expected.has(key)) expected.set(key, { base: cleanBase, machineType, label });
+      };
+
+      rows.forEach((row) => {
+        const production = parseNumber(row.production);
+        if (production <= 0) return;
+        if (isFrontProduction(row.type)) {
+          addExpected(row.front, "Colhedora", "colhedora");
+          addExpected(row.front, "Transbordo", "transbordo");
+        } else if (isExternalCane(row.type)) {
+          addExpected(row.type, "Colhedora", "colhedora");
+          addExpected(row.type, "Transbordo", "transbordo");
+        } else if (row.type === TYPES.OWN_TRANSPORT) {
+          addExpected(TYPES.OWN_TRANSPORT, "Caminhão Próprio", "caminhões próprios");
+        } else if (row.type === TYPES.THIRD_TRANSPORT) {
+          addExpected(TYPES.THIRD_TRANSPORT, "Caminhão Terceiro", "caminhões terceiros");
+        }
+      });
+
+      return [...expected.values()]
+        .filter((item) => !machineRows.some((row) => (
+          row.machineType === item.machineType
+          && sameText(machineProductionBaseLabel(row), item.base)
+          && parseNumber(row.production) > 0
+        )))
+        .map((item) => ({
+          tone: "warn",
+          title: "Detalhe por máquina faltando",
+          text: `${item.base} · sem ${item.label} lançado na produção por máquina.`
+        }));
+    }
+
     function dayInconsistencies(date) {
       const cleanDate = normalizeRecordDate(date) || todayInputValue();
       const rows = dayRows(cleanDate);
@@ -5479,13 +5540,58 @@
         .forEach((row) => issues.push({ tone: "alert", title: "Qtd. equipamento faltando", text: `${row.type} · ${row.front || row.type}` }));
       rows.filter((row) => !isExternalCane(row.type) && !isTransport(row.type) && targetForRow(row, targets, rowsForSameDate(row, rows)) <= 0)
         .forEach((row) => issues.push({ tone: "warn", title: "Meta não cadastrada", text: `${row.type} · ${row.front || "sem frente"}` }));
-      if (summary.total > 0 && !machineRows.length) issues.push({ tone: "warn", title: "Sem produção por máquina", text: "Há produção diária, mas nenhum equipamento detalhado no dia." });
+      const expectedMachineIssues = expectedMachineDetailIssuesForDay(rows, machineRows);
+      issues.push(...expectedMachineIssues);
+      if (summary.total > 0 && !machineRows.length && !expectedMachineIssues.length) issues.push({ tone: "warn", title: "Sem produção por máquina", text: "Há produção diária, mas nenhum equipamento detalhado no dia." });
       machineIssues.forEach((item) => {
         const status = machineProductionDisplayStatus(item);
         issues.push({ tone: status.tone === "alert" ? "alert" : "warn", title: `Máquinas: ${status.label}`, text: `${machineProductionBaseLabel(item)} · ${item.machineType} · Dif. ${formatNumber(item.difference)}` });
       });
       if (!issues.length) issues.push({ tone: "good", title: "Dia consistente", text: "Nenhuma inconsistência crítica encontrada para fechamento." });
       return { date: cleanDate, rows, summary, machineRows, issues };
+    }
+
+    function safraDailyPendingRows(endDate = todayInputValue()) {
+      const safraStart = safraPlanMonths[0]?.start || "2026-04-23";
+      const today = todayInputValue();
+      const cleanEnd = normalizeRecordDate(endDate) || today;
+      const cappedEnd = cleanEnd > today ? today : cleanEnd;
+      return datesInRangeList(safraStart, cappedEnd).map((date) => {
+        const data = dayInconsistencies(date);
+        const issues = data.issues.filter((item) => item.tone !== "good");
+        const critical = issues.filter((item) => item.tone === "alert").length;
+        const warnings = issues.filter((item) => item.tone === "warn").length;
+        const approved = isDayApproved(date);
+        const machineSummary = machineProductionSummary(data.machineRows);
+        const status = !dayRecord(date)
+          ? "Sem lançamento"
+          : critical
+            ? "Corrigir"
+            : warnings
+              ? "Revisar"
+              : approved
+                ? "Completo"
+                : "Completo · aprovar";
+        const tone = status === "Completo" ? "good" : critical || !dayRecord(date) ? "alert" : "";
+        return {
+          date,
+          status,
+          tone,
+          approved,
+          issues,
+          critical,
+          warnings,
+          production: data.summary.total,
+          transport: data.summary.transportTotal,
+          machines: machineSummary.total,
+          machineCount: machineSummary.machines,
+          details: issues.length
+            ? issues.map((item) => `${item.title}: ${item.text}`).join(" | ")
+            : approved
+              ? "Dados completos e aprovados."
+              : "Dados completos; falta aprovar o dia."
+        };
+      });
     }
 
     function exportDayBackupFile(date) {
@@ -11446,6 +11552,90 @@
       `;
     }
 
+    function renderSafraDailyPendingConference(date) {
+      if (!els.conferenceSafraPendingWrap) return;
+      const rows = safraDailyPendingRows(date);
+      const pendingRows = rows.filter((row) => row.status !== "Completo");
+      const completeRows = rows.filter((row) => !row.issues.length);
+      const approvedRows = rows.filter((row) => row.approved);
+      const criticalRows = rows.filter((row) => row.critical > 0);
+      const newestRows = [...rows].reverse();
+      if (els.conferenceSafraStatusPill) {
+        els.conferenceSafraStatusPill.textContent = `${pendingRows.length} pend. / ${rows.length} dias`;
+        els.conferenceSafraStatusPill.className = `status-pill ${criticalRows.length ? "alert" : pendingRows.length ? "" : "good"}`;
+      }
+
+      if (!rows.length) {
+        els.conferenceSafraPendingWrap.innerHTML = '<div class="empty-state">A safra iniciou em 23/04/2026. Selecione uma data igual ou posterior para conferir.</div>';
+        return;
+      }
+
+      els.conferenceSafraPendingWrap.innerHTML = `
+        <div class="summary-grid">
+          <div class="summary-card">
+            <small>Período conferido</small>
+            <strong>${formatDate(rows[0].date)} a ${formatDate(rows[rows.length - 1].date)}</strong>
+            <span>Início oficial da safra: 23/04/2026</span>
+          </div>
+          <div class="summary-card">
+            <small>Dias completos</small>
+            <strong>${completeRows.length}</strong>
+            <span>${formatPercent(progressFor(completeRows.length, rows.length))} sem falta de dados</span>
+          </div>
+          <div class="summary-card">
+            <small>Pendências</small>
+            <strong>${pendingRows.length}</strong>
+            <span>${criticalRows.length} crítica${criticalRows.length === 1 ? "" : "s"} · ${pendingRows.length - criticalRows.length} para revisar/aprovar</span>
+          </div>
+          <div class="summary-card">
+            <small>Dias aprovados</small>
+            <strong>${approvedRows.length}</strong>
+            <span>${formatPercent(progressFor(approvedRows.length, rows.length))} fechados</span>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-top: 14px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Status</th>
+                <th>Moagem</th>
+                <th>Transporte</th>
+                <th>Máquinas</th>
+                <th>Fechamento</th>
+                <th>Pendências / correções</th>
+                <th>Ação</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${newestRows.map((row) => `
+                <tr>
+                  <td>${formatDate(row.date)}</td>
+                  <td><span class="status-pill ${escapeHtml(row.tone)}">${escapeHtml(row.status)}</span></td>
+                  <td>${row.production ? formatNumber(row.production) : "-"}</td>
+                  <td>${row.transport ? formatNumber(row.transport) : "-"}</td>
+                  <td>${row.machines ? `${formatNumber(row.machines)} · ${row.machineCount} equip.` : "-"}</td>
+                  <td>${row.approved ? '<span class="status-pill good">Aprovado</span>' : '<span class="status-pill">Aberto</span>'}</td>
+                  <td>${escapeHtml(row.details)}</td>
+                  <td><button class="btn-secondary" type="button" data-conference-day="${escapeHtml(row.date)}">Conferir</button></td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      els.conferenceSafraPendingWrap.querySelectorAll("[data-conference-day]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const day = normalizeRecordDate(button.dataset.conferenceDay);
+          if (!day) return;
+          els.conferenceDate.value = day;
+          renderConference();
+          els.conferenceDate.focus();
+        });
+      });
+    }
+
     function renderConference() {
       if (!els.conferenceDate) return;
       const date = normalizeRecordDate(els.conferenceDate.value) || todayInputValue();
@@ -11485,6 +11675,7 @@
           `).join("")}
         </div>
       `;
+      renderSafraDailyPendingConference(date);
       renderConferenceComparison(date);
       renderConferenceForecast(date);
       renderConferenceHeatmap(date);
