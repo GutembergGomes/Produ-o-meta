@@ -596,6 +596,42 @@
       font-weight: 760;
     }
 
+    .preview-edit-table input,
+    .preview-edit-table select {
+      width: 100%;
+      min-width: 86px;
+      min-height: 34px;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--input-bg);
+      color: var(--ink);
+      font: inherit;
+      font-size: .82rem;
+    }
+
+    .preview-edit-table .preview-keep {
+      min-width: 52px;
+      text-align: center;
+    }
+
+    .preview-edit-table .preview-fleet {
+      min-width: 112px;
+    }
+
+    .preview-warning {
+      display: grid;
+      gap: 5px;
+      margin-bottom: 10px;
+      padding: 10px;
+      border: 1px solid var(--red);
+      border-left: 5px solid var(--red);
+      border-radius: var(--radius);
+      background: var(--alert-bg);
+      color: var(--red);
+      font-weight: 800;
+    }
+
     .dashboard-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3150,6 +3186,7 @@
         <div class="panel-body">
           <p class="section-note">O sistema continua salvando no navegador e, quando o Firebase estiver configurado, grava a mesma base no banco. Assim voce tem backup local em arquivo JSON e uma copia remota dos dados.</p>
           <div class="sync-status" id="firebaseSyncStatus">Preencha os dados do Firebase para ativar a sincronizacao com o banco.</div>
+          <div class="sync-status" id="firebaseDiagnosticsWrap">Diagnóstico do banco ainda não executado.</div>
           <div class="settings-grid">
             <div class="field">
               <label for="firebaseApiKey">API Key</label>
@@ -3241,7 +3278,7 @@
     const DAILY_APPROVALS_KEY = "cambui.daily.production.approvals.v1";
     const MAX_AUTO_BACKUPS = 12;
     const MAX_AUDIT_LOG = 80;
-    const MAX_PENDING_SYNCS = 40;
+    const MAX_PENDING_SYNCS = 200;
     const PREVIOUS_KEYS = [
       "cambui.daily.production.v4",
       "cambui.daily.own.production.v3",
@@ -3578,7 +3615,8 @@
       firebaseMessagingSenderId: document.querySelector("#firebaseMessagingSenderId"),
       firebaseAppId: document.querySelector("#firebaseAppId"),
       firebaseStatusPill: document.querySelector("#firebaseStatusPill"),
-      firebaseSyncStatus: document.querySelector("#firebaseSyncStatus")
+      firebaseSyncStatus: document.querySelector("#firebaseSyncStatus"),
+      firebaseDiagnosticsWrap: document.querySelector("#firebaseDiagnosticsWrap")
     };
 
     let records = loadRecords();
@@ -4346,18 +4384,31 @@
         patioRecords: deleteField,
         stoppageRecords: deleteField,
         reductionRecords: deleteField,
-        machineProductionRecords: deleteField
+        machineProductionRecords: deleteField,
+        dailyApprovals: deleteField
       };
     }
 
-    async function runFirebaseWritesInChunks(tasks, size = 300) {
+    async function runFirebaseWritesInChunks(tasks, size = 120) {
       for (let index = 0; index < tasks.length; index += size) {
         const chunk = tasks.slice(index, index + size);
         await Promise.all(chunk.map((task) => task()));
       }
     }
 
-    async function syncFirebaseCollection(root, collectionName, rows) {
+    function firebaseRowTimestamp(row) {
+      const time = Date.parse(row && (row.updatedAt || row.approvedAt || row.reopenedAt || row.createdAt) ? (row.updatedAt || row.approvedAt || row.reopenedAt || row.createdAt) : "");
+      return Number.isNaN(time) ? 0 : time;
+    }
+
+    function shouldReplaceFirebaseRow(nextRow, currentRow) {
+      const nextTime = firebaseRowTimestamp(nextRow);
+      const currentTime = firebaseRowTimestamp(currentRow);
+      if (nextTime !== currentTime) return nextTime > currentTime;
+      return true;
+    }
+
+    async function syncFirebaseCollection(root, collectionName, rows, options = {}) {
       const collectionRef = root.collection(collectionName);
       const cleanRows = Array.isArray(rows) ? rows : [];
       const byDocId = new Map();
@@ -4366,24 +4417,91 @@
         byDocId.set(safeFirebaseDocId(id), { ...row, id, plant: String(row.plant || PLANT).trim() || PLANT });
       });
 
-      const snapshot = await collectionRef.get();
       const tasks = [];
-      snapshot.docs.forEach((doc) => {
-        if (!byDocId.has(doc.id)) tasks.push(() => doc.ref.delete());
-      });
+      if (options.deleteMissing) {
+        const snapshot = await readFirebaseCollectionSnapshot(collectionRef);
+        snapshot.docs.forEach((doc) => {
+          if (!byDocId.has(doc.id)) tasks.push(() => doc.ref.delete());
+        });
+      }
       byDocId.forEach((row, docId) => {
-        tasks.push(() => collectionRef.doc(docId).set(row));
+        tasks.push(() => collectionRef.doc(docId).set(row, { merge: true }));
       });
 
       await runFirebaseWritesInChunks(tasks);
     }
 
+    async function readFirebaseCollectionSnapshot(collectionRef, pageSize = 500) {
+      const docs = [];
+      let query = collectionRef.orderBy(firebase.firestore.FieldPath.documentId()).limit(pageSize);
+      let snapshot = await query.get();
+      docs.push(...snapshot.docs);
+      while (snapshot.docs.length === pageSize) {
+        const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+        snapshot = await collectionRef
+          .orderBy(firebase.firestore.FieldPath.documentId())
+          .startAfter(lastDoc)
+          .limit(pageSize)
+          .get();
+        docs.push(...snapshot.docs);
+      }
+      return { docs };
+    }
+
     async function readFirebaseCollection(root, collectionName) {
-      const snapshot = await root.collection(collectionName).get();
+      const snapshot = await readFirebaseCollectionSnapshot(root.collection(collectionName));
       return snapshot.docs.map((doc) => {
         const data = doc.data() || {};
         return { id: data.id || decodeURIComponent(doc.id), ...data };
       });
+    }
+
+    async function readFirebaseRecords(root) {
+      const snapshot = await readFirebaseCollectionSnapshot(root.collection("records"));
+      return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    }
+
+    function mergeFirebaseRows(localRows, remoteRows, cleaner = (rows) => rows) {
+      const byId = new Map();
+      cleaner([...(localRows || []), ...(remoteRows || [])]).forEach((row) => {
+        const id = String(row && row.id ? row.id : makeId());
+        const current = byId.get(id);
+        if (!current || shouldReplaceFirebaseRow(row, current)) byId.set(id, row);
+      });
+      return cleaner([...byId.values()]);
+    }
+
+    function renderFirebaseDiagnostics(data = {}) {
+      if (!els.firebaseDiagnosticsWrap) return;
+      const expected = {
+        records: Number(data.expectedRecords ?? data.remoteRecords ?? 0) || 0,
+        patio: Number(data.expectedPatio ?? data.remotePatio ?? 0) || 0,
+        stoppage: Number(data.expectedStoppage ?? data.remoteStoppage ?? 0) || 0,
+        reduction: Number(data.expectedReduction ?? data.remoteReduction ?? 0) || 0,
+        machine: Number(data.expectedMachine ?? data.remoteMachine ?? 0) || 0,
+        approvals: Number(data.expectedApprovals ?? data.remoteApprovals ?? 0) || 0
+      };
+      const mismatchCount = [
+        [expected.records, data.remoteRecords],
+        [expected.patio, data.remotePatio],
+        [expected.stoppage, data.remoteStoppage],
+        [expected.reduction, data.remoteReduction],
+        [expected.machine, data.remoteMachine],
+        [expected.approvals, data.remoteApprovals]
+      ].filter(([expectedCount, remoteCount]) => Number(expectedCount || 0) > Number(remoteCount || 0)).length;
+      const pieces = [
+        `Banco: ${data.connected ? "conectado" : "sem teste"}`,
+        `Diário local/remoto/esperado: ${data.localRecords ?? getCleanRecords(records).length}/${data.remoteRecords ?? "-"}/${expected.records || "-"}`,
+        `Pátio: ${data.localPatio ?? getCleanPatioRecords(patioRecords).length}/${data.remotePatio ?? "-"}/${expected.patio || "-"}`,
+        `Paradas: ${data.localStoppage ?? getCleanStoppageRecords(stoppageRecords).length}/${data.remoteStoppage ?? "-"}/${expected.stoppage || "-"}`,
+        `Reduções: ${data.localReduction ?? getCleanReductionRecords(reductionRecords).length}/${data.remoteReduction ?? "-"}/${expected.reduction || "-"}`,
+        `Máquinas: ${data.localMachine ?? getCleanMachineProductionRecords(machineProductionRecords).length}/${data.remoteMachine ?? "-"}/${expected.machine || "-"}`,
+        `Fechamentos: ${data.localApprovals ?? getCleanDailyApprovals().length}/${data.remoteApprovals ?? "-"}/${expected.approvals || "-"}`
+      ];
+      const elapsed = data.elapsedMs ? ` · ${formatNumberFixed(data.elapsedMs / 1000, 1)}s` : "";
+      const warning = mismatchCount ? ` · Atenção: ${mismatchCount} módulo${mismatchCount === 1 ? "" : "s"} com contador maior que os documentos carregáveis. Use "Enviar para Firebase" em um computador que tenha todos os dados.` : "";
+      els.firebaseDiagnosticsWrap.textContent = `${pieces.join(" · ")}${elapsed}${warning}`;
+      els.firebaseDiagnosticsWrap.className = `sync-status${mismatchCount ? " alert" : data.connected ? " good" : ""}`;
     }
 
     async function ensureFirebaseReady(options = {}) {
@@ -4505,7 +4623,18 @@
     }
 
     async function testFirebaseConnection() {
+      const startedAt = performance.now();
       const tested = await runFirebaseTask(async (root) => {
+        const [metaSnapshot, recordRows, patioRows, stoppageRows, reductionRows, machineRows, approvalRows] = await Promise.all([
+          root.get(),
+          readFirebaseRecords(root),
+          readFirebaseCollection(root, "patioRecords"),
+          readFirebaseCollection(root, "stoppageRecords"),
+          readFirebaseCollection(root, "reductionRecords"),
+          readFirebaseCollection(root, "machineProductionRecords"),
+          readFirebaseCollection(root, "dailyApprovals")
+        ]);
+        const meta = metaSnapshot.exists ? metaSnapshot.data() || {} : {};
         await root.set({
           plant: PLANT,
           version: APP_VERSION,
@@ -4516,8 +4645,31 @@
           stoppageRecordCount: getCleanStoppageRecords(stoppageRecords).length,
           reductionRecordCount: getCleanReductionRecords(reductionRecords).length,
           machineProductionRecordCount: getCleanMachineProductionRecords(machineProductionRecords).length,
+          dailyApprovalCount: getCleanDailyApprovals().length,
           ...firebaseLargeArrayCleanupFields()
         }, { merge: true });
+        return {
+          connected: true,
+          remoteRecords: recordRows.length,
+          remotePatio: patioRows.length,
+          remoteStoppage: stoppageRows.length,
+          remoteReduction: reductionRows.length,
+          remoteMachine: machineRows.length,
+          remoteApprovals: approvalRows.length,
+          expectedRecords: Number(meta.recordCount) || 0,
+          expectedPatio: Number(meta.patioRecordCount) || 0,
+          expectedStoppage: Number(meta.stoppageRecordCount) || 0,
+          expectedReduction: Number(meta.reductionRecordCount) || 0,
+          expectedMachine: Number(meta.machineProductionRecordCount) || 0,
+          expectedApprovals: Number(meta.dailyApprovalCount) || 0,
+          localRecords: getCleanRecords(records).length,
+          localPatio: getCleanPatioRecords(patioRecords).length,
+          localStoppage: getCleanStoppageRecords(stoppageRecords).length,
+          localReduction: getCleanReductionRecords(reductionRecords).length,
+          localMachine: getCleanMachineProductionRecords(machineProductionRecords).length,
+          localApprovals: getCleanDailyApprovals().length,
+          elapsedMs: Math.round(performance.now() - startedAt)
+        };
       }, {
         silent: true,
         pendingMessage: "Testando conexao com o Firebase...",
@@ -4525,6 +4677,7 @@
         errorStatus: "Nao foi possivel validar a conexao com o Firebase."
       });
 
+      if (tested && typeof tested === "object") renderFirebaseDiagnostics(tested);
       showToast(tested ? "Firebase conectado com sucesso." : "Falha ao testar o Firebase.");
     }
 
@@ -4540,6 +4693,7 @@
           stoppageRecordCount: getCleanStoppageRecords(stoppageRecords).length,
           reductionRecordCount: getCleanReductionRecords(reductionRecords).length,
           machineProductionRecordCount: getCleanMachineProductionRecords(machineProductionRecords).length,
+          dailyApprovalCount: getCleanDailyApprovals().length,
           ...firebaseLargeArrayCleanupFields()
         }, { merge: true });
       }, options);
@@ -4568,6 +4722,7 @@
           stoppageRecordCount: getCleanStoppageRecords(stoppageRecords).length,
           reductionRecordCount: getCleanReductionRecords(reductionRecords).length,
           machineProductionRecordCount: getCleanMachineProductionRecords(machineProductionRecords).length,
+          dailyApprovalCount: getCleanDailyApprovals().length,
           lastRecordDate: cleanRecord.date,
           ...firebaseLargeArrayCleanupFields()
         }, { merge: true });
@@ -4604,6 +4759,7 @@
           stoppageRecordCount: getCleanStoppageRecords(stoppageRecords).length,
           reductionRecordCount: getCleanReductionRecords(reductionRecords).length,
           machineProductionRecordCount: getCleanMachineProductionRecords(machineProductionRecords).length,
+          dailyApprovalCount: getCleanDailyApprovals().length,
           ...firebaseLargeArrayCleanupFields()
         }, { merge: true });
       }, options);
@@ -4615,6 +4771,7 @@
       const cleanStoppageRecords = getCleanStoppageRecords(stoppageRecords);
       const cleanReductionRecords = getCleanReductionRecords(reductionRecords);
       const cleanMachineProductionRecords = prepareMachineProductionRowsForSync(machineProductionRecords);
+      const cleanDailyApprovals = getCleanDailyApprovals();
       const localDates = new Set(cleanRecords.map((record) => record.date));
       const lastRecord = cleanRecords[cleanRecords.length - 1] || null;
       const now = new Date().toISOString();
@@ -4635,17 +4792,19 @@
           reductionRecordCount: cleanReductionRecords.length,
           machineProductionUpdatedAt: now,
           machineProductionRecordCount: cleanMachineProductionRecords.length,
+          dailyApprovalsUpdatedAt: now,
+          dailyApprovalCount: cleanDailyApprovals.length,
           lastRecordDate: lastRecord ? lastRecord.date : "",
           ...firebaseLargeArrayCleanupFields()
         }, { merge: true });
 
         const recordsRef = root.collection("records");
-        const remoteSnapshot = await recordsRef.get();
+        const remoteSnapshot = await readFirebaseCollectionSnapshot(recordsRef);
         const deletes = remoteSnapshot.docs
           .filter((doc) => {
             const data = doc.data() || {};
             const docDate = normalizeRecordDate(data.date || doc.id);
-            return !localDates.has(docDate) || doc.id !== docDate;
+            return localDates.has(docDate) && doc.id !== docDate;
           })
           .map((doc) => doc.ref.delete());
 
@@ -4662,7 +4821,8 @@
           syncFirebaseCollection(root, "patioRecords", cleanPatioRecords),
           syncFirebaseCollection(root, "stoppageRecords", cleanStoppageRecords),
           syncFirebaseCollection(root, "reductionRecords", cleanReductionRecords),
-          syncFirebaseCollection(root, "machineProductionRecords", cleanMachineProductionRecords)
+          syncFirebaseCollection(root, "machineProductionRecords", cleanMachineProductionRecords),
+          syncFirebaseCollection(root, "dailyApprovals", cleanDailyApprovals)
         ]);
         persistPatioUpdatedAt(now);
         persistStoppageUpdatedAt(now);
@@ -4751,24 +4911,44 @@
       }, options);
     }
 
+    async function syncDailyApprovalsToFirebase(options = {}) {
+      const cleanApprovals = getCleanDailyApprovals();
+      const now = new Date().toISOString();
+      return runFirebaseTask(async (root) => {
+        await root.set({
+          plant: PLANT,
+          version: APP_VERSION,
+          updatedAt: now,
+          dailyApprovalsUpdatedAt: now,
+          dailyApprovalCount: cleanApprovals.length,
+          ...firebaseLargeArrayCleanupFields()
+        }, { merge: true });
+        await syncFirebaseCollection(root, "dailyApprovals", cleanApprovals);
+      }, options);
+    }
+
     async function downloadAllDataFromFirebase(options = {}) {
       const downloaded = await runFirebaseTask(async (root) => {
-        const [metaSnapshot, recordSnapshots, patioRows, stoppageRows, reductionRows, machineProductionRows] = await Promise.all([
+        const startedAt = performance.now();
+        const [metaSnapshot, recordRows, patioRows, stoppageRows, reductionRows, machineProductionRows, approvalRows] = await Promise.all([
           root.get(),
-          root.collection("records").get(),
+          readFirebaseRecords(root),
           readFirebaseCollection(root, "patioRecords"),
           readFirebaseCollection(root, "stoppageRecords"),
           readFirebaseCollection(root, "reductionRecords"),
-          readFirebaseCollection(root, "machineProductionRecords")
+          readFirebaseCollection(root, "machineProductionRecords"),
+          readFirebaseCollection(root, "dailyApprovals")
         ]);
 
         return {
           meta: metaSnapshot.exists ? metaSnapshot.data() : {},
-          records: recordSnapshots.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+          records: recordRows,
           patioRecords: patioRows,
           stoppageRecords: stoppageRows,
           reductionRecords: reductionRows,
-          machineProductionRecords: machineProductionRows
+          machineProductionRecords: machineProductionRows,
+          dailyApprovals: approvalRows,
+          elapsedMs: Math.round(performance.now() - startedAt)
         };
       }, options);
 
@@ -4818,8 +4998,17 @@
         : [];
       const remoteMachineProductionUpdatedAt = String((downloaded.meta && (downloaded.meta.machineProductionUpdatedAt || downloaded.meta.updatedAt)) || "");
       const hasRemoteMachineProductionPayload = Boolean(remoteMachineProductionRows.length || downloaded.meta && (Array.isArray(downloaded.meta.machineProductionRecords) || "machineProductionRecordCount" in downloaded.meta || downloaded.meta.machineProductionUpdatedAt));
+      const remoteApprovalRows = Array.isArray(downloaded.dailyApprovals) && downloaded.dailyApprovals.length
+        ? downloaded.dailyApprovals
+        : downloaded.meta && Array.isArray(downloaded.meta.dailyApprovals)
+          ? downloaded.meta.dailyApprovals
+          : [];
+      const remoteDailyApprovals = remoteApprovalRows.length
+        ? getCleanDailyApprovals(remoteApprovalRows)
+        : [];
+      const hasRemoteApprovalsPayload = Boolean(remoteApprovalRows.length || downloaded.meta && (Array.isArray(downloaded.meta.dailyApprovals) || "dailyApprovalCount" in downloaded.meta || downloaded.meta.dailyApprovalsUpdatedAt));
 
-      if (!remoteTargets && !remoteRecords.length && !hasRemotePatioPayload && !hasRemoteStoppagePayload && !hasRemoteReductionPayload && !hasRemoteMachineProductionPayload) {
+      if (!remoteTargets && !remoteRecords.length && !hasRemotePatioPayload && !hasRemoteStoppagePayload && !hasRemoteReductionPayload && !hasRemoteMachineProductionPayload && !hasRemoteApprovalsPayload) {
         if (!options.silent) showToast("Nenhum dado encontrado no Firebase.");
         return false;
       }
@@ -4835,41 +5024,61 @@
       }
 
       const shouldSkipPatioDownload = options.skipPatioIfLocalExists && getCleanPatioRecords(patioRecords).length;
-      const remotePatioTime = Date.parse(remotePatioUpdatedAt || "");
-      const localPatioTime = Date.parse(patioLocalUpdatedAt || "");
-      const remotePatioIsNewer = Number.isNaN(localPatioTime)
-        || (!Number.isNaN(remotePatioTime) && remotePatioTime >= localPatioTime);
-      if (hasRemotePatioPayload && !shouldSkipPatioDownload && (options.forcePatioReplace || remotePatioIsNewer)) {
-        patioRecords = getCleanPatioRecords(remotePatioRecords);
+      if (hasRemotePatioPayload && !shouldSkipPatioDownload) {
+        patioRecords = options.forcePatioReplace
+          ? getCleanPatioRecords(remotePatioRecords)
+          : mergeFirebaseRows(patioRecords, remotePatioRecords, getCleanPatioRecords);
         persistPatioRecords({ updatedAt: remotePatioUpdatedAt || new Date().toISOString() });
       }
 
-      const remoteStoppageTime = Date.parse(remoteStoppageUpdatedAt || "");
-      const localStoppageTime = Date.parse(stoppageLocalUpdatedAt || "");
-      const remoteStoppageIsNewer = Number.isNaN(localStoppageTime)
-        || (!Number.isNaN(remoteStoppageTime) && remoteStoppageTime >= localStoppageTime);
-      if (hasRemoteStoppagePayload && (options.forceStoppageReplace || remoteStoppageIsNewer)) {
-        stoppageRecords = getCleanStoppageRecords(remoteStoppageRecords);
+      if (hasRemoteStoppagePayload) {
+        stoppageRecords = options.forceStoppageReplace
+          ? getCleanStoppageRecords(remoteStoppageRecords)
+          : mergeFirebaseRows(stoppageRecords, remoteStoppageRecords, getCleanStoppageRecords);
         persistStoppageRecords({ updatedAt: remoteStoppageUpdatedAt || new Date().toISOString() });
       }
 
-      const remoteReductionTime = Date.parse(remoteReductionUpdatedAt || "");
-      const localReductionTime = Date.parse(reductionLocalUpdatedAt || "");
-      const remoteReductionIsNewer = Number.isNaN(localReductionTime)
-        || (!Number.isNaN(remoteReductionTime) && remoteReductionTime >= localReductionTime);
-      if (hasRemoteReductionPayload && (options.forceReductionReplace || remoteReductionIsNewer)) {
-        reductionRecords = getCleanReductionRecords(remoteReductionRecords);
+      if (hasRemoteReductionPayload) {
+        reductionRecords = options.forceReductionReplace
+          ? getCleanReductionRecords(remoteReductionRecords)
+          : mergeFirebaseRows(reductionRecords, remoteReductionRecords, getCleanReductionRecords);
         persistReductionRecords({ updatedAt: remoteReductionUpdatedAt || new Date().toISOString() });
       }
 
-      const remoteMachineProductionTime = Date.parse(remoteMachineProductionUpdatedAt || "");
-      const localMachineProductionTime = Date.parse(machineProductionLocalUpdatedAt || "");
-      const remoteMachineProductionIsNewer = Number.isNaN(localMachineProductionTime)
-        || (!Number.isNaN(remoteMachineProductionTime) && remoteMachineProductionTime >= localMachineProductionTime);
-      if (hasRemoteMachineProductionPayload && (options.forceMachineProductionReplace || remoteMachineProductionIsNewer)) {
-        machineProductionRecords = getCleanMachineProductionRecords(remoteMachineProductionRecords);
+      if (hasRemoteMachineProductionPayload) {
+        machineProductionRecords = options.forceMachineProductionReplace
+          ? getCleanMachineProductionRecords(remoteMachineProductionRecords)
+          : mergeFirebaseRows(machineProductionRecords, remoteMachineProductionRecords, getCleanMachineProductionRecords);
         persistMachineProductionRecords({ updatedAt: remoteMachineProductionUpdatedAt || new Date().toISOString() });
       }
+
+      if (hasRemoteApprovalsPayload) {
+        dailyApprovals = mergeFirebaseRows(dailyApprovals, remoteDailyApprovals, getCleanDailyApprovals);
+        persistDailyApprovals();
+      }
+
+      renderFirebaseDiagnostics({
+        connected: true,
+        remoteRecords: remoteRecords.length,
+        remotePatio: remotePatioRecords.length,
+        remoteStoppage: remoteStoppageRecords.length,
+        remoteReduction: remoteReductionRecords.length,
+        remoteMachine: remoteMachineProductionRecords.length,
+        remoteApprovals: remoteDailyApprovals.length,
+        expectedRecords: Number(downloaded.meta?.recordCount) || 0,
+        expectedPatio: Number(downloaded.meta?.patioRecordCount) || 0,
+        expectedStoppage: Number(downloaded.meta?.stoppageRecordCount) || 0,
+        expectedReduction: Number(downloaded.meta?.reductionRecordCount) || 0,
+        expectedMachine: Number(downloaded.meta?.machineProductionRecordCount) || 0,
+        expectedApprovals: Number(downloaded.meta?.dailyApprovalCount) || 0,
+        localRecords: getCleanRecords(records).length,
+        localPatio: getCleanPatioRecords(patioRecords).length,
+        localStoppage: getCleanStoppageRecords(stoppageRecords).length,
+        localReduction: getCleanReductionRecords(reductionRecords).length,
+        localMachine: getCleanMachineProductionRecords(machineProductionRecords).length,
+        localApprovals: getCleanDailyApprovals().length,
+        elapsedMs: downloaded.elapsedMs
+      });
 
       renderOptions();
       renderTargets();
@@ -4880,6 +5089,8 @@
       renderStoppages();
       renderReductions();
       renderMachineProductions();
+      renderConference();
+      renderFieldMode();
       renderHistory();
       return true;
     }
@@ -5317,12 +5528,14 @@
       if (type === "stoppage-sync") return "Paradas da usina aguardando sincronização";
       if (type === "reduction-sync") return "Redução de moagem aguardando sincronização";
       if (type === "machine-production-sync") return "Produção das máquinas aguardando sincronização";
+      if (type === "daily-approvals-sync") return "Fechamentos diários aguardando sincronização";
       if (type === "upload-all") return "Base completa aguardando sincronização";
       return "Sincronização pendente";
     }
 
     function queueSyncKey(type, payload = {}) {
       if (type === "record-upsert" || type === "record-delete") return `${type}:${payload.date || ""}`;
+      if (type === "daily-approvals-sync") return `${type}:${payload.date || ""}`;
       return type;
     }
 
@@ -5450,6 +5663,15 @@
           pendingMessage: "Enviando pendencia da produção das máquinas...",
           successStatus: "Pendencia da produção das máquinas sincronizada.",
           errorStatus: "Nao foi possivel sincronizar a produção das máquinas pendente."
+        });
+      }
+
+      if (item.type === "daily-approvals-sync") {
+        return syncDailyApprovalsToFirebase({
+          silent: true,
+          pendingMessage: "Enviando pendencia dos fechamentos diários...",
+          successStatus: "Pendencia dos fechamentos diários sincronizada.",
+          errorStatus: "Nao foi possivel sincronizar os fechamentos diários pendentes."
         });
       }
 
@@ -11223,7 +11445,7 @@
       renderConferenceHeatmap(date);
     }
 
-    function approveConferenceDay() {
+    async function approveConferenceDay() {
       const date = normalizeRecordDate(els.conferenceDate.value) || todayInputValue();
       const data = dayInconsistencies(date);
       const critical = data.issues.filter((item) => item.tone === "alert").length;
@@ -11232,13 +11454,19 @@
       createAutoBackup(`Dia aprovado em ${formatDate(date)}`, { skipAudit: true });
       exportDayBackupFile(date);
       addAuditEntry("fechamento", `Dia ${formatDate(date)} aprovado e backup em arquivo gerado.`);
+      const syncState = await syncOrQueue("daily-approvals-sync", { date }, () => syncDailyApprovalsToFirebase({
+        silent: true,
+        pendingMessage: "Enviando fechamento diário para o banco...",
+        successStatus: "Fechamento diário sincronizado com o banco.",
+        errorStatus: "Fechamento salvo localmente, mas a sincronização com o banco falhou."
+      }));
       renderConference();
       renderDashboard();
       renderManagementReports();
-      showToast(`Dia ${formatDate(date)} aprovado.`);
+      showToast(syncState === "synced" ? `Dia ${formatDate(date)} aprovado e sincronizado.` : `Dia ${formatDate(date)} aprovado localmente.`);
     }
 
-    function reopenConferenceDay() {
+    async function reopenConferenceDay() {
       const date = normalizeRecordDate(els.conferenceDate.value) || todayInputValue();
       if (!isDayApproved(date)) {
         showToast("Este dia já está em aberto.");
@@ -11247,10 +11475,16 @@
       if (!window.confirm(`Deseja reabrir ${formatDate(date)} para edição?`)) return;
       setDailyApproval(date, "open");
       addAuditEntry("fechamento", `Dia ${formatDate(date)} reaberto para edição.`);
+      const syncState = await syncOrQueue("daily-approvals-sync", { date }, () => syncDailyApprovalsToFirebase({
+        silent: true,
+        pendingMessage: "Enviando reabertura diária para o banco...",
+        successStatus: "Reabertura diária sincronizada com o banco.",
+        errorStatus: "Reabertura salva localmente, mas a sincronização com o banco falhou."
+      }));
       renderConference();
       renderDashboard();
       renderManagementReports();
-      showToast(`Dia ${formatDate(date)} reaberto.`);
+      showToast(syncState === "synced" ? `Dia ${formatDate(date)} reaberto e sincronizado.` : `Dia ${formatDate(date)} reaberto localmente.`);
     }
 
     function openFieldShortcut(type, front = "") {
@@ -13006,19 +13240,73 @@
       return lines.reduce((rows, line) => {
         if (/^total\b|^c[oó]digo\b/i.test(line)) return rows;
         const match = line.match(/^(\d{3,})\s+(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})\s+(\d+)\s+(\d[\d.,]*)\s+(\d[\d.,]*)/);
-        if (!match) return rows;
-        rows.push({
-          codigo: normalizeFleetCode(match[1]),
-          frota: normalizeFleetCode(match[1]),
+        const fallback = machineDailyRowFromLooseLine(line);
+        if (!match && !fallback) return rows;
+        const row = fallback || {
+          codigo: match[1],
           data: match[2],
           cargas: match[3],
-          toneladas: normalizeReportNumber(match[4]),
-          producao: normalizeReportNumber(match[4]),
-          media: normalizeReportNumber(match[5]),
-          observacao: `Cargas: ${match[3]} · Média: ${normalizeReportNumber(match[5])}`
+          toneladas: match[4],
+          media: match[5]
+        };
+        rows.push({
+          codigo: normalizeFleetCode(row.codigo),
+          frota: normalizeFleetCode(row.codigo),
+          data: row.data,
+          cargas: row.cargas,
+          toneladas: normalizeReportNumber(row.toneladas),
+          producao: normalizeReportNumber(row.toneladas),
+          media: normalizeReportNumber(row.media),
+          observacao: `Cargas: ${row.cargas} · Média: ${normalizeReportNumber(row.media)}`
         });
         return rows;
       }, []);
+    }
+
+    function reportNumericTokens(text) {
+      return String(text || "")
+        .replace(/[Oo](?=\d)/g, "0")
+        .match(/\d+(?:\.\d{3})*(?:,\d+)?|\d+(?:,\d+)?|\d+(?:\.\d+)?/g) || [];
+    }
+
+    function machineDailyRowFromLooseLine(line) {
+      const text = String(line || "").replace(/\s+/g, " ").trim();
+      const codeMatch = text.match(/^(\d{3,6})\b/);
+      const dateMatch = text.match(/(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/);
+      if (!codeMatch || !dateMatch) return null;
+      const afterDate = text.slice(text.indexOf(dateMatch[0]) + dateMatch[0].length);
+      const numbers = reportNumericTokens(afterDate);
+      if (numbers.length < 2) return null;
+      const cargas = numbers.find((item) => /^\d+$/.test(item)) || numbers[0];
+      const remaining = numbers.filter((item) => item !== cargas || numbers.indexOf(item) !== numbers.indexOf(cargas));
+      const toneladas = remaining[0] || "";
+      const media = remaining[1] || "";
+      if (!toneladas) return null;
+      return {
+        codigo: codeMatch[1],
+        data: dateMatch[1],
+        cargas,
+        toneladas,
+        media
+      };
+    }
+
+    function machineProductionTotalsFromText(text) {
+      const cleaned = stripHtml(text);
+      const lines = cleaned
+        .split(/\r?\n/)
+        .map((line) => line.replace(/\s+/g, " ").trim())
+        .filter((line) => /^total\b/i.test(line));
+      if (!lines.length) return { loads: 0, production: 0, average: 0 };
+      const numbers = reportNumericTokens(lines[lines.length - 1]).map((item) => ({
+        raw: item,
+        value: parseNumber(normalizeReportNumber(item))
+      })).filter((item) => Number.isFinite(item.value));
+      if (!numbers.length) return { loads: 0, production: 0, average: 0 };
+      const loads = numbers.find((item) => Number.isInteger(item.value) && item.value > 0)?.value || 0;
+      const production = numbers.reduce((max, item) => item.value > max ? item.value : max, 0);
+      const average = numbers.map((item) => item.value).filter((value) => value > 0 && value !== loads && value !== production).pop() || 0;
+      return { loads, production, average };
     }
 
     function normalizeReportNumber(value) {
@@ -13219,11 +13507,20 @@
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
       const rows = [];
+      const reportTexts = [];
 
       workbook.SheetNames.forEach((sheetName) => {
         const sheet = workbook.Sheets[sheetName];
         const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-        const reportRows = parseHarvesterReport(matrixToReportText(matrix));
+        const reportText = matrixToReportText(matrix);
+        reportTexts.push(reportText);
+        const dailyRows = parseMachineDailyReport(reportText);
+        if (dailyRows.length) {
+          rows.push(...dailyRows);
+          return;
+        }
+
+        const reportRows = parseHarvesterReport(reportText);
         if (reportRows.length) {
           rows.push(...reportRows);
           return;
@@ -13238,6 +13535,7 @@
         rows.push(...XLSX.utils.sheet_to_json(sheet, { defval: "" }));
       });
 
+      rows.reportText = reportTexts.join("\n");
       return rows;
     }
 
@@ -13455,7 +13753,8 @@
 
       if (isExcel) {
         const rows = await rowsFromExcelFile(file);
-        return { rows, text: rows.map((row) => Object.values(row || {}).join(" ")).join("\n") };
+        const text = rows.reportText || rows.map((row) => Object.values(row || {}).join(" ")).join("\n");
+        return { rows, text, totals: machineProductionTotalsFromText(text) };
       }
 
       if (isPdf) {
@@ -13468,18 +13767,18 @@
           text = "";
         }
         if (!rows.length) rows = await rowsFromOcrPdfFile(file);
-        return { rows, text };
+        return { rows, text, totals: machineProductionTotalsFromText(text) };
       }
 
       if (isImage) {
         const data = await ocrImageData(file);
         const text = data.text || "";
         const rows = parseHarvesterOcrData(data);
-        return { rows: rows.length ? rows : extractRowsFromText(text, name), text };
+        return { rows: rows.length ? rows : extractRowsFromText(text, name), text, totals: machineProductionTotalsFromText(text) };
       }
 
       const text = await file.text();
-      return { rows: extractRowsFromText(text, name), text };
+      return { rows: extractRowsFromText(text, name), text, totals: machineProductionTotalsFromText(text) };
     }
 
     function machineProductionDateFromImportRow(row, fallback = "") {
@@ -13568,14 +13867,22 @@
         .sort((a, b) => a.date.localeCompare(b.date) || a.fleet.localeCompare(b.fleet, "pt-BR", { numeric: true }));
       const dates = new Set(records.map((row) => row.date));
       const fleets = new Set(records.map((row) => normalizeKey(row.fleet)));
+      const recognizedLoads = records.reduce((sum, row) => sum + (Number(row.loads) || 0), 0);
+      const totalProduction = records.reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+      const fileTotals = payload.totals || machineProductionTotalsFromText(payload.text || "");
 
       return {
         context: { ...importContext, front, machineType, multiDay: useRowDates },
-        rows,
         records,
         days: dates.size,
         fleets: fleets.size,
-        totalProduction: records.reduce((sum, row) => sum + (Number(row.production) || 0), 0)
+        recognizedLoads,
+        totalProduction,
+        fileLoads: fileTotals.loads || 0,
+        fileTotalProduction: fileTotals.production || 0,
+        fileAverage: fileTotals.average || 0,
+        productionDifference: fileTotals.production ? totalProduction - fileTotals.production : 0,
+        loadDifference: fileTotals.loads ? recognizedLoads - fileTotals.loads : 0
       };
     }
 
@@ -13591,11 +13898,20 @@
         return;
       }
 
-      els.machineImportPreviewSummary.textContent = `${preview.records.length} linha${preview.records.length === 1 ? "" : "s"} reconhecida${preview.records.length === 1 ? "" : "s"} · ${preview.days} dia${preview.days === 1 ? "" : "s"} · ${preview.fleets} equipamento${preview.fleets === 1 ? "" : "s"} · Total ${formatNumber(preview.totalProduction)}.`;
+      els.machineImportPreviewSummary.textContent = `${preview.records.length} linha${preview.records.length === 1 ? "" : "s"} reconhecida${preview.records.length === 1 ? "" : "s"} · ${preview.days} dia${preview.days === 1 ? "" : "s"} · ${preview.fleets} equipamento${preview.fleets === 1 ? "" : "s"} · Total reconhecido ${formatNumber(preview.totalProduction)}${preview.fileTotalProduction ? ` · Total arquivo ${formatNumber(preview.fileTotalProduction)}` : ""}.`;
+      const frontChoices = [...frontOptions, TYPES.OWN_TRANSPORT, TYPES.THIRD_TRANSPORT];
+      const warning = preview.fileTotalProduction && Math.abs(preview.productionDifference) > MACHINE_PRODUCTION_TOLERANCE
+        ? `<div class="preview-warning">
+            <strong>Atenção: soma reconhecida diferente do total do arquivo.</strong>
+            <span>Arquivo ${formatNumber(preview.fileTotalProduction)} · Prévia ${formatNumber(preview.totalProduction)} · Diferença ${formatNumber(preview.productionDifference)}. Edite os campos antes de salvar.</span>
+          </div>`
+        : "";
       els.machineImportPreviewWrap.innerHTML = `
-        <table>
+        ${warning}
+        <table class="preview-edit-table">
           <thead>
             <tr>
+              <th>Salvar</th>
               <th>Data</th>
               <th>Frente / base</th>
               <th>Tipo</th>
@@ -13603,18 +13919,29 @@
               <th>Cargas</th>
               <th>Produção</th>
               <th>Média (t)</th>
+              <th>Obs.</th>
             </tr>
           </thead>
           <tbody>
-            ${preview.rows.map((row) => `
-              <tr>
-                <td>${formatDate(row.date)}</td>
-                <td>${escapeHtml(machineProductionBaseLabel(row))}</td>
-                <td>${escapeHtml(row.machineType)}</td>
-                <td>${escapeHtml(row.fleet)}</td>
-                <td>${row.loads ? formatNumber(row.loads) : "-"}</td>
-                <td>${formatNumber(row.production)}</td>
-                <td>${row.averageYield ? formatNumber(row.averageYield) : "-"}</td>
+            ${preview.records.map((row, index) => `
+              <tr data-preview-index="${index}">
+                <td class="preview-keep"><input data-preview-field="keep" type="checkbox" checked aria-label="Salvar linha ${index + 1}"></td>
+                <td><input data-preview-field="date" type="date" value="${escapeHtml(row.date)}"></td>
+                <td>
+                  <select data-preview-field="front">
+                    ${frontChoices.map((item) => `<option value="${escapeHtml(item)}" ${sameText(item, row.front) ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
+                  </select>
+                </td>
+                <td>
+                  <select data-preview-field="machineType">
+                    ${machineProductionTypes.map((item) => `<option value="${escapeHtml(item)}" ${item === row.machineType ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
+                  </select>
+                </td>
+                <td><input class="preview-fleet" data-preview-field="fleet" type="text" value="${escapeHtml(row.fleet)}"></td>
+                <td><input data-preview-field="loads" inputmode="decimal" type="text" value="${row.loads ? formatNumber(row.loads) : ""}"></td>
+                <td><input data-preview-field="production" inputmode="decimal" type="text" value="${formatNumber(row.production)}"></td>
+                <td><input data-preview-field="averageYield" inputmode="decimal" type="text" value="${row.averageYield ? formatNumber(row.averageYield) : ""}"></td>
+                <td><input data-preview-field="note" type="text" value="${escapeHtml(row.note || "")}"></td>
               </tr>
             `).join("")}
           </tbody>
@@ -13623,18 +13950,75 @@
       els.machineImportPreviewDialog.showModal();
     }
 
+    function machineImportPreviewEditedRecords() {
+      if (!pendingMachineImportPreview) return [];
+      const rows = [...els.machineImportPreviewWrap.querySelectorAll("tr[data-preview-index]")];
+      return rows.map((tableRow, index) => {
+        const original = pendingMachineImportPreview.records[index] || {};
+        const fieldValue = (field) => {
+          const input = tableRow.querySelector(`[data-preview-field="${field}"]`);
+          if (!input) return "";
+          if (input.type === "checkbox") return input.checked;
+          return input.value;
+        };
+        if (!fieldValue("keep")) return null;
+        const machineType = normalizeMachineProductionType(fieldValue("machineType") || original.machineType);
+        const front = isMachineTruckType(machineType)
+          ? defaultMachineProductionFrontForType(machineType)
+          : frontOptions.find((item) => sameText(item, fieldValue("front"))) || fieldValue("front") || original.front;
+        const production = parseNumber(fieldValue("production"));
+        const loads = parseNumber(fieldValue("loads"));
+        const averageYield = parseNumber(fieldValue("averageYield")) || (loads ? production / loads : 0);
+        return normalizeMachineProductionRecord({
+          ...original,
+          date: fieldValue("date") || original.date,
+          front,
+          machineType,
+          fleet: normalizeFleetCode(fieldValue("fleet") || original.fleet),
+          production,
+          loads,
+          averageYield,
+          note: fieldValue("note") || "",
+          updatedAt: new Date().toISOString()
+        });
+      }).filter(Boolean);
+    }
+
+    function machineImportPreviewEditedSummary(records) {
+      const dates = new Set(records.map((row) => row.date));
+      const fleets = new Set(records.map((row) => normalizeKey(row.fleet)));
+      const totalProduction = records.reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+      const recognizedLoads = records.reduce((sum, row) => sum + (Number(row.loads) || 0), 0);
+      return {
+        records,
+        days: dates.size,
+        fleets: fleets.size,
+        totalProduction,
+        recognizedLoads,
+        fileTotalProduction: pendingMachineImportPreview?.fileTotalProduction || 0,
+        fileLoads: pendingMachineImportPreview?.fileLoads || 0
+      };
+    }
+
     async function confirmMachineImportPreview() {
       const preview = pendingMachineImportPreview;
-      if (!preview || !preview.records.length) {
+      const editedRecords = machineImportPreviewEditedRecords();
+      if (!preview || !editedRecords.length) {
         showToast("Nenhuma prévia disponível para salvar.");
         return;
+      }
+
+      const editedSummary = machineImportPreviewEditedSummary(editedRecords);
+      if (editedSummary.fileTotalProduction && Math.abs(editedSummary.totalProduction - editedSummary.fileTotalProduction) > MACHINE_PRODUCTION_TOLERANCE) {
+        const proceed = window.confirm(`A produção editada (${formatNumber(editedSummary.totalProduction)}) ainda está diferente do total do arquivo (${formatNumber(editedSummary.fileTotalProduction)}). Deseja salvar mesmo assim?`);
+        if (!proceed) return;
       }
 
       let added = 0;
       let updated = 0;
       const affectedKeys = new Set();
       const nextRecords = [...machineProductionRecords];
-      preview.records.forEach((record) => {
+      editedRecords.forEach((record) => {
         affectedKeys.add(machineProductionGroupKey(record));
         const existingIndex = nextRecords.findIndex((item) => (
           item.date === record.date
@@ -13678,15 +14062,15 @@
 
       machineProductionRecords = cleanNextRecords;
       persistMachineProductionRecords();
-      const firstRecord = preview.records[0];
+      const firstRecord = editedRecords[0];
       els.machineDate.value = firstRecord.date;
       setMachineProductionEntryDate(firstRecord.date);
       els.machineType.value = firstRecord.machineType;
       els.machineFront.value = firstRecord.front;
-      setMachineProductionRange(firstRecord.date, preview.records[preview.records.length - 1].date);
+      setMachineProductionRange(firstRecord.date, editedRecords[editedRecords.length - 1].date);
       renderMachineProductions();
       renderMachineProductionDashboardPage();
-      addAuditEntry("importacao", `Produção importada para ${preview.context.machineType}: ${added} nova${added === 1 ? "" : "s"}, ${updated} atualizada${updated === 1 ? "" : "s"}, ${preview.days} dia${preview.days === 1 ? "" : "s"}.`);
+      addAuditEntry("importacao", `Produção importada para ${preview.context.machineType}: ${added} nova${added === 1 ? "" : "s"}, ${updated} atualizada${updated === 1 ? "" : "s"}, ${editedSummary.days} dia${editedSummary.days === 1 ? "" : "s"}.`);
       closeMachineImportPreviewDialog();
 
       const rowsForSync = prepareMachineProductionRowsForSync(machineProductionRecords);
@@ -13699,7 +14083,7 @@
       persistMachineProductionRecords();
       renderMachineProductions();
 
-      const syncState = await syncOrQueue("machine-production-sync", { source: "machine-file-import-preview", days: preview.days, machineType: preview.context.machineType }, () => syncMachineProductionRecordsToFirebase({
+      const syncState = await syncOrQueue("machine-production-sync", { source: "machine-file-import-preview", days: editedSummary.days, machineType: preview.context.machineType }, () => syncMachineProductionRecordsToFirebase({
         silent: true,
         pendingMessage: "Enviando produção importada ao banco...",
         successStatus: "Produção importada e sincronizada.",
