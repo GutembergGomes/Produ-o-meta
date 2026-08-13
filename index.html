@@ -632,6 +632,13 @@
       font-weight: 800;
     }
 
+    .preview-warning.good {
+      border-color: var(--green);
+      border-left-color: var(--green);
+      background: rgba(102, 184, 118, .14);
+      color: var(--green-dark);
+    }
+
     .dashboard-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2548,6 +2555,8 @@
             <option value="Frente 4003">Frente 4003</option>
             <option value="Frente 4007">Frente 4007</option>
             <option value="Frente 4009">Frente 4009</option>
+            <option value="Cana Floresta">Cana Floresta</option>
+            <option value="Cana Vale">Cana Vale</option>
             <option value="Transporte Próprio">Transporte Próprio</option>
             <option value="Transporte Terceiro">Transporte Terceiro</option>
           </select>
@@ -2641,6 +2650,8 @@
               <option value="Frente 4003">Frente 4003</option>
               <option value="Frente 4007">Frente 4007</option>
               <option value="Frente 4009">Frente 4009</option>
+              <option value="Cana Floresta">Cana Floresta</option>
+              <option value="Cana Vale">Cana Vale</option>
               <option value="Transporte Próprio">Transporte Próprio</option>
               <option value="Transporte Terceiro">Transporte Terceiro</option>
             </select>
@@ -2704,6 +2715,8 @@
               <option value="Frente 4003">Frente 4003</option>
               <option value="Frente 4007">Frente 4007</option>
               <option value="Frente 4009">Frente 4009</option>
+              <option value="Cana Floresta">Cana Floresta</option>
+              <option value="Cana Vale">Cana Vale</option>
               <option value="Transporte Próprio">Transporte Próprio</option>
               <option value="Transporte Terceiro">Transporte Terceiro</option>
             </select>
@@ -3310,6 +3323,9 @@
     const ownHarvestFronts = ["Frente 4001", "Frente 4002", "Frente 4003"];
     const thirdHarvestFronts = ["Frente 4007", "Frente 4009"];
     const frontOptions = [...ownHarvestFronts, ...thirdHarvestFronts];
+    const externalCaneBases = [TYPES.FLORESTA_CANE, TYPES.VALE_CANE];
+    const machineProductionHarvestBaseOptions = [...frontOptions, ...externalCaneBases];
+    const machineProductionBaseOptions = [...machineProductionHarvestBaseOptions, TYPES.OWN_TRANSPORT, TYPES.THIRD_TRANSPORT];
 
     const fleetOptions = [
       "Colhedora 4001-01",
@@ -7444,13 +7460,18 @@
       return ownHarvestFronts[0];
     }
 
+    function normalizeMachineProductionBase(value, machineType) {
+      const normalizedType = normalizeMachineProductionType(machineType);
+      if (isMachineTruckType(normalizedType)) return defaultMachineProductionFrontForType(normalizedType);
+      const raw = String(value || "").trim();
+      return machineProductionHarvestBaseOptions.find((item) => sameText(item, raw)) || "";
+    }
+
     function normalizeMachineProductionRecord(row) {
       const date = normalizeRecordDate(row.date || row.data || row.day);
       const machineType = normalizeMachineProductionType(row.machineType || row.type || row.tipo || row.equipmentType);
-      const frontValue = String(row.front || row.frente || "").trim();
-      const front = isMachineTruckType(machineType)
-        ? defaultMachineProductionFrontForType(machineType)
-        : frontOptions.find((item) => sameText(item, frontValue)) || "";
+      const frontValue = String(row.front || row.frente || row.base || row.origem || "").trim();
+      const front = normalizeMachineProductionBase(frontValue, machineType);
       const fleet = String(row.fleet || row.frota || row.machine || row.maquina || row.equipment || row.caminhao || "").trim();
       const production = Math.max(0, parseNumber(row.production ?? row.producao ?? row.toneladas ?? row.total ?? 0));
       const loads = Math.max(0, parseNumber(row.loads ?? row.cargas ?? row.carregamentos ?? row.trips ?? row.viagens ?? 0));
@@ -7566,7 +7587,7 @@
       }
       if (isMachineTruckType(els.machineType.value)) {
         els.machineFront.value = defaultMachineProductionFrontForType(els.machineType.value);
-      } else if (!frontOptions.includes(els.machineFront.value)) {
+      } else if (!machineProductionHarvestBaseOptions.includes(els.machineFront.value)) {
         els.machineFront.value = ownHarvestFronts[0];
       }
       updateMachineProductionFormContext();
@@ -7596,8 +7617,8 @@
         if (frontLabel) frontLabel.textContent = "Base automática do transporte";
       } else {
         els.machineFront.disabled = false;
-        if (!frontOptions.includes(els.machineFront.value)) els.machineFront.value = ownHarvestFronts[0];
-        if (frontLabel) frontLabel.textContent = "Frente";
+        if (!machineProductionHarvestBaseOptions.includes(els.machineFront.value)) els.machineFront.value = ownHarvestFronts[0];
+        if (frontLabel) frontLabel.textContent = "Frente / entrega";
       }
     }
 
@@ -7614,19 +7635,43 @@
     function dailyFrontHarvestProduction(date, front) {
       const record = recordForDate(date);
       if (!record) return 0;
+      if (sameText(front, TYPES.FLORESTA_CANE)) {
+        return rowsFromRecords([record])
+          .filter((row) => row.type === TYPES.FLORESTA_CANE)
+          .reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+      }
+      if (sameText(front, TYPES.VALE_CANE)) {
+        return rowsFromRecords([record])
+          .filter((row) => row.type === TYPES.VALE_CANE)
+          .reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+      }
       const harvestType = ownHarvestFronts.some((item) => sameText(item, front)) ? TYPES.OWN_HARVEST : TYPES.THIRD_HARVEST;
       return rowsFromRecords([record])
         .filter((row) => row.type === harvestType && sameText(row.front, front))
         .reduce((sum, row) => sum + (Number(row.production) || 0), 0);
     }
 
+    function dailyMachineTransportProduction(date, machineType) {
+      const record = recordForDate(date);
+      if (!record) return 0;
+      const transportType = normalizeMachineProductionType(machineType) === "Caminhão Terceiro"
+        ? TYPES.THIRD_TRANSPORT
+        : TYPES.OWN_TRANSPORT;
+      return rowsFromRecords([record])
+        .filter((row) => row.type === transportType)
+        .reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+    }
+
     function dailyMachineProductionTarget(item) {
-      if (!item || item.machineType === "Caminhão Próprio" || item.machineType === "Caminhão Terceiro") return 0;
+      if (!item) return 0;
+      if (item.machineType === "Caminhão Próprio" || item.machineType === "Caminhão Terceiro") {
+        return dailyMachineTransportProduction(item.date, item.machineType);
+      }
       return dailyFrontHarvestProduction(item.date, item.front);
     }
 
     function machineProductionRequiresDailyMatch(group) {
-      return Boolean(group && group.machineType !== "Caminhão Próprio" && group.machineType !== "Caminhão Terceiro");
+      return Boolean(group);
     }
 
     function machineProductionGroupKey(row) {
@@ -8311,8 +8356,8 @@
     function resetMachineProductionForm(date = els.machineDate.value || todayInputValue()) {
       els.machineEntryId.value = "";
       els.machineDate.value = date;
-      els.machineFront.value = ownHarvestFronts[0];
       els.machineType.value = primaryMachineTypeForMode();
+      els.machineFront.value = defaultMachineProductionFrontForType(els.machineType.value);
       updateMachineProductionFormContext();
       els.machineFleet.value = "";
       els.machineProduction.value = "";
@@ -9441,7 +9486,7 @@
     }
 
     function renderOptions() {
-      els.frontOptions.innerHTML = frontOptions.map((item) => `<option value="${escapeHtml(item)}"></option>`).join("");
+      els.frontOptions.innerHTML = machineProductionBaseOptions.map((item) => `<option value="${escapeHtml(item)}"></option>`).join("");
       const knownFleets = [
         ...fleetOptions,
         ...entries.map((row) => row.fleet),
@@ -13278,7 +13323,8 @@
       const numbers = reportNumericTokens(afterDate);
       if (numbers.length < 2) return null;
       const cargas = numbers.find((item) => /^\d+$/.test(item)) || numbers[0];
-      const remaining = numbers.filter((item) => item !== cargas || numbers.indexOf(item) !== numbers.indexOf(cargas));
+      const loadIndex = numbers.findIndex((item) => item === cargas);
+      const remaining = numbers.filter((item, index) => index !== loadIndex);
       const toneladas = remaining[0] || "";
       const media = remaining[1] || "";
       if (!toneladas) return null;
@@ -13697,7 +13743,7 @@
       els.machineImportType.value = normalizeMachineProductionType(els.machineType.value);
       els.machineImportFront.value = isMachineTruckType(els.machineImportType.value)
         ? defaultMachineProductionFrontForType(els.machineImportType.value)
-        : els.machineFront.value || ownHarvestFronts[0];
+        : normalizeMachineProductionBase(els.machineFront.value, els.machineImportType.value) || ownHarvestFronts[0];
       els.machineImportFront.disabled = isMachineTruckType(els.machineImportType.value);
       els.machineImportMultiDay.checked = false;
       pendingMachineImportContext = null;
@@ -13716,7 +13762,7 @@
       const multiDay = Boolean(els.machineImportMultiDay && els.machineImportMultiDay.checked);
       const front = isMachineTruckType(machineType)
         ? defaultMachineProductionFrontForType(machineType)
-        : frontOptions.find((item) => item === els.machineImportFront.value) || "";
+        : normalizeMachineProductionBase(els.machineImportFront.value, machineType);
       if ((!multiDay && !date) || !front || !machineType) {
         showToast(multiDay ? "Informe a frente e o tipo do arquivo." : "Informe o dia, a frente e o tipo do arquivo.");
         return;
@@ -13796,13 +13842,21 @@
       const machineType = normalizeMachineProductionType(importContext.machineType);
       const front = isMachineTruckType(machineType)
         ? defaultMachineProductionFrontForType(machineType)
-        : importContext.front;
+        : normalizeMachineProductionBase(importContext.front, machineType);
       const fallbackDate = normalizeRecordDate(importContext.date) || todayInputValue();
       const hasRowDates = (payload.rows || []).some((row) => machineProductionDateFromImportRow(row, ""));
       const useRowDates = Boolean(importContext.multiDay || hasRowDates);
       const rows = [];
+      const errors = [];
+      const sourceRows = payload.rows || [];
 
-      (payload.rows || []).forEach((row) => {
+      const sourcePreview = (row) => Object.values(row || {})
+        .map((value) => String(value ?? "").replace(/\s+/g, " ").trim())
+        .filter(Boolean)
+        .join(" | ")
+        .slice(0, 220);
+
+      sourceRows.forEach((row, index) => {
         const fleet = String(valueFromRow(row, [
           "codigo",
           "código",
@@ -13845,7 +13899,20 @@
         ])) || (loads ? production / loads : 0);
         const note = String(valueFromRow(row, ["modelo", "observação", "observacao", "obs", "note"]) || "").trim();
 
-        if (!fleet || !date || !production || normalizeKey(fleet).startsWith("total")) return;
+        const reasons = [];
+        if (normalizeKey(fleet).startsWith("total")) return;
+        if (!fleet) reasons.push("sem código/equipamento");
+        if (!date) reasons.push("sem data válida");
+        if (!production) reasons.push("sem produção/toneladas");
+        if (!front) reasons.push("sem frente/base válida");
+        if (reasons.length) {
+          errors.push({
+            row: index + 1,
+            reason: reasons.join(", "),
+            source: sourcePreview(row) || `Linha ${index + 1}`
+          });
+          return;
+        }
         rows.push({
           id: makeId(),
           date,
@@ -13882,7 +13949,10 @@
         fileTotalProduction: fileTotals.production || 0,
         fileAverage: fileTotals.average || 0,
         productionDifference: fileTotals.production ? totalProduction - fileTotals.production : 0,
-        loadDifference: fileTotals.loads ? recognizedLoads - fileTotals.loads : 0
+        loadDifference: fileTotals.loads ? recognizedLoads - fileTotals.loads : 0,
+        sourceRows: sourceRows.length,
+        ignoredRows: errors.length,
+        errors
       };
     }
 
@@ -13899,15 +13969,50 @@
       }
 
       els.machineImportPreviewSummary.textContent = `${preview.records.length} linha${preview.records.length === 1 ? "" : "s"} reconhecida${preview.records.length === 1 ? "" : "s"} · ${preview.days} dia${preview.days === 1 ? "" : "s"} · ${preview.fleets} equipamento${preview.fleets === 1 ? "" : "s"} · Total reconhecido ${formatNumber(preview.totalProduction)}${preview.fileTotalProduction ? ` · Total arquivo ${formatNumber(preview.fileTotalProduction)}` : ""}.`;
-      const frontChoices = [...frontOptions, TYPES.OWN_TRANSPORT, TYPES.THIRD_TRANSPORT];
-      const warning = preview.fileTotalProduction && Math.abs(preview.productionDifference) > MACHINE_PRODUCTION_TOLERANCE
+      const frontChoices = machineProductionBaseOptions;
+      const hasProductionMismatch = preview.fileTotalProduction && Math.abs(preview.productionDifference) > MACHINE_PRODUCTION_TOLERANCE;
+      const hasLoadMismatch = preview.fileLoads && Math.abs(preview.loadDifference) > MACHINE_PRODUCTION_TOLERANCE;
+      const warning = hasProductionMismatch || hasLoadMismatch
         ? `<div class="preview-warning">
             <strong>Atenção: soma reconhecida diferente do total do arquivo.</strong>
-            <span>Arquivo ${formatNumber(preview.fileTotalProduction)} · Prévia ${formatNumber(preview.totalProduction)} · Diferença ${formatNumber(preview.productionDifference)}. Edite os campos antes de salvar.</span>
+            <span>Produção arquivo ${preview.fileTotalProduction ? formatNumber(preview.fileTotalProduction) : "-"} · Prévia ${formatNumber(preview.totalProduction)} · Diferença ${formatNumber(preview.productionDifference)}${preview.fileLoads ? ` · Cargas arquivo ${formatNumber(preview.fileLoads)} · Prévia ${formatNumber(preview.recognizedLoads)} · Diferença ${formatNumber(preview.loadDifference)}` : ""}. Edite os campos antes de salvar.</span>
+          </div>`
+        : "";
+      const comparison = `
+        <div class="preview-warning ${hasProductionMismatch || hasLoadMismatch || preview.ignoredRows ? "" : "good"}">
+          <strong>Comparador arquivo x prévia</strong>
+          <span>Linhas no arquivo ${preview.sourceRows} · Linhas para salvar ${preview.records.length} · Ignoradas ${preview.ignoredRows} · Produção arquivo ${preview.fileTotalProduction ? formatNumber(preview.fileTotalProduction) : "-"} · Produção prévia ${formatNumber(preview.totalProduction)} · Cargas arquivo ${preview.fileLoads ? formatNumber(preview.fileLoads) : "-"} · Cargas prévia ${formatNumber(preview.recognizedLoads)}.</span>
+        </div>
+      `;
+      const errorReport = preview.errors && preview.errors.length
+        ? `<div class="preview-warning">
+            <strong>Relatório de linhas ignoradas</strong>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Linha</th>
+                    <th>Motivo</th>
+                    <th>Conteúdo reconhecido</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${preview.errors.map((item) => `
+                    <tr>
+                      <td>${item.row}</td>
+                      <td>${escapeHtml(item.reason)}</td>
+                      <td>${escapeHtml(item.source)}</td>
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
+            </div>
           </div>`
         : "";
       els.machineImportPreviewWrap.innerHTML = `
+        ${comparison}
         ${warning}
+        ${errorReport}
         <table class="preview-edit-table">
           <thead>
             <tr>
@@ -13965,7 +14070,7 @@
         const machineType = normalizeMachineProductionType(fieldValue("machineType") || original.machineType);
         const front = isMachineTruckType(machineType)
           ? defaultMachineProductionFrontForType(machineType)
-          : frontOptions.find((item) => sameText(item, fieldValue("front"))) || fieldValue("front") || original.front;
+          : normalizeMachineProductionBase(fieldValue("front") || original.front, machineType);
         const production = parseNumber(fieldValue("production"));
         const loads = parseNumber(fieldValue("loads"));
         const averageYield = parseNumber(fieldValue("averageYield")) || (loads ? production / loads : 0);
@@ -14104,7 +14209,7 @@
           multiDay: false,
           front: isMachineTruckType(els.machineType.value)
             ? defaultMachineProductionFrontForType(els.machineType.value)
-            : els.machineFront.value || ownHarvestFronts[0]
+            : normalizeMachineProductionBase(els.machineFront.value, els.machineType.value) || ownHarvestFronts[0]
         };
         const preview = machineProductionImportPreviewFromPayload(payload, importContext);
         renderMachineImportPreview(preview);
@@ -17204,7 +17309,7 @@
       els.machineImportFront.disabled = isMachineTruckType(machineType);
       els.machineImportFront.value = isMachineTruckType(machineType)
         ? defaultMachineProductionFrontForType(machineType)
-        : frontOptions.includes(els.machineImportFront.value)
+        : machineProductionHarvestBaseOptions.includes(els.machineImportFront.value)
           ? els.machineImportFront.value
           : ownHarvestFronts[0];
     });
