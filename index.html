@@ -2683,9 +2683,9 @@
         <div class="workspace-actions">
           <button class="btn-secondary" id="importMachineFileBtn" type="button">Importar foto ou PDF</button>
           <button class="btn-secondary" id="importMachineFolderBtn" type="button">Importar pasta</button>
-          <input class="file-input" id="machineImportFile" type="file" accept="image/*,.pdf,.csv,.txt,.html,.htm,.xls,.xlsx,application/pdf,text/csv,text/plain,text/html">
+          <input class="file-input" id="machineImportFile" type="file" multiple accept="image/*,.pdf,.csv,.txt,.html,.htm,.xls,.xlsx,application/pdf,text/csv,text/plain,text/html">
           <input class="file-input" id="machineImportFolder" type="file" multiple webkitdirectory directory>
-          <span class="workspace-hint">Você pode importar um arquivo ou uma pasta inteira. O sistema tenta reconhecer data, frente/base e tipo pelo conteúdo, nome do arquivo ou subpasta, depois mostra a prévia para confirmar.</span>
+          <span class="workspace-hint">Você pode importar arquivo, vários arquivos ou uma pasta inteira. Por segurança do navegador, escolha a pasta no seletor do Windows; não cole o caminho manualmente.</span>
         </div>
         <div class="acceptance-controls">
           <label class="check-control" for="machineAcceptDifference">
@@ -2740,7 +2740,7 @@
         <div class="import-dialog-actions">
           <button class="btn-secondary" id="cancelMachineImportBtn" type="button">Cancelar</button>
           <button class="btn-secondary" id="chooseMachineImportFolderBtn" type="button">Escolher pasta</button>
-          <button class="btn-primary" id="chooseMachineImportFileBtn" type="button">Escolher arquivo</button>
+          <button class="btn-primary" id="chooseMachineImportFileBtn" type="button">Escolher arquivo(s)</button>
         </div>
       </dialog>
 
@@ -14122,7 +14122,7 @@
       els.machineImportFile.click();
     }
 
-    function chooseMachineImportFolder() {
+    async function chooseMachineImportFolder() {
       const date = normalizeRecordDate(els.machineImportDate.value);
       const machineType = normalizeMachineProductionType(els.machineImportType.value);
       const front = isMachineTruckType(machineType)
@@ -14136,6 +14136,22 @@
       els.machineFront.value = front;
       els.machineType.value = machineType;
       els.machineImportDialog.close();
+      if (typeof window.showDirectoryPicker === "function") {
+        try {
+          const directoryHandle = await window.showDirectoryPicker({ mode: "read" });
+          const files = await filesFromMachineProductionDirectory(directoryHandle);
+          await importMachineProductionFolder(files);
+          pendingMachineImportContext = null;
+          return;
+        } catch (error) {
+          if (error && error.name === "AbortError") {
+            pendingMachineImportContext = null;
+            showToast("Seleção de pasta cancelada.");
+            return;
+          }
+          showToast("O navegador não liberou a pasta. Vou abrir o seletor alternativo.");
+        }
+      }
       els.machineImportFolder.click();
     }
 
@@ -14593,7 +14609,37 @@
     }
 
     function machineProductionImportFilePath(file) {
-      return String((file && (file.webkitRelativePath || file.name)) || "");
+      return String((file && (file.relativePath || file.webkitRelativePath || file.name)) || "");
+    }
+
+    function machineProductionFileWithPath(file, relativePath) {
+      try {
+        Object.defineProperty(file, "relativePath", {
+          value: relativePath,
+          configurable: true
+        });
+      } catch {
+        try {
+          file.relativePath = relativePath;
+        } catch {
+          // Mantém apenas o nome do arquivo se o navegador bloquear a anotação.
+        }
+      }
+      return file;
+    }
+
+    async function filesFromMachineProductionDirectory(directoryHandle, basePath = "") {
+      const files = [];
+      for await (const [name, handle] of directoryHandle.entries()) {
+        const relativePath = basePath ? `${basePath}/${name}` : name;
+        if (handle.kind === "file") {
+          const file = await handle.getFile();
+          files.push(machineProductionFileWithPath(file, relativePath));
+        } else if (handle.kind === "directory") {
+          files.push(...await filesFromMachineProductionDirectory(handle, relativePath));
+        }
+      }
+      return files;
     }
 
     function isSupportedMachineProductionImportFile(file) {
@@ -17822,7 +17868,19 @@
           ? els.machineImportFront.value
           : ownHarvestFronts[0];
     });
-    els.machineImportFile.addEventListener("change", (event) => importMachineProductionFile(event.target.files[0]));
+    els.machineImportFile.addEventListener("change", async (event) => {
+      const files = [...(event.target.files || [])];
+      try {
+        if (files.length > 1) {
+          await importMachineProductionFolder(files);
+        } else {
+          await importMachineProductionFile(files[0]);
+        }
+      } finally {
+        els.machineImportFile.value = "";
+        pendingMachineImportContext = null;
+      }
+    });
     els.machineImportFolder.addEventListener("change", async (event) => {
       try {
         await importMachineProductionFolder(event.target.files);
