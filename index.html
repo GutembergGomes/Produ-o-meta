@@ -2682,8 +2682,10 @@
         </div>
         <div class="workspace-actions">
           <button class="btn-secondary" id="importMachineFileBtn" type="button">Importar foto ou PDF</button>
+          <button class="btn-secondary" id="importMachineFolderBtn" type="button">Importar pasta</button>
           <input class="file-input" id="machineImportFile" type="file" accept="image/*,.pdf,.csv,.txt,.html,.htm,.xls,.xlsx,application/pdf,text/csv,text/plain,text/html">
-          <span class="workspace-hint">Antes de escolher o arquivo, o sistema solicitará o dia, a frente/transporte e se o relatório é de colhedora, transbordo ou caminhão.</span>
+          <input class="file-input" id="machineImportFolder" type="file" multiple webkitdirectory directory>
+          <span class="workspace-hint">Você pode importar um arquivo ou uma pasta inteira. O sistema tenta reconhecer data, frente/base e tipo pelo conteúdo, nome do arquivo ou subpasta, depois mostra a prévia para confirmar.</span>
         </div>
         <div class="acceptance-controls">
           <label class="check-control" for="machineAcceptDifference">
@@ -2737,7 +2739,8 @@
         </label>
         <div class="import-dialog-actions">
           <button class="btn-secondary" id="cancelMachineImportBtn" type="button">Cancelar</button>
-          <button class="btn-primary" id="chooseMachineImportFileBtn" type="button">Escolher foto ou PDF</button>
+          <button class="btn-secondary" id="chooseMachineImportFolderBtn" type="button">Escolher pasta</button>
+          <button class="btn-primary" id="chooseMachineImportFileBtn" type="button">Escolher arquivo</button>
         </div>
       </dialog>
 
@@ -3290,7 +3293,11 @@
     const REDUCTION_SYNC_KEY = "cambui.daily.production.reductions.sync.v1";
     const MACHINE_PRODUCTION_STORAGE_KEY = "cambui.daily.production.machines.v1";
     const MACHINE_PRODUCTION_SYNC_KEY = "cambui.daily.production.machines.sync.v1";
+    const RECORDS_SYNC_KEY = "cambui.daily.production.records.sync.v1";
+    const TARGETS_SYNC_KEY = "cambui.daily.production.targets.sync.v1";
     const FIREBASE_CONFIG_KEY = "cambui.daily.production.firebase.config.v1";
+    const FIREBASE_META_CACHE_KEY = "cambui.daily.production.firebase.meta.cache.v1";
+    const FIREBASE_WRITE_CACHE_KEY = "cambui.daily.production.firebase.write.cache.v1";
     const THEME_KEY = "cambui.daily.production.theme.v1";
     const FIREBASE_APP_NAME = "cambui-production-app";
     const AUTO_BACKUPS_KEY = "cambui.daily.production.auto.backups.v1";
@@ -3300,6 +3307,7 @@
     const MAX_AUTO_BACKUPS = 12;
     const MAX_AUDIT_LOG = 80;
     const MAX_PENDING_SYNCS = 200;
+    const FIREBASE_AUTO_PULL_INTERVAL_MS = 120000;
     const PREVIOUS_KEYS = [
       "cambui.daily.production.v4",
       "cambui.daily.own.production.v3",
@@ -3515,6 +3523,7 @@
       machineImportFront: document.querySelector("#machineImportFront"),
       machineImportType: document.querySelector("#machineImportType"),
       machineImportMultiDay: document.querySelector("#machineImportMultiDay"),
+      machineImportFolder: document.querySelector("#machineImportFolder"),
       machineImportPreviewDialog: document.querySelector("#machineImportPreviewDialog"),
       machineImportPreviewSummary: document.querySelector("#machineImportPreviewSummary"),
       machineImportPreviewWrap: document.querySelector("#machineImportPreviewWrap"),
@@ -3647,6 +3656,8 @@
 
     let records = loadRecords();
     let targets = loadTargets();
+    let recordsLocalUpdatedAt = loadLocalTimestamp(RECORDS_SYNC_KEY) || latestRowsUpdatedAt(records);
+    let targetsLocalUpdatedAt = loadLocalTimestamp(TARGETS_SYNC_KEY);
     let patioRecords = loadPatioRecords();
     let patioLocalUpdatedAt = loadPatioUpdatedAt();
     let stoppageRecords = loadStoppageRecords();
@@ -3660,6 +3671,8 @@
     let autoBackups = loadAutoBackups();
     let auditLog = loadAuditLog();
     let pendingSyncQueue = loadPendingSyncQueue();
+    let firebaseWriteCache = loadFirebaseWriteCache();
+    let firebaseAutoPullTimer = null;
     let currentTheme = loadTheme();
     let transportRankingPeriod = "week";
     let machineProductionMode = "harvesters";
@@ -4345,6 +4358,10 @@
     function formatFirebaseError(error) {
       const code = String(error && error.code ? error.code : "").trim();
       const message = String(error && error.message ? error.message : error || "Erro desconhecido").trim();
+      const normalized = normalizeKey(`${code} ${message}`);
+      if (normalized.includes("resource-exhausted") || normalized.includes("quota") || normalized.includes("cota")) {
+        return "Limite/cota do Firebase atingido. O sistema manteve os dados no computador e vai tentar novamente depois, sem ficar forçando o banco.";
+      }
       const detail = code ? `${code}: ${message}` : message;
       return detail.length > 180 ? `${detail.slice(0, 177)}...` : detail;
     }
@@ -4390,6 +4407,62 @@
 
     function firebaseRootRef() {
       return firebaseState.db.collection("productionApps").doc("cambui");
+    }
+
+    function loadLocalTimestamp(key) {
+      try {
+        return String(localStorage.getItem(key) || "");
+      } catch {
+        return "";
+      }
+    }
+
+    function persistLocalTimestamp(key, value = new Date().toISOString()) {
+      try {
+        localStorage.setItem(key, value);
+      } catch {
+        // Se o navegador negar espaço, o sistema ainda mantém os dados em memória.
+      }
+      return value;
+    }
+
+    function latestRowsUpdatedAt(rows = []) {
+      return (rows || []).reduce((latest, row) => {
+        const value = String((row && (row.updatedAt || row.approvedAt || row.reopenedAt || row.createdAt)) || "");
+        return value && value.localeCompare(latest) > 0 ? value : latest;
+      }, "");
+    }
+
+    function loadFirebaseWriteCache() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(FIREBASE_WRITE_CACHE_KEY) || "{}");
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+      } catch {
+        return {};
+      }
+    }
+
+    function persistFirebaseWriteCache() {
+      try {
+        localStorage.setItem(FIREBASE_WRITE_CACHE_KEY, JSON.stringify(firebaseWriteCache));
+      } catch {
+        firebaseWriteCache = {};
+      }
+    }
+
+    function stableFirebaseValue(value) {
+      if (Array.isArray(value)) return value.map(stableFirebaseValue);
+      if (value && typeof value === "object") {
+        return Object.keys(value).sort().reduce((result, key) => {
+          result[key] = stableFirebaseValue(value[key]);
+          return result;
+        }, {});
+      }
+      return value;
+    }
+
+    function firebaseWriteHash(value) {
+      return JSON.stringify(stableFirebaseValue(value));
     }
 
     function safeFirebaseDocId(value) {
@@ -4451,10 +4524,17 @@
         });
       }
       byDocId.forEach((row, docId) => {
-        tasks.push(() => collectionRef.doc(docId).set(row, { merge: true }));
+        const cacheKey = `${collectionName}/${docId}`;
+        const hash = firebaseWriteHash(row);
+        if (!options.force && firebaseWriteCache[cacheKey] === hash) return;
+        tasks.push(async () => {
+          await collectionRef.doc(docId).set(row, { merge: true });
+          firebaseWriteCache[cacheKey] = hash;
+        });
       });
 
       await runFirebaseWritesInChunks(tasks);
+      if (tasks.length) persistFirebaseWriteCache();
     }
 
     async function readFirebaseCollectionSnapshot(collectionRef, pageSize = 500) {
@@ -4645,43 +4725,23 @@
       }
 
       const connected = await ensureFirebaseReady({ silent: true, force: changed });
+      if (connected) startFirebaseAutoPull();
       showToast(connected ? "Configuracao do Firebase salva." : "Configuracao salva, mas a conexao com o Firebase falhou.");
     }
 
     async function testFirebaseConnection() {
       const startedAt = performance.now();
       const tested = await runFirebaseTask(async (root) => {
-        const [metaSnapshot, recordRows, patioRows, stoppageRows, reductionRows, machineRows, approvalRows] = await Promise.all([
-          root.get(),
-          readFirebaseRecords(root),
-          readFirebaseCollection(root, "patioRecords"),
-          readFirebaseCollection(root, "stoppageRecords"),
-          readFirebaseCollection(root, "reductionRecords"),
-          readFirebaseCollection(root, "machineProductionRecords"),
-          readFirebaseCollection(root, "dailyApprovals")
-        ]);
+        const metaSnapshot = await root.get();
         const meta = metaSnapshot.exists ? metaSnapshot.data() || {} : {};
-        await root.set({
-          plant: PLANT,
-          version: APP_VERSION,
-          updatedAt: new Date().toISOString(),
-          targets: getCleanTargets(),
-          recordCount: records.length,
-          patioRecordCount: getCleanPatioRecords(patioRecords).length,
-          stoppageRecordCount: getCleanStoppageRecords(stoppageRecords).length,
-          reductionRecordCount: getCleanReductionRecords(reductionRecords).length,
-          machineProductionRecordCount: getCleanMachineProductionRecords(machineProductionRecords).length,
-          dailyApprovalCount: getCleanDailyApprovals().length,
-          ...firebaseLargeArrayCleanupFields()
-        }, { merge: true });
         return {
           connected: true,
-          remoteRecords: recordRows.length,
-          remotePatio: patioRows.length,
-          remoteStoppage: stoppageRows.length,
-          remoteReduction: reductionRows.length,
-          remoteMachine: machineRows.length,
-          remoteApprovals: approvalRows.length,
+          remoteRecords: Number(meta.recordCount) || 0,
+          remotePatio: Number(meta.patioRecordCount) || 0,
+          remoteStoppage: Number(meta.stoppageRecordCount) || 0,
+          remoteReduction: Number(meta.reductionRecordCount) || 0,
+          remoteMachine: Number(meta.machineProductionRecordCount) || 0,
+          remoteApprovals: Number(meta.dailyApprovalCount) || 0,
           expectedRecords: Number(meta.recordCount) || 0,
           expectedPatio: Number(meta.patioRecordCount) || 0,
           expectedStoppage: Number(meta.stoppageRecordCount) || 0,
@@ -4704,15 +4764,17 @@
       });
 
       if (tested && typeof tested === "object") renderFirebaseDiagnostics(tested);
-      showToast(tested ? "Firebase conectado com sucesso." : "Falha ao testar o Firebase.");
+      showToast(tested ? "Firebase conectado com teste leve. Use baixar dados se quiser conferir tudo." : "Falha ao testar o Firebase.");
     }
 
     async function syncTargetsToFirebase(options = {}) {
+      const now = new Date().toISOString();
       return runFirebaseTask(async (root) => {
         await root.set({
           plant: PLANT,
           version: APP_VERSION,
-          updatedAt: new Date().toISOString(),
+          updatedAt: now,
+          targetsUpdatedAt: now,
           targets: getCleanTargets(),
           recordCount: records.length,
           patioRecordCount: getCleanPatioRecords(patioRecords).length,
@@ -4722,6 +4784,7 @@
           dailyApprovalCount: getCleanDailyApprovals().length,
           ...firebaseLargeArrayCleanupFields()
         }, { merge: true });
+        targetsLocalUpdatedAt = persistLocalTimestamp(TARGETS_SYNC_KEY, now);
       }, options);
     }
 
@@ -4742,6 +4805,7 @@
           plant: PLANT,
           version: APP_VERSION,
           updatedAt: cleanRecord.updatedAt,
+          recordsUpdatedAt: cleanRecord.updatedAt,
           targets: getCleanTargets(),
           recordCount: records.length,
           patioRecordCount: getCleanPatioRecords(patioRecords).length,
@@ -4779,6 +4843,7 @@
           plant: PLANT,
           version: APP_VERSION,
           updatedAt: new Date().toISOString(),
+          recordsUpdatedAt: new Date().toISOString(),
           targets: getCleanTargets(),
           recordCount: records.length,
           patioRecordCount: getCleanPatioRecords(patioRecords).length,
@@ -4808,6 +4873,8 @@
           plant: PLANT,
           version: APP_VERSION,
           updatedAt: now,
+          targetsUpdatedAt: now,
+          recordsUpdatedAt: now,
           targets: getCleanTargets(),
           recordCount: cleanRecords.length,
           patioUpdatedAt: now,
@@ -4953,21 +5020,64 @@
       }, options);
     }
 
+    function firebaseRemoteTimestamp(meta, key) {
+      return String((meta && (meta[key] || meta.updatedAt)) || "");
+    }
+
+    function firebaseLocalDownloadMeta() {
+      return {
+        targetsUpdatedAt: targetsLocalUpdatedAt,
+        recordsUpdatedAt: recordsLocalUpdatedAt || latestRowsUpdatedAt(records),
+        patioUpdatedAt: patioLocalUpdatedAt,
+        stoppageUpdatedAt: stoppageLocalUpdatedAt,
+        reductionUpdatedAt: reductionLocalUpdatedAt,
+        machineProductionUpdatedAt: machineProductionLocalUpdatedAt,
+        dailyApprovalsUpdatedAt: latestRowsUpdatedAt(getCleanDailyApprovals(dailyApprovals))
+      };
+    }
+
+    function firebaseShouldDownloadModule(meta, localMeta, updatedKey, countKey, localCount, force = false) {
+      if (force) return true;
+      const remoteUpdatedAt = firebaseRemoteTimestamp(meta, updatedKey);
+      const localUpdatedAt = String(localMeta[updatedKey] || "");
+      if (remoteUpdatedAt && (!localUpdatedAt || remoteUpdatedAt.localeCompare(localUpdatedAt) > 0)) return true;
+      const remoteCount = Number(meta && meta[countKey]);
+      return Number.isFinite(remoteCount) && remoteCount > Number(localCount || 0) && !remoteUpdatedAt;
+    }
+
     async function downloadAllDataFromFirebase(options = {}) {
       const downloaded = await runFirebaseTask(async (root) => {
         const startedAt = performance.now();
-        const [metaSnapshot, recordRows, patioRows, stoppageRows, reductionRows, machineProductionRows, approvalRows] = await Promise.all([
-          root.get(),
-          readFirebaseRecords(root),
-          readFirebaseCollection(root, "patioRecords"),
-          readFirebaseCollection(root, "stoppageRecords"),
-          readFirebaseCollection(root, "reductionRecords"),
-          readFirebaseCollection(root, "machineProductionRecords"),
-          readFirebaseCollection(root, "dailyApprovals")
+        const metaSnapshot = await root.get();
+        const meta = metaSnapshot.exists ? metaSnapshot.data() || {} : {};
+        const localMeta = firebaseLocalDownloadMeta();
+        const force = Boolean(options.force);
+        const readRecords = firebaseShouldDownloadModule(meta, localMeta, "recordsUpdatedAt", "recordCount", getCleanRecords(records).length, force);
+        const readPatio = firebaseShouldDownloadModule(meta, localMeta, "patioUpdatedAt", "patioRecordCount", getCleanPatioRecords(patioRecords).length, force);
+        const readStoppage = firebaseShouldDownloadModule(meta, localMeta, "stoppageUpdatedAt", "stoppageRecordCount", getCleanStoppageRecords(stoppageRecords).length, force);
+        const readReduction = firebaseShouldDownloadModule(meta, localMeta, "reductionUpdatedAt", "reductionRecordCount", getCleanReductionRecords(reductionRecords).length, force);
+        const readMachine = firebaseShouldDownloadModule(meta, localMeta, "machineProductionUpdatedAt", "machineProductionRecordCount", getCleanMachineProductionRecords(machineProductionRecords).length, force);
+        const readApprovals = firebaseShouldDownloadModule(meta, localMeta, "dailyApprovalsUpdatedAt", "dailyApprovalCount", getCleanDailyApprovals(dailyApprovals).length, force);
+        const readTargets = force || firebaseRemoteTimestamp(meta, "targetsUpdatedAt").localeCompare(String(localMeta.targetsUpdatedAt || "")) > 0;
+
+        const [recordRows, patioRows, stoppageRows, reductionRows, machineProductionRows, approvalRows] = await Promise.all([
+          readRecords ? readFirebaseRecords(root) : Promise.resolve([]),
+          readPatio ? readFirebaseCollection(root, "patioRecords") : Promise.resolve([]),
+          readStoppage ? readFirebaseCollection(root, "stoppageRecords") : Promise.resolve([]),
+          readReduction ? readFirebaseCollection(root, "reductionRecords") : Promise.resolve([]),
+          readMachine ? readFirebaseCollection(root, "machineProductionRecords") : Promise.resolve([]),
+          readApprovals ? readFirebaseCollection(root, "dailyApprovals") : Promise.resolve([])
         ]);
 
         return {
-          meta: metaSnapshot.exists ? metaSnapshot.data() : {},
+          meta,
+          readTargets,
+          readRecords,
+          readPatio,
+          readStoppage,
+          readReduction,
+          readMachine,
+          readApprovals,
           records: recordRows,
           patioRecords: patioRows,
           stoppageRecords: stoppageRows,
@@ -4982,7 +5092,38 @@
         return false;
       }
 
-      const remoteTargets = downloaded.meta && downloaded.meta.targets ? cloneTargets(downloaded.meta.targets) : null;
+      const hasChangedRemoteModule = Boolean(
+        downloaded.readTargets
+        || downloaded.readRecords
+        || downloaded.readPatio
+        || downloaded.readStoppage
+        || downloaded.readReduction
+        || downloaded.readMachine
+        || downloaded.readApprovals
+      );
+      if (!hasChangedRemoteModule) {
+        firebaseState.lastMessage = "Banco verificado: este computador ja esta atualizado.";
+        renderFirebaseStatus();
+        renderFirebaseDiagnostics({
+          connected: true,
+          remoteRecords: Number(downloaded.meta?.recordCount) || getCleanRecords(records).length,
+          remotePatio: Number(downloaded.meta?.patioRecordCount) || getCleanPatioRecords(patioRecords).length,
+          remoteStoppage: Number(downloaded.meta?.stoppageRecordCount) || getCleanStoppageRecords(stoppageRecords).length,
+          remoteReduction: Number(downloaded.meta?.reductionRecordCount) || getCleanReductionRecords(reductionRecords).length,
+          remoteMachine: Number(downloaded.meta?.machineProductionRecordCount) || getCleanMachineProductionRecords(machineProductionRecords).length,
+          remoteApprovals: Number(downloaded.meta?.dailyApprovalCount) || getCleanDailyApprovals().length,
+          localRecords: getCleanRecords(records).length,
+          localPatio: getCleanPatioRecords(patioRecords).length,
+          localStoppage: getCleanStoppageRecords(stoppageRecords).length,
+          localReduction: getCleanReductionRecords(reductionRecords).length,
+          localMachine: getCleanMachineProductionRecords(machineProductionRecords).length,
+          localApprovals: getCleanDailyApprovals().length,
+          elapsedMs: downloaded.elapsedMs
+        });
+        return false;
+      }
+
+      const remoteTargets = downloaded.readTargets && downloaded.meta && downloaded.meta.targets ? cloneTargets(downloaded.meta.targets) : null;
       const remoteRecords = consolidateRecords(downloaded.records || []);
       const remotePatioRows = Array.isArray(downloaded.patioRecords) && downloaded.patioRecords.length
         ? downloaded.patioRecords
@@ -5041,12 +5182,12 @@
 
       if (remoteTargets) {
         targets = cloneTargets(remoteTargets);
-        persistTargets();
+        persistTargets({ updatedAt: firebaseRemoteTimestamp(downloaded.meta, "targetsUpdatedAt") || new Date().toISOString() });
       }
 
       if (remoteRecords.length) {
         records = consolidateRecords([...records, ...remoteRecords]);
-        persistRecords();
+        persistRecords({ updatedAt: firebaseRemoteTimestamp(downloaded.meta, "recordsUpdatedAt") || latestRowsUpdatedAt(remoteRecords) || new Date().toISOString() });
       }
 
       const shouldSkipPatioDownload = options.skipPatioIfLocalExists && getCleanPatioRecords(patioRecords).length;
@@ -5085,12 +5226,12 @@
 
       renderFirebaseDiagnostics({
         connected: true,
-        remoteRecords: remoteRecords.length,
-        remotePatio: remotePatioRecords.length,
-        remoteStoppage: remoteStoppageRecords.length,
-        remoteReduction: remoteReductionRecords.length,
-        remoteMachine: remoteMachineProductionRecords.length,
-        remoteApprovals: remoteDailyApprovals.length,
+        remoteRecords: downloaded.readRecords ? remoteRecords.length : Number(downloaded.meta?.recordCount) || remoteRecords.length,
+        remotePatio: downloaded.readPatio ? remotePatioRecords.length : Number(downloaded.meta?.patioRecordCount) || remotePatioRecords.length,
+        remoteStoppage: downloaded.readStoppage ? remoteStoppageRecords.length : Number(downloaded.meta?.stoppageRecordCount) || remoteStoppageRecords.length,
+        remoteReduction: downloaded.readReduction ? remoteReductionRecords.length : Number(downloaded.meta?.reductionRecordCount) || remoteReductionRecords.length,
+        remoteMachine: downloaded.readMachine ? remoteMachineProductionRecords.length : Number(downloaded.meta?.machineProductionRecordCount) || remoteMachineProductionRecords.length,
+        remoteApprovals: downloaded.readApprovals ? remoteDailyApprovals.length : Number(downloaded.meta?.dailyApprovalCount) || remoteDailyApprovals.length,
         expectedRecords: Number(downloaded.meta?.recordCount) || 0,
         expectedPatio: Number(downloaded.meta?.patioRecordCount) || 0,
         expectedStoppage: Number(downloaded.meta?.stoppageRecordCount) || 0,
@@ -5130,8 +5271,9 @@
       }
     }
 
-    function persistTargets() {
+    function persistTargets(options = {}) {
       localStorage.setItem(TARGETS_KEY, JSON.stringify(getCleanTargets()));
+      targetsLocalUpdatedAt = persistLocalTimestamp(TARGETS_SYNC_KEY, options.updatedAt || new Date().toISOString());
     }
 
     function getCleanRecords(source = records) {
@@ -5844,6 +5986,19 @@
       return true;
     }
 
+    function startFirebaseAutoPull() {
+      if (firebaseAutoPullTimer) clearInterval(firebaseAutoPullTimer);
+      if (!hasFirebaseConfig()) return;
+      firebaseAutoPullTimer = setInterval(async () => {
+        if (!hasFirebaseConfig() || !isOnline() || firebaseState.syncing || document.hidden || pendingSyncQueue.length) return;
+        await downloadAllDataFromFirebase({
+          silent: true,
+          pendingMessage: "Verificando atualizacoes do banco...",
+          successStatus: "Atualizacoes do banco conferidas."
+        });
+      }, FIREBASE_AUTO_PULL_INTERVAL_MS);
+    }
+
     function renderPendingSyncQueue() {
       if (!pendingSyncQueue.length) {
         els.pendingSyncWrap.innerHTML = '<div class="empty-state">Nenhuma pendencia de sincronizacao. Se ficar sem internet, o sistema salva localmente e envia depois.</div>';
@@ -6145,9 +6300,10 @@
       }
     }
 
-    function persistRecords() {
+    function persistRecords(options = {}) {
       records = getCleanRecords(records);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+      recordsLocalUpdatedAt = persistLocalTimestamp(RECORDS_SYNC_KEY, options.updatedAt || latestRowsUpdatedAt(records) || new Date().toISOString());
     }
 
     function summarizeRows(rows, options = {}) {
@@ -13966,13 +14122,49 @@
       els.machineImportFile.click();
     }
 
+    function chooseMachineImportFolder() {
+      const date = normalizeRecordDate(els.machineImportDate.value);
+      const machineType = normalizeMachineProductionType(els.machineImportType.value);
+      const front = isMachineTruckType(machineType)
+        ? defaultMachineProductionFrontForType(machineType)
+        : normalizeMachineProductionBase(els.machineImportFront.value, machineType);
+      if (!front || !machineType) {
+        showToast("Informe a frente/base padrão e o tipo para importar a pasta.");
+        return;
+      }
+      pendingMachineImportContext = { date, front, machineType, multiDay: true, folder: true };
+      els.machineFront.value = front;
+      els.machineType.value = machineType;
+      els.machineImportDialog.close();
+      els.machineImportFolder.click();
+    }
+
     function machineProductionTypeFromReport(text, fallback = "Colhedora") {
       const key = normalizeKey(text);
       if ((key.includes("caminhoes") || key.includes("caminhao")) && key.includes("terce")) return "Caminhão Terceiro";
       if (key.includes("caminhoes e dias trabalhados") || key.includes("caminhao e dias trabalhados")) return "Caminhão Próprio";
+      if ((key.includes("caminhao") || key.includes("caminhoes")) && (key.includes("proprio") || key.includes("proprios"))) return "Caminhão Próprio";
       if (key.includes("transbordo") && key.includes("dias trabalhados")) return "Transbordo";
+      if (key.includes("transbordo") || key.includes("transbordos")) return "Transbordo";
       if (key.includes("colhedora") && key.includes("dias trabalhados")) return "Colhedora";
+      if (key.includes("colhedora") || key.includes("colhedoras")) return "Colhedora";
       return normalizeMachineProductionType(fallback);
+    }
+
+    function machineProductionBaseFromReport(text, machineType, fallback = "") {
+      const normalizedType = normalizeMachineProductionType(machineType);
+      if (isMachineTruckType(normalizedType)) return defaultMachineProductionFrontForType(normalizedType);
+      const key = normalizeKey(text);
+      const exact = machineProductionHarvestBaseOptions.find((item) => key.includes(normalizeKey(item)));
+      if (exact) return exact;
+      const frontNumber = key.match(/\b(4001|4002|4003|4007|4009)\b/);
+      if (frontNumber) {
+        const byNumber = machineProductionHarvestBaseOptions.find((item) => normalizeKey(item).includes(frontNumber[1]));
+        if (byNumber) return byNumber;
+      }
+      if (key.includes("floresta")) return TYPES.FLORESTA_CANE;
+      if (key.includes("vale")) return TYPES.VALE_CANE;
+      return normalizeMachineProductionBase(fallback, normalizedType);
     }
 
     function machineProductionDateFromReport(text, fallback = todayInputValue()) {
@@ -13980,6 +14172,17 @@
       const endMatch = source.match(/fim\s*:?\s*(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/i);
       const startMatch = source.match(/in[ií]cio\s*:?\s*(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/i);
       return normalizeRecordDate((endMatch && endMatch[1]) || (startMatch && startMatch[1]) || fallback) || fallback;
+    }
+
+    function machineProductionDateFromAnyText(text, fallback = "") {
+      const source = String(text || "");
+      const reportDate = machineProductionDateFromReport(source, "");
+      if (reportDate) return reportDate;
+      const brMatch = source.match(/(\d{1,2})[\/._-](\d{1,2})[\/._-](\d{2,4})/);
+      if (brMatch) return normalizeRecordDate(`${brMatch[1]}/${brMatch[2]}/${brMatch[3]}`) || fallback;
+      const isoMatch = source.match(/(\d{4})[\/._-](\d{1,2})[\/._-](\d{1,2})/);
+      if (isoMatch) return normalizeRecordDate(`${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`) || fallback;
+      return normalizeRecordDate(fallback);
     }
 
     async function machineProductionImportPayload(file) {
@@ -14159,7 +14362,7 @@
         return;
       }
 
-      els.machineImportPreviewSummary.textContent = `${preview.records.length} linha${preview.records.length === 1 ? "" : "s"} reconhecida${preview.records.length === 1 ? "" : "s"} · ${preview.days} dia${preview.days === 1 ? "" : "s"} · ${preview.fleets} equipamento${preview.fleets === 1 ? "" : "s"} · Total reconhecido ${formatNumber(preview.totalProduction)}${preview.fileTotalProduction ? ` · Total arquivo ${formatNumber(preview.fileTotalProduction)}` : ""}.`;
+      els.machineImportPreviewSummary.textContent = `${preview.sourceFiles ? `${preview.sourceFiles} arquivo${preview.sourceFiles === 1 ? "" : "s"} · ` : ""}${preview.records.length} linha${preview.records.length === 1 ? "" : "s"} reconhecida${preview.records.length === 1 ? "" : "s"} · ${preview.days} dia${preview.days === 1 ? "" : "s"} · ${preview.fleets} equipamento${preview.fleets === 1 ? "" : "s"} · Total reconhecido ${formatNumber(preview.totalProduction)}${preview.fileTotalProduction ? ` · Total arquivo ${formatNumber(preview.fileTotalProduction)}` : ""}.`;
       const frontChoices = machineProductionBaseOptions;
       const hasProductionMismatch = preview.fileTotalProduction && Math.abs(preview.productionDifference) > MACHINE_PRODUCTION_TOLERANCE;
       const hasLoadMismatch = preview.fileLoads && Math.abs(preview.loadDifference) > MACHINE_PRODUCTION_TOLERANCE;
@@ -14172,7 +14375,7 @@
       const comparison = `
         <div class="preview-warning ${hasProductionMismatch || hasLoadMismatch || preview.ignoredRows ? "" : "good"}">
           <strong>Comparador arquivo x prévia</strong>
-          <span>Linhas no arquivo ${preview.sourceRows} · Linhas para salvar ${preview.records.length} · Ignoradas ${preview.ignoredRows} · Produção arquivo ${preview.fileTotalProduction ? formatNumber(preview.fileTotalProduction) : "-"} · Produção prévia ${formatNumber(preview.totalProduction)} · Cargas arquivo ${preview.fileLoads ? formatNumber(preview.fileLoads) : "-"} · Cargas prévia ${formatNumber(preview.recognizedLoads)}.</span>
+          <span>${preview.sourceFiles ? `Arquivos ${preview.sourceFiles} · ` : ""}Linhas no arquivo ${preview.sourceRows} · Linhas para salvar ${preview.records.length} · Ignoradas ${preview.ignoredRows} · Produção arquivo ${preview.fileTotalProduction ? formatNumber(preview.fileTotalProduction) : "-"} · Produção prévia ${formatNumber(preview.totalProduction)} · Cargas arquivo ${preview.fileLoads ? formatNumber(preview.fileLoads) : "-"} · Cargas prévia ${formatNumber(preview.recognizedLoads)}.</span>
         </div>
       `;
       const errorReport = preview.errors && preview.errors.length
@@ -14389,12 +14592,123 @@
       showToast(syncState === "synced" ? `${summary} Banco atualizado.` : summary);
     }
 
+    function machineProductionImportFilePath(file) {
+      return String((file && (file.webkitRelativePath || file.name)) || "");
+    }
+
+    function isSupportedMachineProductionImportFile(file) {
+      const name = machineProductionImportFilePath(file).toLowerCase();
+      return Boolean(file) && (
+        /^image\//i.test(file.type)
+        || /\.(pdf|csv|txt|html|htm|xls|xlsx)$/i.test(name)
+        || file.type === "application/pdf"
+        || /^text\//i.test(file.type)
+      );
+    }
+
+    function machineProductionImportContextForFile(file, payload, baseContext = {}) {
+      const descriptor = `${machineProductionImportFilePath(file)}\n${payload?.text || ""}`;
+      const machineType = machineProductionTypeFromReport(descriptor, baseContext.machineType || els.machineType.value || "Colhedora");
+      const front = machineProductionBaseFromReport(descriptor, machineType, baseContext.front || els.machineFront.value || ownHarvestFronts[0]);
+      const date = machineProductionDateFromAnyText(descriptor, baseContext.date || els.machineDate.value || todayInputValue()) || todayInputValue();
+      return {
+        ...baseContext,
+        date,
+        front,
+        machineType,
+        multiDay: Boolean(baseContext.multiDay || baseContext.folder)
+      };
+    }
+
+    function mergeMachineImportPreviews(previews, fileErrors = []) {
+      const records = previews.flatMap((preview) => preview.records || []);
+      const errors = [
+        ...previews.flatMap((preview) => (preview.errors || []).map((error) => ({
+          ...error,
+          source: preview.fileName ? `${preview.fileName}: ${error.source}` : error.source
+        }))),
+        ...fileErrors
+      ];
+      const dates = new Set(records.map((row) => row.date));
+      const fleets = new Set(records.map((row) => normalizeKey(row.fleet)));
+      const recognizedLoads = records.reduce((sum, row) => sum + (Number(row.loads) || 0), 0);
+      const totalProduction = records.reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+      const fileLoads = previews.reduce((sum, preview) => sum + (Number(preview.fileLoads) || 0), 0);
+      const fileTotalProduction = previews.reduce((sum, preview) => sum + (Number(preview.fileTotalProduction) || 0), 0);
+      return {
+        context: {
+          machineType: previews.length > 1 ? "Pasta de arquivos" : previews[0]?.context?.machineType || "Arquivo",
+          front: previews[0]?.context?.front || "",
+          multiDay: true,
+          folder: true
+        },
+        records: records.sort((a, b) => a.date.localeCompare(b.date) || a.machineType.localeCompare(b.machineType) || a.fleet.localeCompare(b.fleet, "pt-BR", { numeric: true })),
+        days: dates.size,
+        fleets: fleets.size,
+        recognizedLoads,
+        totalProduction,
+        fileLoads,
+        fileTotalProduction,
+        fileAverage: fileLoads ? fileTotalProduction / fileLoads : 0,
+        productionDifference: fileTotalProduction ? totalProduction - fileTotalProduction : 0,
+        loadDifference: fileLoads ? recognizedLoads - fileLoads : 0,
+        sourceRows: previews.reduce((sum, preview) => sum + (Number(preview.sourceRows) || 0), 0),
+        ignoredRows: errors.length,
+        sourceFiles: previews.length,
+        errors
+      };
+    }
+
+    async function importMachineProductionFolder(fileList) {
+      const files = [...(fileList || [])].filter(isSupportedMachineProductionImportFile);
+      if (!files.length) {
+        showToast("Nenhum arquivo compatível foi encontrado na pasta.");
+        return;
+      }
+
+      const baseContext = pendingMachineImportContext || {
+        date: els.machineDate.value || "",
+        machineType: els.machineType.value || "Colhedora",
+        multiDay: true,
+        folder: true,
+        front: isMachineTruckType(els.machineType.value)
+          ? defaultMachineProductionFrontForType(els.machineType.value)
+          : normalizeMachineProductionBase(els.machineFront.value, els.machineType.value) || ownHarvestFronts[0]
+      };
+      const previews = [];
+      const fileErrors = [];
+
+      showToast(`Lendo ${files.length} arquivo${files.length === 1 ? "" : "s"} da pasta...`);
+      for (const file of files) {
+        try {
+          const payload = await machineProductionImportPayload(file);
+          const context = machineProductionImportContextForFile(file, payload, baseContext);
+          const preview = machineProductionImportPreviewFromPayload(payload, context);
+          preview.fileName = machineProductionImportFilePath(file);
+          previews.push(preview);
+        } catch {
+          fileErrors.push({
+            row: "-",
+            reason: "arquivo não lido",
+            source: machineProductionImportFilePath(file) || "Arquivo sem nome"
+          });
+        }
+      }
+
+      if (!previews.length) {
+        showToast("Não foi possível reconhecer dados válidos na pasta.");
+        return;
+      }
+
+      renderMachineImportPreview(mergeMachineImportPreviews(previews, fileErrors));
+    }
+
     async function importMachineProductionFile(file) {
       if (!file) return;
       try {
         showToast("Lendo arquivo da produção das máquinas...");
         const payload = await machineProductionImportPayload(file);
-        const importContext = pendingMachineImportContext || {
+        const baseContext = pendingMachineImportContext || {
           date: els.machineDate.value || todayInputValue(),
           machineType: els.machineType.value || "Colhedora",
           multiDay: false,
@@ -14402,7 +14716,9 @@
             ? defaultMachineProductionFrontForType(els.machineType.value)
             : normalizeMachineProductionBase(els.machineFront.value, els.machineType.value) || ownHarvestFronts[0]
         };
+        const importContext = machineProductionImportContextForFile(file, payload, baseContext);
         const preview = machineProductionImportPreviewFromPayload(payload, importContext);
+        preview.fileName = machineProductionImportFilePath(file);
         renderMachineImportPreview(preview);
       } catch {
         showToast("Não foi possível ler a foto, PDF ou arquivo da produção.");
@@ -17489,9 +17805,11 @@
     document.querySelector("#saveMachineEntryBtn").addEventListener("click", saveMachineProductionEntry);
     document.querySelector("#cancelMachineEditBtn").addEventListener("click", () => resetMachineProductionForm(els.machineDate.value || todayInputValue()));
     document.querySelector("#importMachineFileBtn").addEventListener("click", openMachineImportDialog);
+    document.querySelector("#importMachineFolderBtn").addEventListener("click", openMachineImportDialog);
     document.querySelector("#closeMachineImportDialogBtn").addEventListener("click", closeMachineImportDialog);
     document.querySelector("#cancelMachineImportBtn").addEventListener("click", closeMachineImportDialog);
     document.querySelector("#chooseMachineImportFileBtn").addEventListener("click", chooseMachineImportFile);
+    document.querySelector("#chooseMachineImportFolderBtn").addEventListener("click", chooseMachineImportFolder);
     document.querySelector("#closeMachineImportPreviewBtn").addEventListener("click", closeMachineImportPreviewDialog);
     document.querySelector("#cancelMachineImportPreviewBtn").addEventListener("click", closeMachineImportPreviewDialog);
     document.querySelector("#confirmMachineImportPreviewBtn").addEventListener("click", confirmMachineImportPreview);
@@ -17505,6 +17823,14 @@
           : ownHarvestFronts[0];
     });
     els.machineImportFile.addEventListener("change", (event) => importMachineProductionFile(event.target.files[0]));
+    els.machineImportFolder.addEventListener("change", async (event) => {
+      try {
+        await importMachineProductionFolder(event.target.files);
+      } finally {
+        els.machineImportFolder.value = "";
+        pendingMachineImportContext = null;
+      }
+    });
     document.querySelector("#saveMachinesDbBtn").addEventListener("click", saveMachineProductionsDatabase);
     document.querySelector("#pullMachinesDbBtn").addEventListener("click", pullMachineProductionsDatabase);
     document.querySelector("#deleteMachineDayBtn").addEventListener("click", deleteMachineProductionEntryDate);
@@ -17671,6 +17997,7 @@
     document.querySelector("#pullFirebaseBtn").addEventListener("click", async () => {
       const loaded = await downloadAllDataFromFirebase({
         silent: true,
+        force: true,
         pendingMessage: "Baixando dados do Firebase...",
         successStatus: "Dados do Firebase carregados no sistema."
       });
@@ -17698,6 +18025,12 @@
       firebaseState.lastMessage = "Conexao restaurada. Tentando sincronizar as pendencias.";
       renderFirebaseStatus();
       await flushPendingSyncQueue({ silent: true });
+      startFirebaseAutoPull();
+      await downloadAllDataFromFirebase({
+        silent: true,
+        pendingMessage: "Verificando atualizacoes do banco...",
+        successStatus: "Atualizacoes do banco conferidas."
+      });
     });
 
     window.addEventListener("offline", () => {
@@ -17708,6 +18041,15 @@
 
     window.addEventListener("afterprint", () => {
       document.body.classList.remove("print-reports");
+    });
+
+    window.addEventListener("focus", () => {
+      if (!hasFirebaseConfig() || !isOnline() || firebaseState.syncing || pendingSyncQueue.length) return;
+      downloadAllDataFromFirebase({
+        silent: true,
+        pendingMessage: "Verificando atualizacoes do banco...",
+        successStatus: "Atualizacoes do banco conferidas."
+      });
     });
 
     applyTheme(currentTheme);
@@ -17753,10 +18095,11 @@
 
     ensureFirebaseReady({ silent: true }).then((ready) => {
       if (!ready) return;
+      startFirebaseAutoPull();
       return downloadAllDataFromFirebase({
         silent: true,
-        pendingMessage: "Baixando dados salvos no Firebase...",
-        successStatus: "Dados do Firebase restaurados no sistema."
+        pendingMessage: "Verificando atualizacoes do banco...",
+        successStatus: "Atualizacoes do banco conferidas."
       }).then((loaded) => {
         if (loaded) {
           showToast("Dados recuperados do Firebase.");
