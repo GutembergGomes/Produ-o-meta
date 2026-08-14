@@ -14139,8 +14139,9 @@
       if (typeof window.showDirectoryPicker === "function") {
         try {
           const directoryHandle = await window.showDirectoryPicker({ mode: "read" });
-          const files = await filesFromMachineProductionDirectory(directoryHandle);
-          await importMachineProductionFolder(files);
+          const scanErrors = [];
+          const files = await filesFromMachineProductionDirectory(directoryHandle, "", scanErrors);
+          await importMachineProductionFolder(files, scanErrors);
           pendingMachineImportContext = null;
           return;
         } catch (error) {
@@ -14378,7 +14379,8 @@
         return;
       }
 
-      els.machineImportPreviewSummary.textContent = `${preview.sourceFiles ? `${preview.sourceFiles} arquivo${preview.sourceFiles === 1 ? "" : "s"} · ` : ""}${preview.records.length} linha${preview.records.length === 1 ? "" : "s"} reconhecida${preview.records.length === 1 ? "" : "s"} · ${preview.days} dia${preview.days === 1 ? "" : "s"} · ${preview.fleets} equipamento${preview.fleets === 1 ? "" : "s"} · Total reconhecido ${formatNumber(preview.totalProduction)}${preview.fileTotalProduction ? ` · Total arquivo ${formatNumber(preview.fileTotalProduction)}` : ""}.`;
+      const supportedFilesLabel = preview.supportedFiles || preview.sourceFiles || 0;
+      els.machineImportPreviewSummary.textContent = `${preview.totalFiles ? `${preview.totalFiles} arquivo${preview.totalFiles === 1 ? "" : "s"} encontrado${preview.totalFiles === 1 ? "" : "s"} · ${preview.pdfFiles || 0} PDF${preview.pdfFiles === 1 ? "" : "s"} · ${supportedFilesLabel} ${supportedFilesLabel === 1 ? "compatível" : "compatíveis"} · ` : preview.sourceFiles ? `${preview.sourceFiles} arquivo${preview.sourceFiles === 1 ? "" : "s"} · ` : ""}${preview.records.length} linha${preview.records.length === 1 ? "" : "s"} reconhecida${preview.records.length === 1 ? "" : "s"} · ${preview.days} dia${preview.days === 1 ? "" : "s"} · ${preview.fleets} equipamento${preview.fleets === 1 ? "" : "s"} · Total reconhecido ${formatNumber(preview.totalProduction)}${preview.fileTotalProduction ? ` · Total arquivo ${formatNumber(preview.fileTotalProduction)}` : ""}.`;
       const frontChoices = machineProductionBaseOptions;
       const hasProductionMismatch = preview.fileTotalProduction && Math.abs(preview.productionDifference) > MACHINE_PRODUCTION_TOLERANCE;
       const hasLoadMismatch = preview.fileLoads && Math.abs(preview.loadDifference) > MACHINE_PRODUCTION_TOLERANCE;
@@ -14391,7 +14393,7 @@
       const comparison = `
         <div class="preview-warning ${hasProductionMismatch || hasLoadMismatch || preview.ignoredRows ? "" : "good"}">
           <strong>Comparador arquivo x prévia</strong>
-          <span>${preview.sourceFiles ? `Arquivos ${preview.sourceFiles} · ` : ""}Linhas no arquivo ${preview.sourceRows} · Linhas para salvar ${preview.records.length} · Ignoradas ${preview.ignoredRows} · Produção arquivo ${preview.fileTotalProduction ? formatNumber(preview.fileTotalProduction) : "-"} · Produção prévia ${formatNumber(preview.totalProduction)} · Cargas arquivo ${preview.fileLoads ? formatNumber(preview.fileLoads) : "-"} · Cargas prévia ${formatNumber(preview.recognizedLoads)}.</span>
+          <span>${preview.totalFiles ? `Arquivos encontrados ${preview.totalFiles} · PDFs ${preview.pdfFiles || 0} · Compatíveis ${preview.supportedFiles || 0} · ` : preview.sourceFiles ? `Arquivos ${preview.sourceFiles} · ` : ""}Linhas no arquivo ${preview.sourceRows} · Linhas para salvar ${preview.records.length} · Ignoradas ${preview.ignoredRows} · Produção arquivo ${preview.fileTotalProduction ? formatNumber(preview.fileTotalProduction) : "-"} · Produção prévia ${formatNumber(preview.totalProduction)} · Cargas arquivo ${preview.fileLoads ? formatNumber(preview.fileLoads) : "-"} · Cargas prévia ${formatNumber(preview.recognizedLoads)}.</span>
         </div>
       `;
       const errorReport = preview.errors && preview.errors.length
@@ -14628,27 +14630,44 @@
       return file;
     }
 
-    async function filesFromMachineProductionDirectory(directoryHandle, basePath = "") {
+    async function filesFromMachineProductionDirectory(directoryHandle, basePath = "", errors = []) {
       const files = [];
-      for await (const [name, handle] of directoryHandle.entries()) {
-        const relativePath = basePath ? `${basePath}/${name}` : name;
-        if (handle.kind === "file") {
-          const file = await handle.getFile();
-          files.push(machineProductionFileWithPath(file, relativePath));
-        } else if (handle.kind === "directory") {
-          files.push(...await filesFromMachineProductionDirectory(handle, relativePath));
+      try {
+        for await (const [name, handle] of directoryHandle.entries()) {
+          const relativePath = basePath ? `${basePath}/${name}` : name;
+          if (handle.kind === "file") {
+            try {
+              const file = await handle.getFile();
+              files.push(machineProductionFileWithPath(file, relativePath));
+            } catch {
+              errors.push({
+                row: "-",
+                reason: "arquivo não liberado pelo Windows/OneDrive",
+                source: relativePath
+              });
+            }
+          } else if (handle.kind === "directory") {
+            files.push(...await filesFromMachineProductionDirectory(handle, relativePath, errors));
+          }
         }
+      } catch {
+        errors.push({
+          row: "-",
+          reason: "subpasta não liberada pelo navegador",
+          source: basePath || "Pasta selecionada"
+        });
       }
       return files;
     }
 
     function isSupportedMachineProductionImportFile(file) {
       const name = machineProductionImportFilePath(file).toLowerCase();
+      const type = String(file?.type || "").toLowerCase();
       return Boolean(file) && (
-        /^image\//i.test(file.type)
+        /^image\//i.test(type)
         || /\.(pdf|csv|txt|html|htm|xls|xlsx)$/i.test(name)
-        || file.type === "application/pdf"
-        || /^text\//i.test(file.type)
+        || type.includes("pdf")
+        || /^text\//i.test(type)
       );
     }
 
@@ -14666,7 +14685,7 @@
       };
     }
 
-    function mergeMachineImportPreviews(previews, fileErrors = []) {
+    function mergeMachineImportPreviews(previews, fileErrors = [], scanSummary = {}) {
       const records = previews.flatMap((preview) => preview.records || []);
       const errors = [
         ...previews.flatMap((preview) => (preview.errors || []).map((error) => ({
@@ -14701,14 +14720,25 @@
         sourceRows: previews.reduce((sum, preview) => sum + (Number(preview.sourceRows) || 0), 0),
         ignoredRows: errors.length,
         sourceFiles: previews.length,
+        totalFiles: Number(scanSummary.totalFiles) || previews.length,
+        pdfFiles: Number(scanSummary.pdfFiles) || 0,
+        supportedFiles: Number(scanSummary.supportedFiles) || previews.length,
         errors
       };
     }
 
-    async function importMachineProductionFolder(fileList) {
-      const files = [...(fileList || [])].filter(isSupportedMachineProductionImportFile);
+    async function importMachineProductionFolder(fileList, scanErrors = []) {
+      const allFiles = [...(fileList || [])];
+      const files = allFiles.filter(isSupportedMachineProductionImportFile);
+      const pdfFiles = allFiles.filter((file) => /\.pdf$/i.test(machineProductionImportFilePath(file)) || String(file?.type || "").toLowerCase().includes("pdf"));
+      const unsupportedFiles = allFiles.filter((file) => !isSupportedMachineProductionImportFile(file));
+      const scanSummary = {
+        totalFiles: allFiles.length,
+        pdfFiles: pdfFiles.length,
+        supportedFiles: files.length
+      };
       if (!files.length) {
-        showToast("Nenhum arquivo compatível foi encontrado na pasta.");
+        showToast(`Nenhum arquivo compatível foi encontrado. Arquivos vistos: ${allFiles.length}; PDFs vistos: ${pdfFiles.length}.`);
         return;
       }
 
@@ -14722,9 +14752,16 @@
           : normalizeMachineProductionBase(els.machineFront.value, els.machineType.value) || ownHarvestFronts[0]
       };
       const previews = [];
-      const fileErrors = [];
+      const fileErrors = [
+        ...(scanErrors || []),
+        ...unsupportedFiles.slice(0, 30).map((file) => ({
+          row: "-",
+          reason: "tipo de arquivo ignorado",
+          source: machineProductionImportFilePath(file) || file.name || "Arquivo sem nome"
+        }))
+      ];
 
-      showToast(`Lendo ${files.length} arquivo${files.length === 1 ? "" : "s"} da pasta...`);
+      showToast(`Pasta lida: ${allFiles.length} arquivo${allFiles.length === 1 ? "" : "s"}, ${pdfFiles.length} PDF${pdfFiles.length === 1 ? "" : "s"}, ${files.length} ${files.length === 1 ? "compatível" : "compatíveis"}.`);
       for (const file of files) {
         try {
           const payload = await machineProductionImportPayload(file);
@@ -14746,7 +14783,7 @@
         return;
       }
 
-      renderMachineImportPreview(mergeMachineImportPreviews(previews, fileErrors));
+      renderMachineImportPreview(mergeMachineImportPreviews(previews, fileErrors, scanSummary));
     }
 
     async function importMachineProductionFile(file) {
