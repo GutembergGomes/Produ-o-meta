@@ -4128,8 +4128,11 @@
       const isoMatch = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
       if (isoMatch) return validInputDate(isoMatch[1], isoMatch[2], isoMatch[3]);
 
-      const brMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-      if (brMatch) return validInputDate(brMatch[3], brMatch[2], brMatch[1]);
+      const brMatch = text.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/);
+      if (brMatch) {
+        const year = brMatch[3].length === 2 ? `20${brMatch[3]}` : brMatch[3];
+        return validInputDate(year, brMatch[2], brMatch[1]);
+      }
 
       const parsed = new Date(text);
       return dateInputFromDate(parsed);
@@ -13689,17 +13692,28 @@
       const lines = cleaned
         .split(/\r?\n/)
         .map((line) => line.replace(/\s+/g, " ").trim())
-        .filter((line) => /^total\b/i.test(line));
-      if (!lines.length) return { loads: 0, production: 0, average: 0 };
-      const numbers = reportNumericTokens(lines[lines.length - 1]).map((item) => ({
-        raw: item,
-        value: parseNumber(normalizeReportNumber(item))
-      })).filter((item) => Number.isFinite(item.value));
-      if (!numbers.length) return { loads: 0, production: 0, average: 0 };
-      const loads = numbers.find((item) => Number.isInteger(item.value) && item.value > 0)?.value || 0;
-      const production = numbers.reduce((max, item) => item.value > max ? item.value : max, 0);
-      const average = numbers.map((item) => item.value).filter((value) => value > 0 && value !== loads && value !== production).pop() || 0;
-      return { loads, production, average };
+        .filter(Boolean);
+      const candidates = lines.filter((line) => {
+        const key = normalizeKey(line);
+        return /^total\b/i.test(line)
+          || key.includes("total geral")
+          || key.includes("producao total")
+          || key.includes("toneladas total")
+          || key.includes("total toneladas")
+          || key.includes("total produzido");
+      });
+      if (!candidates.length) return { loads: 0, production: 0, average: 0 };
+      return candidates.reduce((best, line) => {
+        const numbers = reportNumericTokens(line).map((item) => ({
+          raw: item,
+          value: parseNumber(normalizeReportNumber(item))
+        })).filter((item) => Number.isFinite(item.value));
+        if (!numbers.length) return best;
+        const loads = numbers.find((item) => Number.isInteger(item.value) && item.value > 0 && item.value < 10000)?.value || 0;
+        const production = numbers.reduce((max, item) => item.value > max ? item.value : max, 0);
+        const average = numbers.map((item) => item.value).filter((value) => value > 0 && value !== loads && value !== production).pop() || 0;
+        return production > best.production ? { loads, production, average } : best;
+      }, { loads: 0, production: 0, average: 0 });
     }
 
     function normalizeReportNumber(value) {
@@ -14184,6 +14198,16 @@
       return normalizeMachineProductionBase(fallback, normalizedType);
     }
 
+    function machineProductionFleetFromReport(text, fallback = "") {
+      const source = String(text || "");
+      const fileName = source.split(/[\\/]/).pop() || source;
+      const cleanName = fileName.replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " ").trim();
+      const codeMatches = source.match(/\b\d{3,6}\b/g) || [];
+      const code = codeMatches.find((item) => !/^20\d{2}$/.test(item) && !/^(4001|4002|4003|4007|4009)$/.test(item));
+      if (code) return normalizeFleetCode(code);
+      return String(fallback || cleanName || "Arquivo importado").trim();
+    }
+
     function machineProductionDateFromReport(text, fallback = todayInputValue()) {
       const source = String(text || "");
       const endMatch = source.match(/fim\s*:?\s*(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/i);
@@ -14193,6 +14217,8 @@
 
     function machineProductionDateFromAnyText(text, fallback = "") {
       const source = String(text || "");
+      const namedDayMatch = source.match(/\bdia\s+(\d{1,2})[\/._-](\d{1,2})[\/._-](\d{2,4})/i);
+      if (namedDayMatch) return normalizeRecordDate(`${namedDayMatch[1]}/${namedDayMatch[2]}/${namedDayMatch[3]}`) || fallback;
       const reportDate = machineProductionDateFromReport(source, "");
       if (reportDate) return reportDate;
       const brMatch = source.match(/(\d{1,2})[\/._-](\d{1,2})[\/._-](\d{2,4})/);
@@ -14260,12 +14286,31 @@
       const rows = [];
       const errors = [];
       const sourceRows = payload.rows || [];
+      const fileTotals = payload.totals || machineProductionTotalsFromText(payload.text || "");
+      const sourceName = String(importContext.sourceName || "").trim();
 
       const sourcePreview = (row) => Object.values(row || {})
         .map((value) => String(value ?? "").replace(/\s+/g, " ").trim())
         .filter(Boolean)
         .join(" | ")
         .slice(0, 220);
+
+      if (!sourceRows.length && fileTotals.production > 0) {
+        const descriptor = `${sourceName}\n${payload.text || ""}`;
+        rows.push({
+          id: makeId(),
+          date: machineProductionDateFromAnyText(descriptor, fallbackDate) || fallbackDate,
+          front,
+          machineType,
+          fleet: machineProductionFleetFromReport(descriptor, sourceName || "Arquivo importado"),
+          production: fileTotals.production,
+          loads: fileTotals.loads || 0,
+          averageYield: fileTotals.average || (fileTotals.loads ? fileTotals.production / fileTotals.loads : 0),
+          note: `Total reconhecido do arquivo${sourceName ? `: ${sourceName}` : ""}`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }
 
       sourceRows.forEach((row, index) => {
         const fleet = String(valueFromRow(row, [
@@ -14339,6 +14384,23 @@
         });
       });
 
+      if (!rows.length && fileTotals.production > 0) {
+        const descriptor = `${sourceName}\n${payload.text || ""}`;
+        rows.push({
+          id: makeId(),
+          date: machineProductionDateFromAnyText(descriptor, fallbackDate) || fallbackDate,
+          front,
+          machineType,
+          fleet: machineProductionFleetFromReport(descriptor, sourceName || "Arquivo importado"),
+          production: fileTotals.production,
+          loads: fileTotals.loads || 0,
+          averageYield: fileTotals.average || (fileTotals.loads ? fileTotals.production / fileTotals.loads : 0),
+          note: `Total reconhecido do arquivo${sourceName ? `: ${sourceName}` : ""}`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }
+
       const records = rows
         .map((row) => normalizeMachineProductionRecord(row))
         .filter(Boolean)
@@ -14347,7 +14409,6 @@
       const fleets = new Set(records.map((row) => normalizeKey(row.fleet)));
       const recognizedLoads = records.reduce((sum, row) => sum + (Number(row.loads) || 0), 0);
       const totalProduction = records.reduce((sum, row) => sum + (Number(row.production) || 0), 0);
-      const fileTotals = payload.totals || machineProductionTotalsFromText(payload.text || "");
 
       return {
         context: { ...importContext, front, machineType, multiDay: useRowDates },
@@ -14374,10 +14435,6 @@
 
     function renderMachineImportPreview(preview) {
       pendingMachineImportPreview = preview;
-      if (!preview.records.length) {
-        showToast("Nenhum dia válido foi reconhecido no arquivo.");
-        return;
-      }
 
       const supportedFilesLabel = preview.supportedFiles || preview.sourceFiles || 0;
       els.machineImportPreviewSummary.textContent = `${preview.totalFiles ? `${preview.totalFiles} arquivo${preview.totalFiles === 1 ? "" : "s"} encontrado${preview.totalFiles === 1 ? "" : "s"} · ${preview.pdfFiles || 0} PDF${preview.pdfFiles === 1 ? "" : "s"} · ${supportedFilesLabel} ${supportedFilesLabel === 1 ? "compatível" : "compatíveis"} · ` : preview.sourceFiles ? `${preview.sourceFiles} arquivo${preview.sourceFiles === 1 ? "" : "s"} · ` : ""}${preview.records.length} linha${preview.records.length === 1 ? "" : "s"} reconhecida${preview.records.length === 1 ? "" : "s"} · ${preview.days} dia${preview.days === 1 ? "" : "s"} · ${preview.fleets} equipamento${preview.fleets === 1 ? "" : "s"} · Total reconhecido ${formatNumber(preview.totalProduction)}${preview.fileTotalProduction ? ` · Total arquivo ${formatNumber(preview.fileTotalProduction)}` : ""}.`;
@@ -14425,6 +14482,7 @@
         ${comparison}
         ${warning}
         ${errorReport}
+        ${!preview.records.length ? '<div class="empty-state">Nenhum dado válido para salvar. Confira se o PDF tem texto/tabela selecionável ou se o arquivo está disponível offline no OneDrive.</div>' : `
         <table class="preview-edit-table">
           <thead>
             <tr>
@@ -14463,6 +14521,7 @@
             `).join("")}
           </tbody>
         </table>
+        `}
       `;
       els.machineImportPreviewDialog.showModal();
     }
@@ -14681,6 +14740,7 @@
         date,
         front,
         machineType,
+        sourceName: machineProductionImportFilePath(file),
         multiDay: Boolean(baseContext.multiDay || baseContext.folder)
       };
     }
@@ -14779,7 +14839,12 @@
       }
 
       if (!previews.length) {
-        showToast("Não foi possível reconhecer dados válidos na pasta.");
+        renderMachineImportPreview(mergeMachineImportPreviews([], fileErrors.length ? fileErrors : [{
+          row: "-",
+          reason: "nenhum dado válido reconhecido",
+          source: "Os arquivos foram encontrados, mas não foi possível identificar tabela ou total de produção."
+        }], scanSummary));
+        showToast("A pasta foi lida, mas nenhum dado válido foi reconhecido.");
         return;
       }
 
