@@ -1442,6 +1442,11 @@
       opacity: 1;
     }
 
+    .toast.actionable {
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
     @media (max-width: 1240px) {
       .stats-grid,
       .summary-grid {
@@ -4987,7 +4992,7 @@
           ? `${options.errorStatus} ${firebaseState.lastError}`
           : firebaseState.lastError;
         renderFirebaseStatus();
-        if (!options.silent) showToast(firebaseState.lastError);
+        if (!options.silent) showMachineProductionIssueToast("", invalid[0]);
         return false;
       }
       machineProductionRecords = cleanMachineProductionRecords;
@@ -8113,22 +8118,63 @@
 
     function machineProductionMismatchMessage(group) {
       if (!group) return "Conferência da produção não localizada.";
+      const dateLabel = group.date ? ` em ${formatDate(group.date)}` : "";
       if (!machineProductionRequiresDailyMatch(group)) {
-        return `${group.machineType} em ${group.front} lançado para média geral transportada.`;
+        return `${group.machineType} em ${group.front}${dateLabel} lançado para média geral transportada.`;
       }
       if (group.target <= 0) {
         return `Lance primeiro a produção diária de ${group.front} em ${formatDate(group.date)}.`;
       }
       if (machineProductionDifferenceAllowed(group) && Math.abs(group.difference) > MACHINE_PRODUCTION_TOLERANCE) {
-        return `${group.front} ${group.machineType} com diferença aceita de ${formatNumber(Math.abs(group.difference))} t.`;
+        return `${group.front} ${group.machineType}${dateLabel} com diferença aceita de ${formatNumber(Math.abs(group.difference))} t.`;
       }
       if (group.difference > MACHINE_PRODUCTION_TOLERANCE) {
-        return `${group.front} ${group.machineType} passou ${formatNumber(group.difference)} t do lançamento diário.`;
+        return `${group.front} ${group.machineType}${dateLabel} passou ${formatNumber(group.difference)} t do lançamento diário.`;
       }
       if (group.difference < -MACHINE_PRODUCTION_TOLERANCE) {
-        return `${group.front} ${group.machineType} ainda falta ${formatNumber(Math.abs(group.difference))} t para bater o lançamento diário.`;
+        return `${group.front} ${group.machineType}${dateLabel} ainda falta ${formatNumber(Math.abs(group.difference))} t para bater o lançamento diário.`;
       }
-      return `${group.front} ${group.machineType} batendo com o lançamento diário.`;
+      return `${group.front} ${group.machineType}${dateLabel} batendo com o lançamento diário.`;
+    }
+
+    function openMachineProductionIssue(group) {
+      if (!group) return;
+      const date = normalizeRecordDate(group.date) || todayInputValue();
+      const machineType = normalizeMachineProductionType(group.machineType);
+      const front = machineProductionBaseLabel(group);
+      setMachineProductionMode(machineModeForType(machineType), { syncType: false, render: false });
+      setMachineProductionRange(date, date);
+      setMachineProductionEntryDate(date);
+      els.machineDate.value = date;
+      els.machineType.value = machineType;
+      els.machineFront.value = isMachineTruckType(machineType)
+        ? defaultMachineProductionFrontForType(machineType)
+        : normalizeMachineProductionBase(front, machineType) || ownHarvestFronts[0];
+      if (els.machineFrontFilter && [...els.machineFrontFilter.options].some((option) => sameText(option.value, front))) {
+        els.machineFrontFilter.value = front;
+      }
+      updateMachineProductionFormContext();
+      renderMachineProductions();
+      renderMachineProductionDashboardPage();
+      switchView("machines");
+      setTimeout(() => {
+        els.machineRowsWrap?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 50);
+    }
+
+    function showMachineProductionIssueToast(prefix, group) {
+      const detail = machineProductionMismatchMessage(group);
+      if (!group) {
+        showToast(`${prefix}${prefix ? " " : ""}${detail}`);
+        return;
+      }
+      const date = normalizeRecordDate(group.date);
+      const actionLabel = date ? ` Clique aqui para abrir ${formatDate(date)}.` : " Clique aqui para abrir a produção.";
+      const message = `${prefix}${prefix ? " " : ""}${detail}${actionLabel}`;
+      showToast(message, {
+        duration: 6500,
+        onClick: () => openMachineProductionIssue(group)
+      });
     }
 
     function renderMachineProductionConsistency(rows) {
@@ -8674,11 +8720,11 @@
 
       let { nextRecord, nextRows, group, merged } = machineProductionGroupAfterSave(record, editingId);
       if (!group || (machineProductionRequiresDailyMatch(group) && group.target <= 0)) {
-        showToast(machineProductionMismatchMessage(group));
+        showMachineProductionIssueToast("", group);
         return;
       }
       if (machineProductionRequiresDailyMatch(group) && group.difference > MACHINE_PRODUCTION_TOLERANCE && !machineProductionDifferenceAllowed(group)) {
-        showToast(machineProductionMismatchMessage(group));
+        showMachineProductionIssueToast("", group);
         return;
       }
       if (machineProductionRequiresDailyMatch(group) && machineProductionDifferenceAllowed(group) && Math.abs(group.difference) > MACHINE_PRODUCTION_TOLERANCE && !machineProductionStoredDifferenceAccepted(group)) {
@@ -8697,13 +8743,13 @@
       const canSyncGroup = machineProductionDifferenceAllowed(group);
       const balanceMessage = machineProductionMismatchMessage(group);
       if (!canSyncGroup) {
-        showToast(`${editingId ? "Produção alterada" : merged ? "Produção somada" : "Produção adicionada"} localmente. ${balanceMessage} Banco não enviado ainda.`);
+        showMachineProductionIssueToast(`${editingId ? "Produção alterada" : merged ? "Produção somada" : "Produção adicionada"} localmente. Banco não enviado ainda.`, group);
         return;
       }
       const rowsForSync = prepareMachineProductionRowsForSync(nextRows);
       const allInvalid = invalidMachineProductionGroups(rowsForSync);
       if (allInvalid.length) {
-        showToast(`Produção salva localmente. Corrija antes de enviar ao banco: ${machineProductionMismatchMessage(allInvalid[0])}`);
+        showMachineProductionIssueToast("Produção salva localmente. Corrija antes de enviar ao banco:", allInvalid[0]);
         return;
       }
       machineProductionRecords = rowsForSync;
@@ -8735,7 +8781,7 @@
       const rowsForSync = prepareMachineProductionRowsForSync(machineProductionRecords);
       const invalid = invalidMachineProductionGroups(rowsForSync);
       if (invalid.length) {
-        showToast(`Produção removida localmente. ${machineProductionMismatchMessage(invalid[0])} Banco não enviado ainda.`);
+        showMachineProductionIssueToast("Produção removida localmente. Banco não enviado ainda.", invalid[0]);
         return;
       }
       machineProductionRecords = rowsForSync;
@@ -8773,7 +8819,7 @@
       const rowsForSync = prepareMachineProductionRowsForSync(machineProductionRecords);
       const invalid = invalidMachineProductionGroups(rowsForSync);
       if (invalid.length) {
-        showToast(`Produções removidas localmente. ${machineProductionMismatchMessage(invalid[0])} Banco não enviado ainda.`);
+        showMachineProductionIssueToast("Produções removidas localmente. Banco não enviado ainda.", invalid[0]);
         return;
       }
       machineProductionRecords = rowsForSync;
@@ -8808,7 +8854,7 @@
       const rowsForSync = prepareMachineProductionRowsForSync(machineProductionRecords);
       const invalid = invalidMachineProductionGroups(rowsForSync);
       if (invalid.length) {
-        showToast(`Produções removidas localmente. ${machineProductionMismatchMessage(invalid[0])} Banco não enviado ainda.`);
+        showMachineProductionIssueToast("Produções removidas localmente. Banco não enviado ainda.", invalid[0]);
         return;
       }
       machineProductionRecords = rowsForSync;
@@ -8830,7 +8876,7 @@
       const total = cleanRows.length;
       const invalid = invalidMachineProductionGroups(cleanRows);
       if (invalid.length) {
-        showToast(`Corrija antes de salvar no banco: ${machineProductionMismatchMessage(invalid[0])}`);
+        showMachineProductionIssueToast("Corrija antes de salvar no banco:", invalid[0]);
         return;
       }
       machineProductionRecords = cleanRows;
@@ -14625,7 +14671,7 @@
         .filter((group) => machineProductionRequiresDailyMatch(group))
         .filter((group) => !machineProductionDifferenceAllowed(group));
       if (invalidAffected.length) {
-        showToast(`Arquivo não salvo: ${machineProductionMismatchMessage(invalidAffected[0])}`);
+        showMachineProductionIssueToast("Arquivo não salvo:", invalidAffected[0]);
         return;
       }
       const acceptableDifferences = affectedGroups
@@ -14652,7 +14698,7 @@
       const rowsForSync = prepareMachineProductionRowsForSync(machineProductionRecords);
       const invalid = invalidMachineProductionGroups(rowsForSync);
       if (invalid.length) {
-        showToast(`Arquivo salvo localmente. Corrija antes de enviar ao banco: ${machineProductionMismatchMessage(invalid[0])}`);
+        showMachineProductionIssueToast("Arquivo salvo localmente. Corrija antes de enviar ao banco:", invalid[0]);
         return;
       }
       machineProductionRecords = rowsForSync;
@@ -17638,11 +17684,20 @@
       URL.revokeObjectURL(url);
     }
 
-    function showToast(message) {
+    function showToast(message, options = {}) {
       els.toast.textContent = message;
+      els.toast.classList.toggle("actionable", typeof options.onClick === "function");
+      els.toast.onclick = typeof options.onClick === "function" ? () => {
+        els.toast.classList.remove("visible", "actionable");
+        els.toast.onclick = null;
+        options.onClick();
+      } : null;
       els.toast.classList.add("visible");
       clearTimeout(showToast.timer);
-      showToast.timer = setTimeout(() => els.toast.classList.remove("visible"), 2800);
+      showToast.timer = setTimeout(() => {
+        els.toast.classList.remove("visible", "actionable");
+        els.toast.onclick = null;
+      }, options.duration || 2800);
     }
 
     els.navTabs.forEach((tab) => {
