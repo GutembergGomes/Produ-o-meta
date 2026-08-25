@@ -2240,6 +2240,8 @@
         </div>
         <div class="actions">
           <button class="btn-secondary" id="needCmAddFrontBtn" type="button">Adicionar frente</button>
+          <button class="btn-primary" id="needCmPrintReportBtn" type="button">Imprimir relatório</button>
+          <button class="btn-secondary" id="needCmCopyWhatsBtn" type="button">Copiar WhatsApp</button>
           <button class="btn-secondary" id="needCmResetBtn" type="button">Restaurar planilha</button>
         </div>
       </div>
@@ -3452,11 +3454,11 @@
     const machineProductionBaseOptions = [...machineProductionHarvestBaseOptions, TYPES.OWN_TRANSPORT, TYPES.THIRD_TRANSPORT];
     const defaultNeedCmState = {
       fronts: [
-        { front: "Frente 4001", plan: 2800, radius: 18, netWeight: 65, emptySpeed: 19.636363636363637, loadedSpeed: 17, emptyCycle: 55, loadedCycle: 60, currentRadius: 29 },
-        { front: "Frente 4002", plan: 2200, radius: 38, netWeight: 59, emptySpeed: 27.804878048780488, loadedSpeed: 24, emptyCycle: 82, loadedCycle: 95, currentRadius: 45 },
-        { front: "Frente 4003", plan: 1000, radius: 35, netWeight: 60, emptySpeed: 26.25, loadedSpeed: 20, emptyCycle: 80, loadedCycle: 90, currentRadius: 21 },
-        { front: "Frente 4007", plan: 3750, radius: 46, netWeight: 77, emptySpeed: 25.09090909090909, loadedSpeed: 21.230769230769234, emptyCycle: 110, loadedCycle: 130, currentRadius: 44 },
-        { front: "Frente 4009", plan: 2250, radius: 45, netWeight: 73, emptySpeed: 22.5, loadedSpeed: 18.620689655172413, emptyCycle: 120, loadedCycle: 145, currentRadius: 46 }
+        { front: "Frente 4001", plan: 2800, radius: 18, netWeight: 65, emptySpeed: 19.636363636363637, loadedSpeed: 17, emptyCycle: 55, loadedCycle: 60, currentRadius: 29, fieldRoundTrips: 0 },
+        { front: "Frente 4002", plan: 2200, radius: 38, netWeight: 59, emptySpeed: 27.804878048780488, loadedSpeed: 24, emptyCycle: 82, loadedCycle: 95, currentRadius: 45, fieldRoundTrips: 0 },
+        { front: "Frente 4003", plan: 1000, radius: 35, netWeight: 60, emptySpeed: 26.25, loadedSpeed: 20, emptyCycle: 80, loadedCycle: 90, currentRadius: 21, fieldRoundTrips: 0 },
+        { front: "Frente 4007", plan: 3750, radius: 46, netWeight: 77, emptySpeed: 25.09090909090909, loadedSpeed: 21.230769230769234, emptyCycle: 110, loadedCycle: 130, currentRadius: 44, fieldRoundTrips: 0 },
+        { front: "Frente 4009", plan: 2250, radius: 45, netWeight: 73, emptySpeed: 22.5, loadedSpeed: 18.620689655172413, emptyCycle: 120, loadedCycle: 145, currentRadius: 46, fieldRoundTrips: 0 }
       ],
       params: {
         emptySpeed: 36,
@@ -3468,7 +3470,8 @@
         shiftChange: 0,
         meal: 0,
         availability: 1188,
-        operationalMinutes: 1290
+        operationalMinutes: 1290,
+        fieldRoundTripDiscountPercent: 60
       }
     };
 
@@ -3986,7 +3989,8 @@
           loadedSpeed: parseNumber(row.loadedSpeed),
           emptyCycle: parseNumber(row.emptyCycle),
           loadedCycle: parseNumber(row.loadedCycle),
-          currentRadius: parseNumber(row.currentRadius)
+          currentRadius: parseNumber(row.currentRadius),
+          fieldRoundTrips: parseNumber(row.fieldRoundTrips)
         })),
         params: {
           emptySpeed: parseNumber(source.params?.emptySpeed ?? defaultNeedCmState.params.emptySpeed),
@@ -3998,7 +4002,8 @@
           shiftChange: parseNumber(source.params?.shiftChange ?? defaultNeedCmState.params.shiftChange),
           meal: parseNumber(source.params?.meal ?? defaultNeedCmState.params.meal),
           availability: parseNumber(source.params?.availability ?? defaultNeedCmState.params.availability),
-          operationalMinutes: parseNumber(source.params?.operationalMinutes ?? defaultNeedCmState.params.operationalMinutes)
+          operationalMinutes: parseNumber(source.params?.operationalMinutes ?? defaultNeedCmState.params.operationalMinutes),
+          fieldRoundTripDiscountPercent: parseNumber(source.params?.fieldRoundTripDiscountPercent ?? defaultNeedCmState.params.fieldRoundTripDiscountPercent)
         }
       };
     }
@@ -4037,7 +4042,12 @@
       const availability = clean.params.availability || Math.max(clean.params.operationalMinutes - downtime, 0);
       const cyclesPerCmDay = totalCycle ? availability / totalCycle : 0;
       const tripsPerDayUnit = weightedNetWeight ? planTotal / weightedNetWeight : 0;
-      const requiredFleets = cyclesPerCmDay ? tripsPerDayUnit / cyclesPerCmDay : 0;
+      const grossRequiredFleets = cyclesPerCmDay ? tripsPerDayUnit / cyclesPerCmDay : 0;
+      const totalFieldRoundTrips = fronts.reduce((sum, row) => sum + Math.max(0, parseNumber(row.fieldRoundTrips)), 0);
+      const fieldRoundTripDiscountPercent = Math.max(0, parseNumber(clean.params.fieldRoundTripDiscountPercent));
+      const fieldRoundTripDiscountRate = fieldRoundTripDiscountPercent / 100;
+      const fieldRoundTripDiscount = totalFieldRoundTrips * fieldRoundTripDiscountRate;
+      const requiredFleets = Math.max(grossRequiredFleets - fieldRoundTripDiscount, 0);
       return {
         ...clean,
         fronts,
@@ -4051,6 +4061,11 @@
         availability,
         cyclesPerCmDay,
         tripsPerDayUnit,
+        grossRequiredFleets,
+        totalFieldRoundTrips,
+        fieldRoundTripDiscountPercent,
+        fieldRoundTripDiscountRate,
+        fieldRoundTripDiscount,
         requiredFleets
       };
     }
@@ -4068,12 +4083,12 @@
 
     function needCmKpiHtml(data) {
       return [
-        ["Necessidade caminhões", formatNumberFixed(data.requiredFleets, 2), `Arredondado: ${Math.ceil(data.requiredFleets)} caminhões`],
+        ["Necessidade final", formatNumberFixed(data.requiredFleets, 2), `Após descontar ${formatNumberFixed(data.fieldRoundTripDiscount, 2)} caminhões`],
+        ["Necessidade bruta", formatNumberFixed(data.grossRequiredFleets, 2), "Antes do bate-volta"],
+        ["Bate-volta campo", formatNumber(data.totalFieldRoundTrips), `${formatNumberFixed(data.fieldRoundTripDiscountPercent, 0)}% de desconto por bate-volta`],
         ["Meta moagem dia", formatNumber(data.planTotal), "Puxado do cenário geral"],
         ["Raio médio", `${formatNumberFixed(data.weightedRadius, 2)} km`, "Puxado do cenário geral"],
-        ["Peso líquido", `${formatNumberFixed(data.weightedNetWeight, 2)} tc`, "Puxado do cenário geral"],
-        ["Ciclo CM/dia", formatNumberFixed(data.cyclesPerCmDay, 2), "Recalculado automaticamente"],
-        ["Viagens dia/unid.", formatNumberFixed(data.tripsPerDayUnit, 2), "Meta / peso líquido"]
+        ["Ciclo CM/dia", formatNumberFixed(data.cyclesPerCmDay, 2), "Recalculado automaticamente"]
       ].map((item) => `
         <article class="stat">
           <span>${escapeHtml(item[0])}</span>
@@ -4090,6 +4105,11 @@
             <small>Necessidade final</small>
             <strong>${formatNumberFixed(data.requiredFleets, 2)} caminhões</strong>
             <span>Arredondando para cima: ${Math.ceil(data.requiredFleets)} caminhões necessários</span>
+          </div>
+          <div class="summary-card">
+            <small>Redução bate-volta</small>
+            <strong>-${formatNumberFixed(data.fieldRoundTripDiscount, 2)}</strong>
+            <span>${formatNumber(data.totalFieldRoundTrips)} bate-volta × ${formatNumberFixed(data.fieldRoundTripDiscountPercent, 0)}%</span>
           </div>
           <div class="summary-card">
             <small>Ciclo total</small>
@@ -4125,6 +4145,7 @@
       updateNeedCmText('[data-need-cm-total="planTotal"]', formatNumber(data.planTotal));
       updateNeedCmText('[data-need-cm-total="weightedRadius"]', formatNumberFixed(data.weightedRadius, 2));
       updateNeedCmText('[data-need-cm-total="weightedNetWeight"]', formatNumberFixed(data.weightedNetWeight, 2));
+      updateNeedCmText('[data-need-cm-total="totalFieldRoundTrips"]', formatNumber(data.totalFieldRoundTrips));
       updateNeedCmText('[data-need-cm-param-output="weightedRadius"]', formatNumberFixed(data.weightedRadius, 2));
       updateNeedCmText('[data-need-cm-param-output="weightedNetWeight"]', formatNumberFixed(data.weightedNetWeight, 2));
       updateNeedCmText('[data-need-cm-param-output="planTotal"]', formatNumber(data.planTotal));
@@ -4134,6 +4155,9 @@
       updateNeedCmText('[data-need-cm-param-output="downtime"]', formatNumber(data.downtime));
       updateNeedCmText('[data-need-cm-param-output="cyclesPerCmDay"]', formatNumberFixed(data.cyclesPerCmDay, 2));
       updateNeedCmText('[data-need-cm-param-output="tripsPerDayUnit"]', formatNumberFixed(data.tripsPerDayUnit, 2));
+      updateNeedCmText('[data-need-cm-param-output="grossRequiredFleets"]', formatNumberFixed(data.grossRequiredFleets, 2));
+      updateNeedCmText('[data-need-cm-param-output="totalFieldRoundTrips"]', formatNumber(data.totalFieldRoundTrips));
+      updateNeedCmText('[data-need-cm-param-output="fieldRoundTripDiscount"]', formatNumberFixed(data.fieldRoundTripDiscount, 2));
       updateNeedCmText('[data-need-cm-param-output="requiredFleets"]', formatNumberFixed(data.requiredFleets, 2));
       if (els.needCmSummaryWrap) els.needCmSummaryWrap.innerHTML = needCmSummaryHtml(data);
     }
@@ -4157,6 +4181,7 @@
               <th>Ciclo Carregado (Média)</th>
               <th>Ciclo Total</th>
               <th>Raio atual</th>
+              <th>Bate-volta campo</th>
               <th>Ação</th>
             </tr>
           </thead>
@@ -4173,6 +4198,7 @@
                 <td class="sheet-cell-input">${needCmInput(row.loadedCycle, "loadedCycle", { index, digits: 0 })}</td>
                 <td class="sheet-cell-formula" data-need-cm-row-output="${index}:cycleTotal">${formatNumber(row.cycleTotal)}</td>
                 <td class="sheet-cell-input">${needCmInput(row.currentRadius, "currentRadius", { index, digits: 0 })}</td>
+                <td class="sheet-cell-input">${needCmInput(row.fieldRoundTrips, "fieldRoundTrips", { index, digits: 0 })}</td>
                 <td><button class="btn-secondary btn-danger" type="button" data-need-cm-delete="${index}">Excluir</button></td>
               </tr>
             `).join("")}
@@ -4181,7 +4207,9 @@
               <td class="sheet-cell-total" data-need-cm-total="planTotal">${formatNumber(data.planTotal)}</td>
               <td class="sheet-cell-total" data-need-cm-total="weightedRadius">${formatNumberFixed(data.weightedRadius, 2)}</td>
               <td class="sheet-cell-total" data-need-cm-total="weightedNetWeight">${formatNumberFixed(data.weightedNetWeight, 2)}</td>
-              <td colspan="7"></td>
+              <td colspan="6"></td>
+              <td class="sheet-cell-total" data-need-cm-total="totalFieldRoundTrips">${formatNumber(data.totalFieldRoundTrips)}</td>
+              <td></td>
             </tr>
           </tbody>
         </table>
@@ -4203,8 +4231,10 @@
             <tr><td class="sheet-cell-label">Disponibilidade (Min)</td><td>${needCmInput(data.params.availability, "availability", { digits: 0 })}</td><td class="sheet-cell-input">${needCmInput(data.params.shiftChange, "shiftChange", { digits: 0 })}</td></tr>
             <tr><td class="sheet-cell-label">Ciclo por CM*Dia</td><td class="sheet-cell-formula" data-need-cm-param-output="cyclesPerCmDay">${formatNumberFixed(data.cyclesPerCmDay, 2)}</td><td class="sheet-cell-total">Refeição (min)</td></tr>
             <tr><td class="sheet-cell-label">Viagens Dia/Unidade</td><td class="sheet-cell-formula" data-need-cm-param-output="tripsPerDayUnit">${formatNumberFixed(data.tripsPerDayUnit, 2)}</td><td class="sheet-cell-input">${needCmInput(data.params.meal, "meal", { digits: 0 })}</td></tr>
-            <tr><td class="sheet-cell-total">Necessidade de Caminhões</td><td class="sheet-cell-formula" data-need-cm-param-output="requiredFleets">${formatNumberFixed(data.requiredFleets, 2)}</td><td class="sheet-cell-total">Total de minutos operacionais</td></tr>
-            <tr><td></td><td></td><td>${needCmInput(data.params.operationalMinutes, "operationalMinutes", { digits: 0 })}</td></tr>
+            <tr><td class="sheet-cell-total">Necessidade bruta</td><td class="sheet-cell-formula" data-need-cm-param-output="grossRequiredFleets">${formatNumberFixed(data.grossRequiredFleets, 2)}</td><td class="sheet-cell-total">Total de minutos operacionais</td></tr>
+            <tr><td class="sheet-cell-label">(-) Bate-volta em campo</td><td data-need-cm-param-output="totalFieldRoundTrips">${formatNumber(data.totalFieldRoundTrips)}</td><td>${needCmInput(data.params.operationalMinutes, "operationalMinutes", { digits: 0 })}</td></tr>
+            <tr><td class="sheet-cell-label">% desconto por bate-volta</td><td>${needCmInput(data.params.fieldRoundTripDiscountPercent, "fieldRoundTripDiscountPercent", { digits: 0 })}</td><td class="sheet-cell-formula" data-need-cm-param-output="fieldRoundTripDiscount">Desc. ${formatNumberFixed(data.fieldRoundTripDiscount, 2)}</td></tr>
+            <tr><td class="sheet-cell-total">Necessidade de Caminhões</td><td class="sheet-cell-formula" data-need-cm-param-output="requiredFleets">${formatNumberFixed(data.requiredFleets, 2)}</td><td class="sheet-cell-total">Final após desconto</td></tr>
           </tbody>
         </table>
       `;
@@ -4239,7 +4269,8 @@
         loadedSpeed: 0,
         emptyCycle: 0,
         loadedCycle: 0,
-        currentRadius: 0
+        currentRadius: 0,
+        fieldRoundTrips: 0
       });
       persistNeedCmState();
       renderNeedCm();
@@ -18307,6 +18338,190 @@
       return `"${String(value ?? "").replace(/"/g, '""')}"`;
     }
 
+    function needCmWhatsAppText(data = calculateNeedCm()) {
+      const frontLines = data.fronts.map((row) => (
+        `• ${row.front}: plano ${formatNumber(row.plan)} t | raio ${formatNumberFixed(row.radius, 0)} km | ciclo ${formatNumber(row.cycleTotal)} min | bate-volta ${formatNumber(row.fieldRoundTrips)}`
+      ));
+      return [
+        "*Resumo Necessidade CM*",
+        `Data: ${formatDate(todayInputValue())}`,
+        "",
+        `Necessidade bruta: ${formatNumberFixed(data.grossRequiredFleets, 2)} caminhões`,
+        `Bate-volta em campo: ${formatNumber(data.totalFieldRoundTrips)} × ${formatNumberFixed(data.fieldRoundTripDiscountPercent, 0)}% = desconto ${formatNumberFixed(data.fieldRoundTripDiscount, 2)}`,
+        `Necessidade final: ${formatNumberFixed(data.requiredFleets, 2)} caminhões`,
+        `Arredondado: ${Math.ceil(data.requiredFleets)} caminhões`,
+        "",
+        `Meta moagem dia: ${formatNumber(data.planTotal)} t`,
+        `Raio médio: ${formatNumberFixed(data.weightedRadius, 2)} km`,
+        `Peso líquido médio: ${formatNumberFixed(data.weightedNetWeight, 2)} tc`,
+        `Ciclo por CM/dia: ${formatNumberFixed(data.cyclesPerCmDay, 2)}`,
+        `Viagens dia/unidade: ${formatNumberFixed(data.tripsPerDayUnit, 2)}`,
+        "",
+        "*Frentes*",
+        ...frontLines
+      ].join("\n");
+    }
+
+    function buildNeedCmReportHtml() {
+      const data = calculateNeedCm();
+      const generatedAt = formatDateTime(new Date().toISOString());
+      return `<!doctype html>
+        <html lang="pt-BR">
+        <head>
+          <meta charset="utf-8">
+          <title>Relatório Necessidade CM</title>
+          <style>
+            @page { size: A4 portrait; margin: 10mm; }
+            * { box-sizing: border-box; }
+            body { margin: 0; color: #142217; background: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 11px; }
+            .page { display: grid; gap: 12px; }
+            header { display: flex; justify-content: space-between; gap: 14px; align-items: end; border-bottom: 3px solid #1f6f3a; padding-bottom: 10px; }
+            h1, h2, p { margin: 0; }
+            h1 { font-size: 22px; color: #14391f; }
+            h2 { font-size: 14px; color: #14391f; margin-bottom: 8px; }
+            .muted { color: #64748b; font-weight: 700; }
+            .meta { text-align: right; display: grid; gap: 4px; font-weight: 700; color: #475569; }
+            .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+            .kpi { border: 1px solid #cbd5c7; border-left: 5px solid #1f6f3a; border-radius: 8px; padding: 8px; display: grid; gap: 3px; background: #f8fbf7; }
+            .kpi strong { font-size: 17px; color: #111827; }
+            .kpi span { color: #64748b; font-size: 9px; font-weight: 900; text-transform: uppercase; }
+            .kpi small { color: #64748b; font-weight: 700; }
+            .highlight { border: 2px solid #1f6f3a; border-radius: 10px; padding: 10px; background: #f1faf2; display: grid; gap: 5px; }
+            .highlight strong { font-size: 24px; color: #14391f; }
+            table { width: 100%; border-collapse: collapse; font-size: 10px; }
+            th { background: #eaf3e8; color: #18361f; text-align: left; border: 1px solid #cbd5c7; padding: 6px; }
+            td { border: 1px solid #dfe7dc; padding: 5px 6px; }
+            tbody tr:nth-child(even) td { background: #f8fafc; }
+            .right { text-align: right; }
+            .footer { border-top: 1px solid #cbd5e1; padding-top: 8px; color: #64748b; font-weight: 700; display: flex; justify-content: space-between; }
+          </style>
+        </head>
+        <body>
+          <main class="page">
+            <header>
+              <div>
+                <h1>Relatório Necessidade CM</h1>
+                <p class="muted">Resumo para impressão e envio no WhatsApp</p>
+              </div>
+              <div class="meta">
+                <span>Usina Cambuí</span>
+                <span>Gerado em ${escapeHtml(generatedAt)}</span>
+              </div>
+            </header>
+            <section class="highlight">
+              <span class="muted">Necessidade final após bate-volta</span>
+              <strong>${formatNumberFixed(data.requiredFleets, 2)} caminhões</strong>
+              <span>Arredondado para operação: ${Math.ceil(data.requiredFleets)} caminhões</span>
+            </section>
+            <section class="kpis">
+              <div class="kpi"><span>Necessidade bruta</span><strong>${formatNumberFixed(data.grossRequiredFleets, 2)}</strong><small>Antes do bate-volta</small></div>
+              <div class="kpi"><span>Bate-volta campo</span><strong>${formatNumber(data.totalFieldRoundTrips)}</strong><small>${formatNumberFixed(data.fieldRoundTripDiscountPercent, 0)}% por bate-volta</small></div>
+              <div class="kpi"><span>Desconto</span><strong>${formatNumberFixed(data.fieldRoundTripDiscount, 2)}</strong><small>Caminhões abatidos</small></div>
+              <div class="kpi"><span>Meta moagem dia</span><strong>${formatNumber(data.planTotal)}</strong><small>Toneladas planejadas</small></div>
+              <div class="kpi"><span>Raio médio</span><strong>${formatNumberFixed(data.weightedRadius, 2)} km</strong><small>Raio ponderado</small></div>
+              <div class="kpi"><span>Peso líquido</span><strong>${formatNumberFixed(data.weightedNetWeight, 2)} tc</strong><small>Média ponderada</small></div>
+            </section>
+            <section>
+              <h2>Frentes do cenário</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Frente</th>
+                    <th class="right">Plano</th>
+                    <th class="right">Raio</th>
+                    <th class="right">Peso líquido</th>
+                    <th class="right">Ciclo vazio</th>
+                    <th class="right">Ciclo carregado</th>
+                    <th class="right">Ciclo total</th>
+                    <th class="right">Bate-volta</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${data.fronts.map((row) => `
+                    <tr>
+                      <td>${escapeHtml(row.front)}</td>
+                      <td class="right">${formatNumber(row.plan)}</td>
+                      <td class="right">${formatNumberFixed(row.radius, 0)}</td>
+                      <td class="right">${formatNumberFixed(row.netWeight, 0)}</td>
+                      <td class="right">${formatNumber(row.emptyCycle)}</td>
+                      <td class="right">${formatNumber(row.loadedCycle)}</td>
+                      <td class="right">${formatNumber(row.cycleTotal)}</td>
+                      <td class="right">${formatNumber(row.fieldRoundTrips)}</td>
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
+            </section>
+            <section>
+              <h2>Parâmetros do cálculo</h2>
+              <table>
+                <tbody>
+                  <tr><th>Disponibilidade</th><td class="right">${formatNumber(data.availability)} min</td><th>Ciclo total</th><td class="right">${formatNumberFixed(data.totalCycle, 2)} min</td></tr>
+                  <tr><th>Ciclo por CM/dia</th><td class="right">${formatNumberFixed(data.cyclesPerCmDay, 2)}</td><th>Viagens dia/unidade</th><td class="right">${formatNumberFixed(data.tripsPerDayUnit, 2)}</td></tr>
+                  <tr><th>Indisponibilidade</th><td class="right">${formatNumber(data.downtime)} min</td><th>% desconto bate-volta</th><td class="right">${formatNumberFixed(data.fieldRoundTripDiscountPercent, 0)}%</td></tr>
+                </tbody>
+              </table>
+            </section>
+            <footer class="footer">
+              <span>Necessidade CM</span>
+              <span>Bruta ${formatNumberFixed(data.grossRequiredFleets, 2)} - desconto ${formatNumberFixed(data.fieldRoundTripDiscount, 2)} = final ${formatNumberFixed(data.requiredFleets, 2)}</span>
+            </footer>
+          </main>
+        </body>
+        </html>`;
+    }
+
+    function printNeedCmReport() {
+      renderNeedCm();
+      const html = buildNeedCmReportHtml();
+      const frame = document.createElement("iframe");
+      frame.style.position = "fixed";
+      frame.style.right = "0";
+      frame.style.bottom = "0";
+      frame.style.width = "0";
+      frame.style.height = "0";
+      frame.style.border = "0";
+      frame.setAttribute("aria-hidden", "true");
+      document.body.appendChild(frame);
+      const frameWindow = frame.contentWindow;
+      const frameDocument = frame.contentDocument || (frameWindow ? frameWindow.document : null);
+      if (!frameWindow || !frameDocument) {
+        frame.remove();
+        showToast("Não foi possível gerar o relatório neste navegador.");
+        return;
+      }
+      frameDocument.open();
+      frameDocument.write(html);
+      frameDocument.close();
+      showToast("Relatório da Necessidade CM gerado. Escolha salvar como PDF.");
+      setTimeout(() => {
+        frameWindow.focus();
+        frameWindow.print();
+      }, 250);
+      setTimeout(() => frame.remove(), 2500);
+    }
+
+    async function copyNeedCmWhatsAppSummary() {
+      const text = needCmWhatsAppText();
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const area = document.createElement("textarea");
+          area.value = text;
+          area.style.position = "fixed";
+          area.style.opacity = "0";
+          document.body.appendChild(area);
+          area.select();
+          document.execCommand("copy");
+          area.remove();
+        }
+        showToast("Resumo copiado. Agora é só colar no WhatsApp.");
+      } catch {
+        showToast("Não consegui copiar automaticamente. Use o relatório impresso.");
+      }
+    }
+
     function downloadFile(filename, content, type) {
       const blob = new Blob([content], { type });
       const url = URL.createObjectURL(blob);
@@ -18366,6 +18581,8 @@
       deleteNeedCmFront(Number(button.dataset.needCmDelete));
     });
     document.querySelector("#needCmAddFrontBtn").addEventListener("click", addNeedCmFront);
+    document.querySelector("#needCmPrintReportBtn").addEventListener("click", printNeedCmReport);
+    document.querySelector("#needCmCopyWhatsBtn").addEventListener("click", copyNeedCmWhatsAppSummary);
     document.querySelector("#needCmResetBtn").addEventListener("click", () => {
       needCmState = cloneNeedCmState(defaultNeedCmState);
       persistNeedCmState();
