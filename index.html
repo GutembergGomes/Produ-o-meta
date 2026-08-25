@@ -878,6 +878,11 @@
       line-height: 1.35;
     }
 
+    .alert-item .history-actions {
+      justify-content: flex-start;
+      margin-top: 4px;
+    }
+
     .rank-list {
       display: grid;
       gap: 10px;
@@ -1303,6 +1308,61 @@
       overflow-x: auto;
     }
 
+    .table-wrap.no-scroll {
+      overflow-x: visible;
+    }
+
+    .table-wrap.no-scroll table {
+      min-width: 0;
+    }
+
+    .sheet-table th,
+    .sheet-table td {
+      text-align: center;
+    }
+
+    .sheet-cell-label {
+      background: #00b050;
+      color: #04140b;
+      font-weight: 850;
+    }
+
+    .sheet-cell-input {
+      background: #00b0f0;
+      color: #041018;
+    }
+
+    .sheet-cell-formula {
+      background: #ffff00;
+      color: #1f1f05;
+      font-weight: 800;
+    }
+
+    .sheet-cell-total {
+      font-weight: 850;
+    }
+
+    .sheet-input {
+      width: 100%;
+      min-width: 76px;
+      border: 1px solid rgba(0, 0, 0, .25);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .65);
+      color: #061018;
+      text-align: center;
+      font-weight: 850;
+      padding: 7px 6px;
+    }
+
+    .sheet-note {
+      display: inline-block;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: #ffff00;
+      color: #1f1f05;
+      font-weight: 850;
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
@@ -1664,6 +1724,7 @@
     <div class="nav-inner">
       <button class="nav-tab" type="button" data-view="dashboard" aria-selected="true">Dashboard</button>
       <button class="nav-tab" type="button" data-view="reports" aria-selected="false">Relatórios Gerenciais</button>
+      <button class="nav-tab" type="button" data-view="needCm" aria-selected="false">Necessidade CM</button>
       <button class="nav-tab" type="button" data-view="patio" aria-selected="false">Tempo de Pátio</button>
       <button class="nav-tab" type="button" data-view="stoppages" aria-selected="false">Paradas da Usina</button>
       <button class="nav-tab" type="button" data-view="reductions" aria-selected="false">Redução de Moagem</button>
@@ -2168,6 +2229,47 @@
           <h2>Lançamentos filtrados</h2>
         </div>
         <div class="table-wrap" id="reportsRowsWrap"></div>
+      </section>
+    </section>
+
+    <section class="view" id="needCmView" hidden>
+      <div class="filter-bar dashboard-filter">
+        <div>
+          <h1>Necessidade CM - Agosto</h1>
+          <div class="filter-note">Preencha os dados direto nesta aba. Não precisa anexar planilha para atualizar; o sistema salva e recalcula sozinho.</div>
+        </div>
+        <div class="actions">
+          <button class="btn-secondary" id="needCmAddFrontBtn" type="button">Adicionar frente</button>
+          <button class="btn-secondary" id="needCmResetBtn" type="button">Restaurar planilha</button>
+        </div>
+      </div>
+
+      <section class="stats-grid" id="needCmKpiWrap" aria-label="Indicadores da necessidade de CM"></section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Cenário Geral</h2>
+          <span class="status-pill">Preenchimento manual</span>
+        </div>
+        <div class="table-wrap" id="needCmScenarioWrap"></div>
+      </section>
+
+      <section class="dashboard-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Parâmetros</h2>
+            <span class="status-pill">Cálculo automático</span>
+          </div>
+          <div class="table-wrap no-scroll" id="needCmParamsWrap"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Resumo operacional</h2>
+            <span class="status-pill good">Frotas necessárias</span>
+          </div>
+          <div class="panel-body" id="needCmSummaryWrap"></div>
+        </section>
       </section>
     </section>
 
@@ -3298,6 +3400,7 @@
     const REDUCTION_SYNC_KEY = "cambui.daily.production.reductions.sync.v1";
     const MACHINE_PRODUCTION_STORAGE_KEY = "cambui.daily.production.machines.v1";
     const MACHINE_PRODUCTION_SYNC_KEY = "cambui.daily.production.machines.sync.v1";
+    const NEED_CM_STORAGE_KEY = "cambui.daily.production.need.cm.agosto.v1";
     const RECORDS_SYNC_KEY = "cambui.daily.production.records.sync.v1";
     const TARGETS_SYNC_KEY = "cambui.daily.production.targets.sync.v1";
     const FIREBASE_CONFIG_KEY = "cambui.daily.production.firebase.config.v1";
@@ -3347,6 +3450,27 @@
     const externalCaneBases = [TYPES.FLORESTA_CANE, TYPES.VALE_CANE];
     const machineProductionHarvestBaseOptions = [...frontOptions, ...externalCaneBases];
     const machineProductionBaseOptions = [...machineProductionHarvestBaseOptions, TYPES.OWN_TRANSPORT, TYPES.THIRD_TRANSPORT];
+    const defaultNeedCmState = {
+      fronts: [
+        { front: "Frente 4001", plan: 2800, radius: 18, netWeight: 65, emptySpeed: 19.636363636363637, loadedSpeed: 17, emptyCycle: 55, loadedCycle: 60, currentRadius: 29 },
+        { front: "Frente 4002", plan: 2200, radius: 38, netWeight: 59, emptySpeed: 27.804878048780488, loadedSpeed: 24, emptyCycle: 82, loadedCycle: 95, currentRadius: 45 },
+        { front: "Frente 4003", plan: 1000, radius: 35, netWeight: 60, emptySpeed: 26.25, loadedSpeed: 20, emptyCycle: 80, loadedCycle: 90, currentRadius: 21 },
+        { front: "Frente 4007", plan: 3750, radius: 46, netWeight: 77, emptySpeed: 25.09090909090909, loadedSpeed: 21.230769230769234, emptyCycle: 110, loadedCycle: 130, currentRadius: 44 },
+        { front: "Frente 4009", plan: 2250, radius: 45, netWeight: 73, emptySpeed: 22.5, loadedSpeed: 18.620689655172413, emptyCycle: 120, loadedCycle: 145, currentRadius: 46 }
+      ],
+      params: {
+        emptySpeed: 36,
+        loadedSpeed: 25,
+        t2: 30,
+        t4: 45,
+        supply: 0,
+        maintenance: 0,
+        shiftChange: 0,
+        meal: 0,
+        availability: 1188,
+        operationalMinutes: 1290
+      }
+    };
 
     const fleetOptions = [
       "Colhedora 4001-01",
@@ -3393,6 +3517,7 @@
     const els = {
       dashboardView: document.querySelector("#dashboardView"),
       reportsView: document.querySelector("#reportsView"),
+      needCmView: document.querySelector("#needCmView"),
       patioView: document.querySelector("#patioView"),
       stoppagesView: document.querySelector("#stoppagesView"),
       reductionsView: document.querySelector("#reductionsView"),
@@ -3417,6 +3542,10 @@
       reportsMinProduction: document.querySelector("#reportsMinProduction"),
       reportsSort: document.querySelector("#reportsSort"),
       reportsSearch: document.querySelector("#reportsSearch"),
+      needCmKpiWrap: document.querySelector("#needCmKpiWrap"),
+      needCmScenarioWrap: document.querySelector("#needCmScenarioWrap"),
+      needCmParamsWrap: document.querySelector("#needCmParamsWrap"),
+      needCmSummaryWrap: document.querySelector("#needCmSummaryWrap"),
       reportsFilterSummaryWrap: document.querySelector("#reportsFilterSummaryWrap"),
       reportsPrintSubtitle: document.querySelector("#reportsPrintSubtitle"),
       reportsKpiWrap: document.querySelector("#reportsKpiWrap"),
@@ -3688,6 +3817,7 @@
     let pendingMachineImportContext = null;
     let pendingMachineImportPreview = null;
     let entries = cloneEntries(defaultEntries);
+    let needCmState = loadNeedCmState();
     let activeFront = null;
     const firebaseState = {
       app: null,
@@ -3843,6 +3973,285 @@
       const dailyTarget = Number(target) || 0;
       if (dailyTarget <= 0) return 0;
       return ((Number(production) || 0) / dailyTarget) * 100;
+    }
+
+    function cloneNeedCmState(source = defaultNeedCmState) {
+      return {
+        fronts: (source.fronts || []).map((row, index) => ({
+          front: String(row.front || defaultNeedCmState.fronts[index]?.front || `Frente ${index + 1}`).trim(),
+          plan: parseNumber(row.plan),
+          radius: parseNumber(row.radius),
+          netWeight: parseNumber(row.netWeight),
+          emptySpeed: parseNumber(row.emptySpeed),
+          loadedSpeed: parseNumber(row.loadedSpeed),
+          emptyCycle: parseNumber(row.emptyCycle),
+          loadedCycle: parseNumber(row.loadedCycle),
+          currentRadius: parseNumber(row.currentRadius)
+        })),
+        params: {
+          emptySpeed: parseNumber(source.params?.emptySpeed ?? defaultNeedCmState.params.emptySpeed),
+          loadedSpeed: parseNumber(source.params?.loadedSpeed ?? defaultNeedCmState.params.loadedSpeed),
+          t2: parseNumber(source.params?.t2 ?? defaultNeedCmState.params.t2),
+          t4: parseNumber(source.params?.t4 ?? defaultNeedCmState.params.t4),
+          supply: parseNumber(source.params?.supply ?? defaultNeedCmState.params.supply),
+          maintenance: parseNumber(source.params?.maintenance ?? defaultNeedCmState.params.maintenance),
+          shiftChange: parseNumber(source.params?.shiftChange ?? defaultNeedCmState.params.shiftChange),
+          meal: parseNumber(source.params?.meal ?? defaultNeedCmState.params.meal),
+          availability: parseNumber(source.params?.availability ?? defaultNeedCmState.params.availability),
+          operationalMinutes: parseNumber(source.params?.operationalMinutes ?? defaultNeedCmState.params.operationalMinutes)
+        }
+      };
+    }
+
+    function loadNeedCmState() {
+      try {
+        const raw = localStorage.getItem(NEED_CM_STORAGE_KEY);
+        return raw ? cloneNeedCmState(JSON.parse(raw)) : cloneNeedCmState(defaultNeedCmState);
+      } catch {
+        return cloneNeedCmState(defaultNeedCmState);
+      }
+    }
+
+    function persistNeedCmState() {
+      localStorage.setItem(NEED_CM_STORAGE_KEY, JSON.stringify(cloneNeedCmState(needCmState)));
+    }
+
+    function calculateNeedCm(state = needCmState) {
+      const clean = cloneNeedCmState(state);
+      const fronts = clean.fronts.map((row) => {
+        const emptySpeed = row.emptyCycle ? (row.radius / row.emptyCycle) * 60 : row.emptySpeed;
+        const cycleTotal = row.emptyCycle + row.loadedCycle;
+        return {
+          ...row,
+          emptySpeed,
+          cycleTotal
+        };
+      });
+      const planTotal = fronts.reduce((sum, row) => sum + row.plan, 0);
+      const weightedRadius = planTotal ? fronts.reduce((sum, row) => sum + row.radius * row.plan, 0) / planTotal : 0;
+      const weightedNetWeight = planTotal ? fronts.reduce((sum, row) => sum + row.netWeight * row.plan, 0) / planTotal : 0;
+      const t1 = clean.params.emptySpeed ? (weightedRadius / clean.params.emptySpeed) * 60 : 0;
+      const t3 = clean.params.loadedSpeed ? (weightedRadius / clean.params.loadedSpeed) * 60 : 0;
+      const totalCycle = t1 + clean.params.t2 + t3 + clean.params.t4;
+      const downtime = clean.params.supply + clean.params.maintenance + clean.params.shiftChange + clean.params.meal;
+      const availability = clean.params.availability || Math.max(clean.params.operationalMinutes - downtime, 0);
+      const cyclesPerCmDay = totalCycle ? availability / totalCycle : 0;
+      const tripsPerDayUnit = weightedNetWeight ? planTotal / weightedNetWeight : 0;
+      const requiredFleets = cyclesPerCmDay ? tripsPerDayUnit / cyclesPerCmDay : 0;
+      return {
+        ...clean,
+        fronts,
+        planTotal,
+        weightedRadius,
+        weightedNetWeight,
+        t1,
+        t3,
+        totalCycle,
+        downtime,
+        availability,
+        cyclesPerCmDay,
+        tripsPerDayUnit,
+        requiredFleets
+      };
+    }
+
+    function needCmInput(value, field, options = {}) {
+      const dataset = options.index !== undefined
+        ? `data-need-cm-index="${options.index}" data-need-cm-field="${escapeHtml(field)}"`
+        : `data-need-cm-param="${escapeHtml(field)}"`;
+      return `<input class="sheet-input" type="text" inputmode="decimal" value="${escapeHtml(formatNumberFixed(value, options.digits ?? 2))}" ${dataset}>`;
+    }
+
+    function needCmTextInput(value, field, index) {
+      return `<input class="sheet-input" type="text" value="${escapeHtml(value)}" data-need-cm-index="${index}" data-need-cm-field="${escapeHtml(field)}">`;
+    }
+
+    function needCmKpiHtml(data) {
+      return [
+        ["Necessidade caminhões", formatNumberFixed(data.requiredFleets, 2), `Arredondado: ${Math.ceil(data.requiredFleets)} caminhões`],
+        ["Meta moagem dia", formatNumber(data.planTotal), "Puxado do cenário geral"],
+        ["Raio médio", `${formatNumberFixed(data.weightedRadius, 2)} km`, "Puxado do cenário geral"],
+        ["Peso líquido", `${formatNumberFixed(data.weightedNetWeight, 2)} tc`, "Puxado do cenário geral"],
+        ["Ciclo CM/dia", formatNumberFixed(data.cyclesPerCmDay, 2), "Recalculado automaticamente"],
+        ["Viagens dia/unid.", formatNumberFixed(data.tripsPerDayUnit, 2), "Meta / peso líquido"]
+      ].map((item) => `
+        <article class="stat">
+          <span>${escapeHtml(item[0])}</span>
+          <strong>${escapeHtml(item[1])}</strong>
+          <small>${escapeHtml(item[2])}</small>
+        </article>
+      `).join("");
+    }
+
+    function needCmSummaryHtml(data) {
+      return `
+        <div class="summary-grid">
+          <div class="summary-card">
+            <small>Necessidade final</small>
+            <strong>${formatNumberFixed(data.requiredFleets, 2)} caminhões</strong>
+            <span>Arredondando para cima: ${Math.ceil(data.requiredFleets)} caminhões necessários</span>
+          </div>
+          <div class="summary-card">
+            <small>Ciclo total</small>
+            <strong>${formatNumberFixed(data.totalCycle, 2)} min</strong>
+            <span>T1 + T2 + T3 + T4</span>
+          </div>
+          <div class="summary-card">
+            <small>Disponibilidade</small>
+            <strong>${formatNumber(data.availability)} min</strong>
+            <span>Indisp. ${formatNumber(data.downtime)} min</span>
+          </div>
+          <div class="summary-card">
+            <small>Plano total</small>
+            <strong>${formatNumber(data.planTotal)}</strong>
+            <span>${data.fronts.length} frentes no cenário</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function updateNeedCmText(selector, value) {
+      const element = document.querySelector(selector);
+      if (element) element.textContent = value;
+    }
+
+    function refreshNeedCmCalculatedOutputs() {
+      const data = calculateNeedCm();
+      if (els.needCmKpiWrap) els.needCmKpiWrap.innerHTML = needCmKpiHtml(data);
+      data.fronts.forEach((row, index) => {
+        updateNeedCmText(`[data-need-cm-row-output="${index}:emptySpeed"]`, formatNumberFixed(row.emptySpeed, 2));
+        updateNeedCmText(`[data-need-cm-row-output="${index}:cycleTotal"]`, formatNumber(row.cycleTotal));
+      });
+      updateNeedCmText('[data-need-cm-total="planTotal"]', formatNumber(data.planTotal));
+      updateNeedCmText('[data-need-cm-total="weightedRadius"]', formatNumberFixed(data.weightedRadius, 2));
+      updateNeedCmText('[data-need-cm-total="weightedNetWeight"]', formatNumberFixed(data.weightedNetWeight, 2));
+      updateNeedCmText('[data-need-cm-param-output="weightedRadius"]', formatNumberFixed(data.weightedRadius, 2));
+      updateNeedCmText('[data-need-cm-param-output="weightedNetWeight"]', formatNumberFixed(data.weightedNetWeight, 2));
+      updateNeedCmText('[data-need-cm-param-output="planTotal"]', formatNumber(data.planTotal));
+      updateNeedCmText('[data-need-cm-param-output="t1"]', formatNumberFixed(data.t1, 2));
+      updateNeedCmText('[data-need-cm-param-output="t3"]', formatNumberFixed(data.t3, 2));
+      updateNeedCmText('[data-need-cm-param-output="totalCycle"]', formatNumberFixed(data.totalCycle, 2));
+      updateNeedCmText('[data-need-cm-param-output="downtime"]', formatNumber(data.downtime));
+      updateNeedCmText('[data-need-cm-param-output="cyclesPerCmDay"]', formatNumberFixed(data.cyclesPerCmDay, 2));
+      updateNeedCmText('[data-need-cm-param-output="tripsPerDayUnit"]', formatNumberFixed(data.tripsPerDayUnit, 2));
+      updateNeedCmText('[data-need-cm-param-output="requiredFleets"]', formatNumberFixed(data.requiredFleets, 2));
+      if (els.needCmSummaryWrap) els.needCmSummaryWrap.innerHTML = needCmSummaryHtml(data);
+    }
+
+    function renderNeedCm() {
+      if (!els.needCmKpiWrap) return;
+      const data = calculateNeedCm();
+      els.needCmKpiWrap.innerHTML = needCmKpiHtml(data);
+
+      els.needCmScenarioWrap.innerHTML = `
+        <table class="sheet-table">
+          <thead>
+            <tr>
+              <th>Frentes</th>
+              <th>Plano</th>
+              <th>Raio</th>
+              <th>Peso Líquido</th>
+              <th>Vel. Vazio (km/h)</th>
+              <th>Vel. Carregado (km/h)</th>
+              <th>Ciclo Vazio (Média)</th>
+              <th>Ciclo Carregado (Média)</th>
+              <th>Ciclo Total</th>
+              <th>Raio atual</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.fronts.map((row, index) => `
+              <tr>
+                <td class="sheet-cell-label">${needCmTextInput(row.front, "front", index)}</td>
+                <td>${needCmInput(row.plan, "plan", { index, digits: 0 })}</td>
+                <td class="sheet-cell-input">${needCmInput(row.radius, "radius", { index, digits: 0 })}</td>
+                <td class="sheet-cell-input">${needCmInput(row.netWeight, "netWeight", { index, digits: 0 })}</td>
+                <td class="sheet-cell-formula" data-need-cm-row-output="${index}:emptySpeed">${formatNumberFixed(row.emptySpeed, 2)}</td>
+                <td class="sheet-cell-input">${needCmInput(row.loadedSpeed, "loadedSpeed", { index, digits: 2 })}</td>
+                <td class="sheet-cell-input">${needCmInput(row.emptyCycle, "emptyCycle", { index, digits: 0 })}</td>
+                <td class="sheet-cell-input">${needCmInput(row.loadedCycle, "loadedCycle", { index, digits: 0 })}</td>
+                <td class="sheet-cell-formula" data-need-cm-row-output="${index}:cycleTotal">${formatNumber(row.cycleTotal)}</td>
+                <td class="sheet-cell-input">${needCmInput(row.currentRadius, "currentRadius", { index, digits: 0 })}</td>
+                <td><button class="btn-secondary btn-danger" type="button" data-need-cm-delete="${index}">Excluir</button></td>
+              </tr>
+            `).join("")}
+            <tr>
+              <td class="sheet-cell-total">Total | Raio Ponderado</td>
+              <td class="sheet-cell-total" data-need-cm-total="planTotal">${formatNumber(data.planTotal)}</td>
+              <td class="sheet-cell-total" data-need-cm-total="weightedRadius">${formatNumberFixed(data.weightedRadius, 2)}</td>
+              <td class="sheet-cell-total" data-need-cm-total="weightedNetWeight">${formatNumberFixed(data.weightedNetWeight, 2)}</td>
+              <td colspan="7"></td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="margin-top: 10px;"><span class="sheet-note">Digite os dados nas células verdes/azuis. As amarelas calculam automaticamente.</span></div>
+      `;
+
+      els.needCmParamsWrap.innerHTML = `
+        <table class="sheet-table">
+          <tbody>
+            <tr><td class="sheet-cell-label">Raio Médio (km)</td><td data-need-cm-param-output="weightedRadius">${formatNumberFixed(data.weightedRadius, 2)}</td><td class="sheet-cell-total">Vel. Vazio (km/h)</td></tr>
+            <tr><td class="sheet-cell-label">Densidade (tc)</td><td data-need-cm-param-output="weightedNetWeight">${formatNumberFixed(data.weightedNetWeight, 2)}</td><td class="sheet-cell-input">${needCmInput(data.params.emptySpeed, "emptySpeed", { digits: 0 })}</td></tr>
+            <tr><td class="sheet-cell-label">Meta Moagem dia</td><td data-need-cm-param-output="planTotal">${formatNumber(data.planTotal)}</td><td class="sheet-cell-total">Vel. Carregado (km/h)</td></tr>
+            <tr><td class="sheet-cell-label">T1</td><td class="sheet-cell-formula" data-need-cm-param-output="t1">${formatNumberFixed(data.t1, 2)}</td><td class="sheet-cell-input">${needCmInput(data.params.loadedSpeed, "loadedSpeed", { digits: 0 })}</td></tr>
+            <tr><td class="sheet-cell-label">T2</td><td>${needCmInput(data.params.t2, "t2", { digits: 0 })}</td><td class="sheet-cell-total">Abast. (min)</td></tr>
+            <tr><td class="sheet-cell-label">T3</td><td class="sheet-cell-formula" data-need-cm-param-output="t3">${formatNumberFixed(data.t3, 2)}</td><td class="sheet-cell-input">${needCmInput(data.params.supply, "supply", { digits: 0 })}</td></tr>
+            <tr><td class="sheet-cell-label">T4</td><td>${needCmInput(data.params.t4, "t4", { digits: 0 })}</td><td class="sheet-cell-total">Manutenção</td></tr>
+            <tr><td class="sheet-cell-label">Total</td><td data-need-cm-param-output="totalCycle">${formatNumberFixed(data.totalCycle, 2)}</td><td class="sheet-cell-input">${needCmInput(data.params.maintenance, "maintenance", { digits: 0 })}</td></tr>
+            <tr><td class="sheet-cell-label">Indisponibilidade (Min)</td><td data-need-cm-param-output="downtime">${formatNumber(data.downtime)}</td><td class="sheet-cell-total">Troca de Turno (min)</td></tr>
+            <tr><td class="sheet-cell-label">Disponibilidade (Min)</td><td>${needCmInput(data.params.availability, "availability", { digits: 0 })}</td><td class="sheet-cell-input">${needCmInput(data.params.shiftChange, "shiftChange", { digits: 0 })}</td></tr>
+            <tr><td class="sheet-cell-label">Ciclo por CM*Dia</td><td class="sheet-cell-formula" data-need-cm-param-output="cyclesPerCmDay">${formatNumberFixed(data.cyclesPerCmDay, 2)}</td><td class="sheet-cell-total">Refeição (min)</td></tr>
+            <tr><td class="sheet-cell-label">Viagens Dia/Unidade</td><td class="sheet-cell-formula" data-need-cm-param-output="tripsPerDayUnit">${formatNumberFixed(data.tripsPerDayUnit, 2)}</td><td class="sheet-cell-input">${needCmInput(data.params.meal, "meal", { digits: 0 })}</td></tr>
+            <tr><td class="sheet-cell-total">Necessidade de Caminhões</td><td class="sheet-cell-formula" data-need-cm-param-output="requiredFleets">${formatNumberFixed(data.requiredFleets, 2)}</td><td class="sheet-cell-total">Total de minutos operacionais</td></tr>
+            <tr><td></td><td></td><td>${needCmInput(data.params.operationalMinutes, "operationalMinutes", { digits: 0 })}</td></tr>
+          </tbody>
+        </table>
+      `;
+
+      els.needCmSummaryWrap.innerHTML = needCmSummaryHtml(data);
+    }
+
+    function updateNeedCmValue(target, options = {}) {
+      if (target.dataset.needCmIndex !== undefined) {
+        const index = Number(target.dataset.needCmIndex);
+        const field = target.dataset.needCmField;
+        if (!needCmState.fronts[index] || !field) return;
+        needCmState.fronts[index][field] = field === "front" ? String(target.value || "").trim() || `Frente ${index + 1}` : parseNumber(target.value);
+      } else if (target.dataset.needCmParam) {
+        needCmState.params[target.dataset.needCmParam] = parseNumber(target.value);
+      }
+      persistNeedCmState();
+      if (options.render === false) {
+        refreshNeedCmCalculatedOutputs();
+      } else {
+        renderNeedCm();
+      }
+    }
+
+    function addNeedCmFront() {
+      needCmState.fronts.push({
+        front: `Frente ${needCmState.fronts.length + 1}`,
+        plan: 0,
+        radius: 0,
+        netWeight: 0,
+        emptySpeed: 0,
+        loadedSpeed: 0,
+        emptyCycle: 0,
+        loadedCycle: 0,
+        currentRadius: 0
+      });
+      persistNeedCmState();
+      renderNeedCm();
+      showToast("Nova frente adicionada na Necessidade CM.");
+    }
+
+    function deleteNeedCmFront(index) {
+      if (!needCmState.fronts[index]) return;
+      needCmState.fronts.splice(index, 1);
+      persistNeedCmState();
+      renderNeedCm();
+      showToast("Frente removida da Necessidade CM.");
     }
 
     function escapeHtml(value) {
@@ -5664,7 +6073,13 @@
         .map((item) => ({
           tone: "warn",
           title: "Detalhe por máquina faltando",
-          text: `${item.base} · sem ${item.label} lançado na produção por máquina.`
+          text: `${item.base} · sem ${item.label} lançado na produção por máquina.`,
+          action: {
+            kind: "machines",
+            label: "Abrir produção por máquina",
+            machineType: item.machineType,
+            front: item.base
+          }
         }));
     }
 
@@ -5679,23 +6094,29 @@
         return status.tone === "alert" || status.tone === "warn";
       });
       const issues = [];
-      if (!record) issues.push({ tone: "alert", title: "Dia sem lançamento", text: "Não existe lançamento diário salvo para esta data." });
-      if (record && !rows.length) issues.push({ tone: "alert", title: "Lançamento vazio", text: "O dia existe, mas não tem linhas válidas de produção." });
-      if (summary.targetTotal > 0 && summary.targetPercent < 85) issues.push({ tone: "alert", title: "Meta abaixo de 85%", text: `${formatPercent(summary.targetPercent)} realizado; faltam ${formatNumber(summary.remaining)}.` });
-      if (summary.total > 0 && summary.transportTotal <= 0) issues.push({ tone: "alert", title: "Sem transporte", text: "Há moagem lançada, mas nenhum transporte próprio ou terceiro." });
+      const entryAction = { kind: "entry", label: "Abrir lançamento" };
+      if (!record) issues.push({ tone: "alert", title: "Dia sem lançamento", text: "Não existe lançamento diário salvo para esta data.", action: entryAction });
+      if (record && !rows.length) issues.push({ tone: "alert", title: "Lançamento vazio", text: "O dia existe, mas não tem linhas válidas de produção.", action: entryAction });
+      if (summary.targetTotal > 0 && summary.targetPercent < 85) issues.push({ tone: "alert", title: "Meta abaixo de 85%", text: `${formatPercent(summary.targetPercent)} realizado; faltam ${formatNumber(summary.remaining)}.`, action: entryAction });
+      if (summary.total > 0 && summary.transportTotal <= 0) issues.push({ tone: "alert", title: "Sem transporte", text: "Há moagem lançada, mas nenhum transporte próprio ou terceiro.", action: entryAction });
       if (summary.total > 0 && summary.transportTotal > 0 && Math.abs(summary.transportTotal - summary.total) > Math.max(summary.total * 0.05, 50)) {
-        issues.push({ tone: "warn", title: "Transporte diferente da moagem", text: `Diferença de ${formatNumber(summary.transportTotal - summary.total)} t.` });
+        issues.push({ tone: "warn", title: "Transporte diferente da moagem", text: `Diferença de ${formatNumber(summary.transportTotal - summary.total)} t.`, action: entryAction });
       }
       rows.filter((row) => usesEquipmentQuantity(row.type) && parseNumber(row.production) > 0 && !parseNumber(row.equipmentQuantity))
-        .forEach((row) => issues.push({ tone: "alert", title: "Qtd. equipamento faltando", text: `${row.type} · ${row.front || row.type}` }));
+        .forEach((row) => issues.push({ tone: "alert", title: "Qtd. equipamento faltando", text: `${row.type} · ${row.front || row.type}`, action: entryAction }));
       rows.filter((row) => !isExternalCane(row.type) && !isTransport(row.type) && targetForRow(row, targets, rowsForSameDate(row, rows)) <= 0)
-        .forEach((row) => issues.push({ tone: "warn", title: "Meta não cadastrada", text: `${row.type} · ${row.front || "sem frente"}` }));
+        .forEach((row) => issues.push({ tone: "warn", title: "Meta não cadastrada", text: `${row.type} · ${row.front || "sem frente"}`, action: entryAction }));
       const expectedMachineIssues = expectedMachineDetailIssuesForDay(rows, machineRows);
       issues.push(...expectedMachineIssues);
-      if (summary.total > 0 && !machineRows.length && !expectedMachineIssues.length) issues.push({ tone: "warn", title: "Sem produção por máquina", text: "Há produção diária, mas nenhum equipamento detalhado no dia." });
+      if (summary.total > 0 && !machineRows.length && !expectedMachineIssues.length) issues.push({ tone: "warn", title: "Sem produção por máquina", text: "Há produção diária, mas nenhum equipamento detalhado no dia.", action: { kind: "machines", label: "Abrir produção por máquina", machineType: "Colhedora", front: ownHarvestFronts[0] } });
       machineIssues.forEach((item) => {
         const status = machineProductionDisplayStatus(item);
-        issues.push({ tone: status.tone === "alert" ? "alert" : "warn", title: `Máquinas: ${status.label}`, text: `${machineProductionBaseLabel(item)} · ${item.machineType} · Dif. ${formatNumber(item.difference)}` });
+        issues.push({
+          tone: status.tone === "alert" ? "alert" : "warn",
+          title: `Máquinas: ${status.label}`,
+          text: `${machineProductionBaseLabel(item)} · ${item.machineType} · Dif. ${formatNumber(item.difference)}`,
+          action: { kind: "machines", label: "Abrir conferência", machineType: item.machineType, front: machineProductionBaseLabel(item) }
+        });
       });
       if (!issues.length) issues.push({ tone: "good", title: "Dia consistente", text: "Nenhuma inconsistência crítica encontrada para fechamento." });
       return { date: cleanDate, rows, summary, machineRows, issues };
@@ -8137,11 +8558,10 @@
       return `${group.front} ${group.machineType}${dateLabel} batendo com o lançamento diário.`;
     }
 
-    function openMachineProductionIssue(group) {
-      if (!group) return;
-      const date = normalizeRecordDate(group.date) || todayInputValue();
-      const machineType = normalizeMachineProductionType(group.machineType);
-      const front = machineProductionBaseLabel(group);
+    function openMachineProductionDay(dateValue, machineTypeValue, frontValue = "") {
+      const date = normalizeRecordDate(dateValue) || todayInputValue();
+      const machineType = normalizeMachineProductionType(machineTypeValue);
+      const front = normalizeMachineProductionBase(frontValue, machineType) || defaultMachineProductionFrontForType(machineType);
       setMachineProductionMode(machineModeForType(machineType), { syncType: false, render: false });
       setMachineProductionRange(date, date);
       setMachineProductionEntryDate(date);
@@ -8149,7 +8569,7 @@
       els.machineType.value = machineType;
       els.machineFront.value = isMachineTruckType(machineType)
         ? defaultMachineProductionFrontForType(machineType)
-        : normalizeMachineProductionBase(front, machineType) || ownHarvestFronts[0];
+        : front;
       if (els.machineFrontFilter && [...els.machineFrontFilter.options].some((option) => sameText(option.value, front))) {
         els.machineFrontFilter.value = front;
       }
@@ -8160,6 +8580,11 @@
       setTimeout(() => {
         els.machineRowsWrap?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 50);
+    }
+
+    function openMachineProductionIssue(group) {
+      if (!group) return;
+      openMachineProductionDay(group.date, group.machineType, machineProductionBaseLabel(group));
     }
 
     function showMachineProductionIssueToast(prefix, group) {
@@ -9818,6 +10243,7 @@
       const views = {
         dashboard: els.dashboardView,
         reports: els.reportsView,
+        needCm: els.needCmView,
         patio: els.patioView,
         stoppages: els.stoppagesView,
         reductions: els.reductionsView,
@@ -9837,6 +10263,7 @@
 
       if (name === "dashboard") renderDashboard();
       if (name === "reports") renderManagementReports();
+      if (name === "needCm") renderNeedCm();
       if (name === "patio") renderPatio();
       if (name === "stoppages") renderStoppages();
       if (name === "reductions") renderReductions();
@@ -11841,6 +12268,211 @@
       });
     }
 
+    function openConferenceEntryDay(dateValue) {
+      const date = normalizeRecordDate(dateValue) || todayInputValue();
+      els.entryDate.value = date;
+      refreshEntryFromSelectedDate({ silent: true, clearWhenMissing: true });
+      switchView("entry");
+      showToast(`Lançamento de ${formatDate(date)} aberto.`);
+    }
+
+    function conferenceIssueActionHtml(issue, date) {
+      const action = issue.action;
+      if (!action || !action.kind) return "";
+      return `
+        <div class="history-actions">
+          <button
+            class="btn-secondary"
+            type="button"
+            data-conference-action="${escapeHtml(action.kind)}"
+            data-conference-date="${escapeHtml(date)}"
+            data-conference-machine-type="${escapeHtml(action.machineType || "")}"
+            data-conference-front="${escapeHtml(action.front || "")}"
+          >${escapeHtml(action.label || "Corrigir")}</button>
+        </div>
+      `;
+    }
+
+    function bindConferenceActionButtons(container) {
+      if (!container) return;
+      container.querySelectorAll("[data-conference-action]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const date = normalizeRecordDate(button.dataset.conferenceDate) || todayInputValue();
+          if (button.dataset.conferenceAction === "machines") {
+            openMachineProductionDay(date, button.dataset.conferenceMachineType, button.dataset.conferenceFront);
+            return;
+          }
+          openConferenceEntryDay(date);
+        });
+      });
+    }
+
+    function conferenceOperationRows(data) {
+      const grouped = new Map();
+      data.rows.forEach((row) => {
+        const key = `${row.type}|${row.front || row.type}`;
+        if (!grouped.has(key)) {
+          grouped.set(key, {
+            type: row.type,
+            base: row.front || row.type,
+            production: 0,
+            target: 0,
+            equipmentQuantity: 0,
+            records: 0,
+            targetKeys: new Set()
+          });
+        }
+        const item = grouped.get(key);
+        item.production += parseNumber(row.production);
+        item.equipmentQuantity += parseNumber(row.equipmentQuantity);
+        item.records += 1;
+        const targetKey = `${row.date || data.date}|${targetKeyForRow(row)}`;
+        if (!item.targetKeys.has(targetKey)) {
+          item.target += targetForRow(row, targets, rowsForSameDate(row, data.rows));
+          item.targetKeys.add(targetKey);
+        }
+      });
+      return [...grouped.values()]
+        .map((item) => ({
+          ...item,
+          percent: progressFor(item.production, item.target),
+          averagePerEquipment: item.equipmentQuantity ? item.production / item.equipmentQuantity : 0
+        }))
+        .sort((first, second) => first.type.localeCompare(second.type, "pt-BR") || first.base.localeCompare(second.base, "pt-BR", { numeric: true }));
+    }
+
+    function conferenceOperationTableHtml(data) {
+      const rows = conferenceOperationRows(data);
+      if (!rows.length) return '<div class="empty-state">Sem produção diária para detalhar neste dia.</div>';
+      return `
+        <div class="table-wrap no-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Operação</th>
+                <th>Base</th>
+                <th>Produção</th>
+                <th>Meta</th>
+                <th>%</th>
+                <th>Qtd.</th>
+                <th>Média</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((row) => `
+                <tr>
+                  <td>${escapeHtml(row.type)}</td>
+                  <td>${escapeHtml(row.base)}</td>
+                  <td>${formatNumber(row.production)}</td>
+                  <td>${row.target ? formatNumber(row.target) : "-"}</td>
+                  <td>${row.target ? formatPercent(row.percent) : "-"}</td>
+                  <td>${row.equipmentQuantity ? formatNumber(row.equipmentQuantity) : "-"}</td>
+                  <td>${row.averagePerEquipment ? formatNumber(row.averagePerEquipment) : "-"}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function conferenceMachineTypeTableHtml(data) {
+      const rows = groupedMachineProductionRows(data.machineRows, (row) => row.machineType);
+      if (!rows.length) return '<div class="empty-state">Sem produção por máquina lançada neste dia.</div>';
+      return `
+        <div class="table-wrap no-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Produção</th>
+                <th>Equip.</th>
+                <th>Média/equip.</th>
+                <th>Reg.</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((row) => `
+                <tr>
+                  <td>${escapeHtml(row.label)}</td>
+                  <td>${formatNumber(row.production)}</td>
+                  <td>${row.machineCount}</td>
+                  <td>${formatNumber(row.averagePerMachineDay)}</td>
+                  <td>${row.records}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function conferenceMachineConsistencyTableHtml(data) {
+      const rows = machineProductionConsistencyRows(data.machineRows);
+      if (!rows.length) return '<div class="empty-state">Sem conferência de máquinas para este dia.</div>';
+      return `
+        <div class="table-wrap no-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Base</th>
+                <th>Tipo</th>
+                <th>Diário</th>
+                <th>Máquinas</th>
+                <th>Dif.</th>
+                <th>Status</th>
+                <th>Ação</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((row) => {
+                const status = machineProductionDisplayStatus(row);
+                return `
+                  <tr>
+                    <td>${escapeHtml(machineProductionBaseLabel(row))}</td>
+                    <td>${escapeHtml(row.machineType)}</td>
+                    <td>${machineProductionRequiresDailyMatch(row) ? formatNumber(row.target) : "-"}</td>
+                    <td>${formatNumber(row.production)}</td>
+                    <td>${machineProductionRequiresDailyMatch(row) ? formatNumber(row.difference) : "-"}</td>
+                    <td><span class="status-pill ${escapeHtml(status.tone)}">${escapeHtml(status.label)}</span></td>
+                    <td><button class="btn-secondary" type="button" data-conference-action="machines" data-conference-date="${escapeHtml(data.date)}" data-conference-machine-type="${escapeHtml(row.machineType)}" data-conference-front="${escapeHtml(machineProductionBaseLabel(row))}">Abrir</button></td>
+                  </tr>
+                `;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function conferenceDailyDetailsHtml(data) {
+      return `
+        <div class="analysis-columns" style="margin-top: 14px;">
+          <div>
+            <div class="chart-row-head" style="margin-bottom: 10px;">
+              <strong>Produção diária por operação</strong>
+              <span>meta, quantidade e média</span>
+            </div>
+            ${conferenceOperationTableHtml(data)}
+          </div>
+          <div>
+            <div class="chart-row-head" style="margin-bottom: 10px;">
+              <strong>Produção por tipo de máquina</strong>
+              <span>produção e média/equipamento</span>
+            </div>
+            ${conferenceMachineTypeTableHtml(data)}
+          </div>
+        </div>
+        <div style="margin-top: 14px;">
+          <div class="chart-row-head" style="margin-bottom: 10px;">
+            <strong>Batimento máquinas x lançamento diário</strong>
+            <span>clique em abrir para corrigir o grupo</span>
+          </div>
+          ${conferenceMachineConsistencyTableHtml(data)}
+        </div>
+      `;
+    }
+
     function renderConference() {
       if (!els.conferenceDate) return;
       const date = normalizeRecordDate(els.conferenceDate.value) || todayInputValue();
@@ -11876,10 +12508,13 @@
             <div class="alert-item ${item.tone}">
               <strong>${escapeHtml(item.title)}</strong>
               <span>${escapeHtml(item.text)}</span>
+              ${conferenceIssueActionHtml(item, date)}
             </div>
           `).join("")}
         </div>
+        ${conferenceDailyDetailsHtml(data)}
       `;
+      bindConferenceActionButtons(els.conferenceChecklistWrap);
       renderSafraDailyPendingConference(date);
       renderConferenceComparison(date);
       renderConferenceForecast(date);
@@ -17715,6 +18350,29 @@
       });
     });
 
+    [els.needCmScenarioWrap, els.needCmParamsWrap].forEach((wrap) => {
+      wrap?.addEventListener("input", (event) => {
+        const input = event.target.closest("[data-need-cm-field], [data-need-cm-param]");
+        if (input) updateNeedCmValue(input, { render: false });
+      });
+      wrap?.addEventListener("change", (event) => {
+        const input = event.target.closest("[data-need-cm-field], [data-need-cm-param]");
+        if (input) updateNeedCmValue(input);
+      });
+    });
+    els.needCmScenarioWrap?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-need-cm-delete]");
+      if (!button) return;
+      deleteNeedCmFront(Number(button.dataset.needCmDelete));
+    });
+    document.querySelector("#needCmAddFrontBtn").addEventListener("click", addNeedCmFront);
+    document.querySelector("#needCmResetBtn").addEventListener("click", () => {
+      needCmState = cloneNeedCmState(defaultNeedCmState);
+      persistNeedCmState();
+      renderNeedCm();
+      showToast("Planilha Necessidade CM restaurada.");
+    });
+
     els.conferenceDate.addEventListener("change", renderConference);
     document.querySelector("#conferenceTodayBtn").addEventListener("click", () => {
       els.conferenceDate.value = todayInputValue();
@@ -17722,10 +18380,7 @@
     });
     document.querySelector("#conferenceLoadEntryBtn").addEventListener("click", () => {
       const date = normalizeRecordDate(els.conferenceDate.value) || todayInputValue();
-      els.entryDate.value = date;
-      refreshEntryFromSelectedDate({ silent: true, clearWhenMissing: true });
-      switchView("entry");
-      showToast(`Lançamento de ${formatDate(date)} aberto.`);
+      openConferenceEntryDay(date);
     });
     document.querySelector("#conferenceBackupBtn").addEventListener("click", () => {
       exportDayBackupFile(els.conferenceDate.value || todayInputValue());
