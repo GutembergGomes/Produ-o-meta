@@ -1354,6 +1354,30 @@
       padding: 7px 6px;
     }
 
+    .need-cm-scenario-table th,
+    .need-cm-scenario-table td {
+      padding: 5px 4px;
+      font-size: .7rem;
+      white-space: nowrap;
+    }
+
+    .need-cm-scenario-table .sheet-input {
+      min-width: 48px;
+      padding: 6px 4px;
+      font-size: .72rem;
+    }
+
+    .need-cm-scenario-table th:first-child,
+    .need-cm-scenario-table td:first-child {
+      min-width: 104px;
+      width: 104px;
+    }
+
+    .need-cm-scenario-table td:first-child .sheet-input {
+      min-width: 92px;
+      font-size: .76rem;
+    }
+
     .sheet-note {
       display: inline-block;
       padding: 8px 10px;
@@ -4030,13 +4054,27 @@
 
     function calculateNeedCm(state = needCmState) {
       const clean = cloneNeedCmState(state);
+      const downtime = clean.params.supply + clean.params.maintenance + clean.params.shiftChange + clean.params.meal;
+      const availability = clean.params.availability || Math.max(clean.params.operationalMinutes - downtime, 0);
+      const fieldRoundTripDiscountPercent = Math.max(0, parseNumber(clean.params.fieldRoundTripDiscountPercent));
+      const fieldRoundTripDiscountRate = fieldRoundTripDiscountPercent / 100;
       const fronts = clean.fronts.map((row) => {
         const emptySpeed = row.emptyCycle ? (row.radius / row.emptyCycle) * 60 : row.emptySpeed;
         const cycleTotal = row.emptyCycle + row.t2 + row.t4 + row.loadedCycle;
+        const frontCyclesPerCmDay = cycleTotal ? availability / cycleTotal : 0;
+        const frontTripsPerDayUnit = row.netWeight ? row.plan / row.netWeight : 0;
+        const frontGrossRequiredFleets = frontCyclesPerCmDay ? frontTripsPerDayUnit / frontCyclesPerCmDay : 0;
+        const frontFieldRoundTripDiscount = Math.max(0, parseNumber(row.fieldRoundTrips)) * fieldRoundTripDiscountRate;
+        const frontRequiredFleets = Math.max(frontGrossRequiredFleets - frontFieldRoundTripDiscount, 0);
         return {
           ...row,
           emptySpeed,
-          cycleTotal
+          cycleTotal,
+          frontCyclesPerCmDay,
+          frontTripsPerDayUnit,
+          frontGrossRequiredFleets,
+          frontFieldRoundTripDiscount,
+          frontRequiredFleets
         };
       });
       const planTotal = fronts.reduce((sum, row) => sum + row.plan, 0);
@@ -4047,16 +4085,12 @@
       const t1 = clean.params.emptySpeed ? (weightedRadius / clean.params.emptySpeed) * 60 : 0;
       const t3 = clean.params.loadedSpeed ? (weightedRadius / clean.params.loadedSpeed) * 60 : 0;
       const totalCycle = t1 + weightedT2 + t3 + weightedT4;
-      const downtime = clean.params.supply + clean.params.maintenance + clean.params.shiftChange + clean.params.meal;
-      const availability = clean.params.availability || Math.max(clean.params.operationalMinutes - downtime, 0);
       const cyclesPerCmDay = totalCycle ? availability / totalCycle : 0;
       const tripsPerDayUnit = weightedNetWeight ? planTotal / weightedNetWeight : 0;
-      const grossRequiredFleets = cyclesPerCmDay ? tripsPerDayUnit / cyclesPerCmDay : 0;
       const totalFieldRoundTrips = fronts.reduce((sum, row) => sum + Math.max(0, parseNumber(row.fieldRoundTrips)), 0);
-      const fieldRoundTripDiscountPercent = Math.max(0, parseNumber(clean.params.fieldRoundTripDiscountPercent));
-      const fieldRoundTripDiscountRate = fieldRoundTripDiscountPercent / 100;
-      const fieldRoundTripDiscount = totalFieldRoundTrips * fieldRoundTripDiscountRate;
-      const requiredFleets = Math.max(grossRequiredFleets - fieldRoundTripDiscount, 0);
+      const grossRequiredFleets = fronts.reduce((sum, row) => sum + row.frontGrossRequiredFleets, 0);
+      const fieldRoundTripDiscount = fronts.reduce((sum, row) => sum + row.frontFieldRoundTripDiscount, 0);
+      const requiredFleets = fronts.reduce((sum, row) => sum + row.frontRequiredFleets, 0);
       return {
         ...clean,
         fronts,
@@ -4152,11 +4186,13 @@
       data.fronts.forEach((row, index) => {
         updateNeedCmText(`[data-need-cm-row-output="${index}:emptySpeed"]`, formatNumberFixed(row.emptySpeed, 2));
         updateNeedCmText(`[data-need-cm-row-output="${index}:cycleTotal"]`, formatNumber(row.cycleTotal));
+        updateNeedCmText(`[data-need-cm-row-output="${index}:frontRequiredFleets"]`, formatNumberFixed(row.frontRequiredFleets, 2));
       });
       updateNeedCmText('[data-need-cm-total="planTotal"]', formatNumber(data.planTotal));
       updateNeedCmText('[data-need-cm-total="weightedRadius"]', formatNumberFixed(data.weightedRadius, 2));
       updateNeedCmText('[data-need-cm-total="weightedNetWeight"]', formatNumberFixed(data.weightedNetWeight, 2));
       updateNeedCmText('[data-need-cm-total="totalFieldRoundTrips"]', formatNumber(data.totalFieldRoundTrips));
+      updateNeedCmText('[data-need-cm-total="requiredFleets"]', formatNumberFixed(data.requiredFleets, 2));
       updateNeedCmText('[data-need-cm-param-output="weightedRadius"]', formatNumberFixed(data.weightedRadius, 2));
       updateNeedCmText('[data-need-cm-param-output="weightedNetWeight"]', formatNumberFixed(data.weightedNetWeight, 2));
       updateNeedCmText('[data-need-cm-param-output="planTotal"]', formatNumber(data.planTotal));
@@ -4181,7 +4217,7 @@
       els.needCmKpiWrap.innerHTML = needCmKpiHtml(data);
 
       els.needCmScenarioWrap.innerHTML = `
-        <table class="sheet-table">
+        <table class="sheet-table need-cm-scenario-table">
           <thead>
             <tr>
               <th>Frentes</th>
@@ -4197,6 +4233,7 @@
               <th>Ciclo Total</th>
               <th>Raio atual</th>
               <th>Bate-volta campo</th>
+              <th>CM Frente</th>
               <th>Ação</th>
             </tr>
           </thead>
@@ -4216,6 +4253,7 @@
                 <td class="sheet-cell-formula" data-need-cm-row-output="${index}:cycleTotal">${formatNumber(row.cycleTotal)}</td>
                 <td class="sheet-cell-input">${needCmInput(row.currentRadius, "currentRadius", { index, digits: 0 })}</td>
                 <td class="sheet-cell-input">${needCmInput(row.fieldRoundTrips, "fieldRoundTrips", { index, digits: 0 })}</td>
+                <td class="sheet-cell-formula" data-need-cm-row-output="${index}:frontRequiredFleets">${formatNumberFixed(row.frontRequiredFleets, 2)}</td>
                 <td><button class="btn-secondary btn-danger" type="button" data-need-cm-delete="${index}">Excluir</button></td>
               </tr>
             `).join("")}
@@ -4226,6 +4264,7 @@
               <td class="sheet-cell-total" data-need-cm-total="weightedNetWeight">${formatNumberFixed(data.weightedNetWeight, 2)}</td>
               <td colspan="8"></td>
               <td class="sheet-cell-total" data-need-cm-total="totalFieldRoundTrips">${formatNumber(data.totalFieldRoundTrips)}</td>
+              <td class="sheet-cell-total" data-need-cm-total="requiredFleets">${formatNumberFixed(data.requiredFleets, 2)}</td>
               <td></td>
             </tr>
           </tbody>
@@ -18411,7 +18450,7 @@
 
     function needCmWhatsAppText(data = calculateNeedCm()) {
       const frontLines = data.fronts.map((row) => (
-        `• ${row.front}: plano ${formatNumber(row.plan)} t | raio ${formatNumberFixed(row.radius, 0)} km | T2 ${formatNumber(row.t2)} min | T4 ${formatNumber(row.t4)} min | ciclo ${formatNumber(row.cycleTotal)} min | bate-volta ${formatNumber(row.fieldRoundTrips)}`
+        `• ${row.front}: plano ${formatNumber(row.plan)} t | raio ${formatNumberFixed(row.radius, 0)} km | T2 ${formatNumber(row.t2)} min | T4 ${formatNumber(row.t4)} min | ciclo ${formatNumber(row.cycleTotal)} min | bate-volta ${formatNumber(row.fieldRoundTrips)} | CM ${formatNumberFixed(row.frontRequiredFleets, 2)} (arred. ${Math.ceil(row.frontRequiredFleets)})`
       ));
       return [
         "*Resumo Necessidade CM*",
@@ -18509,6 +18548,8 @@
                     <th class="right">Ciclo carregado</th>
                     <th class="right">Ciclo total</th>
                     <th class="right">Bate-volta</th>
+                    <th class="right">CM final</th>
+                    <th class="right">Arred.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -18524,6 +18565,8 @@
                       <td class="right">${formatNumber(row.loadedCycle)}</td>
                       <td class="right">${formatNumber(row.cycleTotal)}</td>
                       <td class="right">${formatNumber(row.fieldRoundTrips)}</td>
+                      <td class="right">${formatNumberFixed(row.frontRequiredFleets, 2)}</td>
+                      <td class="right">${Math.ceil(row.frontRequiredFleets)}</td>
                     </tr>
                   `).join("")}
                 </tbody>
