@@ -4060,6 +4060,7 @@
       const fieldRoundTripDiscountRate = fieldRoundTripDiscountPercent / 100;
       const fronts = clean.fronts.map((row) => {
         const emptySpeed = row.emptyCycle ? (row.radius / row.emptyCycle) * 60 : row.emptySpeed;
+        const loadedSpeed = row.loadedCycle ? (row.radius / row.loadedCycle) * 60 : row.loadedSpeed;
         const cycleTotal = row.emptyCycle + row.t2 + row.t4 + row.loadedCycle;
         const frontCyclesPerCmDay = cycleTotal ? availability / cycleTotal : 0;
         const frontTripsPerDayUnit = row.netWeight ? row.plan / row.netWeight : 0;
@@ -4069,6 +4070,7 @@
         return {
           ...row,
           emptySpeed,
+          loadedSpeed,
           cycleTotal,
           frontCyclesPerCmDay,
           frontTripsPerDayUnit,
@@ -4080,10 +4082,12 @@
       const planTotal = fronts.reduce((sum, row) => sum + row.plan, 0);
       const weightedRadius = planTotal ? fronts.reduce((sum, row) => sum + row.radius * row.plan, 0) / planTotal : 0;
       const weightedNetWeight = planTotal ? fronts.reduce((sum, row) => sum + row.netWeight * row.plan, 0) / planTotal : 0;
+      const weightedEmptySpeed = planTotal ? fronts.reduce((sum, row) => sum + row.emptySpeed * row.plan, 0) / planTotal : 0;
+      const weightedLoadedSpeed = planTotal ? fronts.reduce((sum, row) => sum + row.loadedSpeed * row.plan, 0) / planTotal : 0;
       const weightedT2 = planTotal ? fronts.reduce((sum, row) => sum + row.t2 * row.plan, 0) / planTotal : 0;
       const weightedT4 = planTotal ? fronts.reduce((sum, row) => sum + row.t4 * row.plan, 0) / planTotal : 0;
       const t1 = clean.params.emptySpeed ? (weightedRadius / clean.params.emptySpeed) * 60 : 0;
-      const t3 = clean.params.loadedSpeed ? (weightedRadius / clean.params.loadedSpeed) * 60 : 0;
+      const t3 = weightedLoadedSpeed ? (weightedRadius / weightedLoadedSpeed) * 60 : 0;
       const totalCycle = t1 + weightedT2 + t3 + weightedT4;
       const cyclesPerCmDay = totalCycle ? availability / totalCycle : 0;
       const tripsPerDayUnit = weightedNetWeight ? planTotal / weightedNetWeight : 0;
@@ -4097,6 +4101,8 @@
         planTotal,
         weightedRadius,
         weightedNetWeight,
+        weightedEmptySpeed,
+        weightedLoadedSpeed,
         weightedT2,
         weightedT4,
         t1,
@@ -4185,17 +4191,21 @@
       if (els.needCmKpiWrap) els.needCmKpiWrap.innerHTML = needCmKpiHtml(data);
       data.fronts.forEach((row, index) => {
         updateNeedCmText(`[data-need-cm-row-output="${index}:emptySpeed"]`, formatNumberFixed(row.emptySpeed, 2));
+        updateNeedCmText(`[data-need-cm-row-output="${index}:loadedSpeed"]`, formatNumberFixed(row.loadedSpeed, 2));
         updateNeedCmText(`[data-need-cm-row-output="${index}:cycleTotal"]`, formatNumber(row.cycleTotal));
         updateNeedCmText(`[data-need-cm-row-output="${index}:frontRequiredFleets"]`, formatNumberFixed(row.frontRequiredFleets, 2));
       });
       updateNeedCmText('[data-need-cm-total="planTotal"]', formatNumber(data.planTotal));
       updateNeedCmText('[data-need-cm-total="weightedRadius"]', formatNumberFixed(data.weightedRadius, 2));
       updateNeedCmText('[data-need-cm-total="weightedNetWeight"]', formatNumberFixed(data.weightedNetWeight, 2));
+      updateNeedCmText('[data-need-cm-total="weightedEmptySpeed"]', formatNumberFixed(data.weightedEmptySpeed, 2));
+      updateNeedCmText('[data-need-cm-total="weightedLoadedSpeed"]', formatNumberFixed(data.weightedLoadedSpeed, 2));
       updateNeedCmText('[data-need-cm-total="totalFieldRoundTrips"]', formatNumber(data.totalFieldRoundTrips));
       updateNeedCmText('[data-need-cm-total="requiredFleets"]', formatNumberFixed(data.requiredFleets, 2));
       updateNeedCmText('[data-need-cm-param-output="weightedRadius"]', formatNumberFixed(data.weightedRadius, 2));
       updateNeedCmText('[data-need-cm-param-output="weightedNetWeight"]', formatNumberFixed(data.weightedNetWeight, 2));
       updateNeedCmText('[data-need-cm-param-output="planTotal"]', formatNumber(data.planTotal));
+      updateNeedCmText('[data-need-cm-param-output="weightedLoadedSpeed"]', formatNumberFixed(data.weightedLoadedSpeed, 2));
       updateNeedCmText('[data-need-cm-param-output="t1"]', formatNumberFixed(data.t1, 2));
       updateNeedCmText('[data-need-cm-param-output="weightedT2"]', formatNumberFixed(data.weightedT2, 2));
       updateNeedCmText('[data-need-cm-param-output="t3"]', formatNumberFixed(data.t3, 2));
@@ -4245,7 +4255,7 @@
                 <td class="sheet-cell-input">${needCmInput(row.radius, "radius", { index, digits: 0 })}</td>
                 <td class="sheet-cell-input">${needCmInput(row.netWeight, "netWeight", { index, digits: 0 })}</td>
                 <td class="sheet-cell-formula" data-need-cm-row-output="${index}:emptySpeed">${formatNumberFixed(row.emptySpeed, 2)}</td>
-                <td class="sheet-cell-input">${needCmInput(row.loadedSpeed, "loadedSpeed", { index, digits: 2 })}</td>
+                <td class="sheet-cell-formula" data-need-cm-row-output="${index}:loadedSpeed">${formatNumberFixed(row.loadedSpeed, 2)}</td>
                 <td class="sheet-cell-input">${needCmInput(row.emptyCycle, "emptyCycle", { index, digits: 0 })}</td>
                 <td class="sheet-cell-input">${needCmInput(row.t2, "t2", { index, digits: 0 })}</td>
                 <td class="sheet-cell-input">${needCmInput(row.t4, "t4", { index, digits: 0 })}</td>
@@ -4262,7 +4272,9 @@
               <td class="sheet-cell-total" data-need-cm-total="planTotal">${formatNumber(data.planTotal)}</td>
               <td class="sheet-cell-total" data-need-cm-total="weightedRadius">${formatNumberFixed(data.weightedRadius, 2)}</td>
               <td class="sheet-cell-total" data-need-cm-total="weightedNetWeight">${formatNumberFixed(data.weightedNetWeight, 2)}</td>
-              <td colspan="8"></td>
+              <td class="sheet-cell-total" data-need-cm-total="weightedEmptySpeed">${formatNumberFixed(data.weightedEmptySpeed, 2)}</td>
+              <td class="sheet-cell-total" data-need-cm-total="weightedLoadedSpeed">${formatNumberFixed(data.weightedLoadedSpeed, 2)}</td>
+              <td colspan="6"></td>
               <td class="sheet-cell-total" data-need-cm-total="totalFieldRoundTrips">${formatNumber(data.totalFieldRoundTrips)}</td>
               <td class="sheet-cell-total" data-need-cm-total="requiredFleets">${formatNumberFixed(data.requiredFleets, 2)}</td>
               <td></td>
@@ -4277,8 +4289,8 @@
           <tbody>
             <tr><td class="sheet-cell-label">Raio Médio (km)</td><td data-need-cm-param-output="weightedRadius">${formatNumberFixed(data.weightedRadius, 2)}</td><td class="sheet-cell-total">Vel. Vazio (km/h)</td></tr>
             <tr><td class="sheet-cell-label">Densidade (tc)</td><td data-need-cm-param-output="weightedNetWeight">${formatNumberFixed(data.weightedNetWeight, 2)}</td><td class="sheet-cell-input">${needCmInput(data.params.emptySpeed, "emptySpeed", { digits: 0 })}</td></tr>
-            <tr><td class="sheet-cell-label">Meta Moagem dia</td><td data-need-cm-param-output="planTotal">${formatNumber(data.planTotal)}</td><td class="sheet-cell-total">Vel. Carregado (km/h)</td></tr>
-            <tr><td class="sheet-cell-label">T1</td><td class="sheet-cell-formula" data-need-cm-param-output="t1">${formatNumberFixed(data.t1, 2)}</td><td class="sheet-cell-input">${needCmInput(data.params.loadedSpeed, "loadedSpeed", { digits: 0 })}</td></tr>
+            <tr><td class="sheet-cell-label">Meta Moagem dia</td><td data-need-cm-param-output="planTotal">${formatNumber(data.planTotal)}</td><td class="sheet-cell-total">Vel. Carregado média</td></tr>
+            <tr><td class="sheet-cell-label">T1</td><td class="sheet-cell-formula" data-need-cm-param-output="t1">${formatNumberFixed(data.t1, 2)}</td><td class="sheet-cell-formula" data-need-cm-param-output="weightedLoadedSpeed">${formatNumberFixed(data.weightedLoadedSpeed, 2)}</td></tr>
             <tr><td class="sheet-cell-label">T2 médio das frentes</td><td class="sheet-cell-formula" data-need-cm-param-output="weightedT2">${formatNumberFixed(data.weightedT2, 2)}</td><td class="sheet-cell-total">Abast. (min)</td></tr>
             <tr><td class="sheet-cell-label">T3</td><td class="sheet-cell-formula" data-need-cm-param-output="t3">${formatNumberFixed(data.t3, 2)}</td><td class="sheet-cell-input">${needCmInput(data.params.supply, "supply", { digits: 0 })}</td></tr>
             <tr><td class="sheet-cell-label">T4 médio das frentes</td><td class="sheet-cell-formula" data-need-cm-param-output="weightedT4">${formatNumberFixed(data.weightedT4, 2)}</td><td class="sheet-cell-total">Manutenção</td></tr>
@@ -18464,6 +18476,7 @@
         `Meta moagem dia: ${formatNumber(data.planTotal)} t`,
         `Raio médio: ${formatNumberFixed(data.weightedRadius, 2)} km`,
         `Peso líquido médio: ${formatNumberFixed(data.weightedNetWeight, 2)} tc`,
+        `Vel. carregado média: ${formatNumberFixed(data.weightedLoadedSpeed, 2)} km/h`,
         `T2 médio: ${formatNumberFixed(data.weightedT2, 2)} min`,
         `T4 médio: ${formatNumberFixed(data.weightedT4, 2)} min`,
         `Ciclo por CM/dia: ${formatNumberFixed(data.cyclesPerCmDay, 2)}`,
@@ -18578,6 +18591,7 @@
                 <tbody>
                   <tr><th>Disponibilidade</th><td class="right">${formatNumber(data.availability)} min</td><th>Ciclo total</th><td class="right">${formatNumberFixed(data.totalCycle, 2)} min</td></tr>
                   <tr><th>Ciclo por CM/dia</th><td class="right">${formatNumberFixed(data.cyclesPerCmDay, 2)}</td><th>Viagens dia/unidade</th><td class="right">${formatNumberFixed(data.tripsPerDayUnit, 2)}</td></tr>
+                  <tr><th>Vel. carregado média</th><td class="right">${formatNumberFixed(data.weightedLoadedSpeed, 2)} km/h</td><th>Raio médio</th><td class="right">${formatNumberFixed(data.weightedRadius, 2)} km</td></tr>
                   <tr><th>T2 médio</th><td class="right">${formatNumberFixed(data.weightedT2, 2)} min</td><th>T4 médio</th><td class="right">${formatNumberFixed(data.weightedT4, 2)} min</td></tr>
                   <tr><th>Indisponibilidade</th><td class="right">${formatNumber(data.downtime)} min</td><th>% desconto bate-volta</th><td class="right">${formatNumberFixed(data.fieldRoundTripDiscountPercent, 0)}%</td></tr>
                 </tbody>
