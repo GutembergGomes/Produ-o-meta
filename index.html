@@ -2242,6 +2242,8 @@
           <button class="btn-secondary" id="needCmAddFrontBtn" type="button">Adicionar frente</button>
           <button class="btn-primary" id="needCmPrintReportBtn" type="button">Imprimir relatório</button>
           <button class="btn-secondary" id="needCmCopyWhatsBtn" type="button">Copiar WhatsApp</button>
+          <button class="btn-secondary" id="needCmSaveDbBtn" type="button">Salvar no banco</button>
+          <button class="btn-secondary" id="needCmRefreshDbBtn" type="button">Atualizar do banco</button>
           <button class="btn-secondary" id="needCmResetBtn" type="button">Restaurar planilha</button>
         </div>
       </div>
@@ -3403,6 +3405,7 @@
     const MACHINE_PRODUCTION_STORAGE_KEY = "cambui.daily.production.machines.v1";
     const MACHINE_PRODUCTION_SYNC_KEY = "cambui.daily.production.machines.sync.v1";
     const NEED_CM_STORAGE_KEY = "cambui.daily.production.need.cm.agosto.v1";
+    const NEED_CM_SYNC_KEY = "cambui.daily.production.need.cm.sync.v1";
     const RECORDS_SYNC_KEY = "cambui.daily.production.records.sync.v1";
     const TARGETS_SYNC_KEY = "cambui.daily.production.targets.sync.v1";
     const FIREBASE_CONFIG_KEY = "cambui.daily.production.firebase.config.v1";
@@ -3454,11 +3457,11 @@
     const machineProductionBaseOptions = [...machineProductionHarvestBaseOptions, TYPES.OWN_TRANSPORT, TYPES.THIRD_TRANSPORT];
     const defaultNeedCmState = {
       fronts: [
-        { front: "Frente 4001", plan: 2800, radius: 18, netWeight: 65, emptySpeed: 19.636363636363637, loadedSpeed: 17, emptyCycle: 55, loadedCycle: 60, currentRadius: 29, fieldRoundTrips: 0 },
-        { front: "Frente 4002", plan: 2200, radius: 38, netWeight: 59, emptySpeed: 27.804878048780488, loadedSpeed: 24, emptyCycle: 82, loadedCycle: 95, currentRadius: 45, fieldRoundTrips: 0 },
-        { front: "Frente 4003", plan: 1000, radius: 35, netWeight: 60, emptySpeed: 26.25, loadedSpeed: 20, emptyCycle: 80, loadedCycle: 90, currentRadius: 21, fieldRoundTrips: 0 },
-        { front: "Frente 4007", plan: 3750, radius: 46, netWeight: 77, emptySpeed: 25.09090909090909, loadedSpeed: 21.230769230769234, emptyCycle: 110, loadedCycle: 130, currentRadius: 44, fieldRoundTrips: 0 },
-        { front: "Frente 4009", plan: 2250, radius: 45, netWeight: 73, emptySpeed: 22.5, loadedSpeed: 18.620689655172413, emptyCycle: 120, loadedCycle: 145, currentRadius: 46, fieldRoundTrips: 0 }
+        { front: "Frente 4001", plan: 2800, radius: 18, netWeight: 65, emptySpeed: 19.636363636363637, loadedSpeed: 17, emptyCycle: 55, t2: 30, t4: 45, loadedCycle: 60, currentRadius: 29, fieldRoundTrips: 0 },
+        { front: "Frente 4002", plan: 2200, radius: 38, netWeight: 59, emptySpeed: 27.804878048780488, loadedSpeed: 24, emptyCycle: 82, t2: 30, t4: 45, loadedCycle: 95, currentRadius: 45, fieldRoundTrips: 0 },
+        { front: "Frente 4003", plan: 1000, radius: 35, netWeight: 60, emptySpeed: 26.25, loadedSpeed: 20, emptyCycle: 80, t2: 30, t4: 45, loadedCycle: 90, currentRadius: 21, fieldRoundTrips: 0 },
+        { front: "Frente 4007", plan: 3750, radius: 46, netWeight: 77, emptySpeed: 25.09090909090909, loadedSpeed: 21.230769230769234, emptyCycle: 110, t2: 30, t4: 45, loadedCycle: 130, currentRadius: 44, fieldRoundTrips: 0 },
+        { front: "Frente 4009", plan: 2250, radius: 45, netWeight: 73, emptySpeed: 22.5, loadedSpeed: 18.620689655172413, emptyCycle: 120, t2: 30, t4: 45, loadedCycle: 145, currentRadius: 46, fieldRoundTrips: 0 }
       ],
       params: {
         emptySpeed: 36,
@@ -3804,6 +3807,7 @@
     let machineProductionRecords = loadMachineProductionRecords();
     let machineProductionLocalUpdatedAt = loadMachineProductionUpdatedAt();
     let dailyApprovals = loadDailyApprovals();
+    let needCmLocalUpdatedAt = loadLocalTimestamp(NEED_CM_SYNC_KEY);
     let firebaseConfig = loadFirebaseConfig();
     let autoBackups = loadAutoBackups();
     let auditLog = loadAuditLog();
@@ -3988,6 +3992,8 @@
           emptySpeed: parseNumber(row.emptySpeed),
           loadedSpeed: parseNumber(row.loadedSpeed),
           emptyCycle: parseNumber(row.emptyCycle),
+          t2: parseNumber(row.t2 ?? source.params?.t2 ?? defaultNeedCmState.params.t2),
+          t4: parseNumber(row.t4 ?? source.params?.t4 ?? defaultNeedCmState.params.t4),
           loadedCycle: parseNumber(row.loadedCycle),
           currentRadius: parseNumber(row.currentRadius),
           fieldRoundTrips: parseNumber(row.fieldRoundTrips)
@@ -4017,15 +4023,16 @@
       }
     }
 
-    function persistNeedCmState() {
+    function persistNeedCmState(options = {}) {
       localStorage.setItem(NEED_CM_STORAGE_KEY, JSON.stringify(cloneNeedCmState(needCmState)));
+      needCmLocalUpdatedAt = persistLocalTimestamp(NEED_CM_SYNC_KEY, options.updatedAt || new Date().toISOString());
     }
 
     function calculateNeedCm(state = needCmState) {
       const clean = cloneNeedCmState(state);
       const fronts = clean.fronts.map((row) => {
         const emptySpeed = row.emptyCycle ? (row.radius / row.emptyCycle) * 60 : row.emptySpeed;
-        const cycleTotal = row.emptyCycle + row.loadedCycle;
+        const cycleTotal = row.emptyCycle + row.t2 + row.t4 + row.loadedCycle;
         return {
           ...row,
           emptySpeed,
@@ -4035,9 +4042,11 @@
       const planTotal = fronts.reduce((sum, row) => sum + row.plan, 0);
       const weightedRadius = planTotal ? fronts.reduce((sum, row) => sum + row.radius * row.plan, 0) / planTotal : 0;
       const weightedNetWeight = planTotal ? fronts.reduce((sum, row) => sum + row.netWeight * row.plan, 0) / planTotal : 0;
+      const weightedT2 = planTotal ? fronts.reduce((sum, row) => sum + row.t2 * row.plan, 0) / planTotal : 0;
+      const weightedT4 = planTotal ? fronts.reduce((sum, row) => sum + row.t4 * row.plan, 0) / planTotal : 0;
       const t1 = clean.params.emptySpeed ? (weightedRadius / clean.params.emptySpeed) * 60 : 0;
       const t3 = clean.params.loadedSpeed ? (weightedRadius / clean.params.loadedSpeed) * 60 : 0;
-      const totalCycle = t1 + clean.params.t2 + t3 + clean.params.t4;
+      const totalCycle = t1 + weightedT2 + t3 + weightedT4;
       const downtime = clean.params.supply + clean.params.maintenance + clean.params.shiftChange + clean.params.meal;
       const availability = clean.params.availability || Math.max(clean.params.operationalMinutes - downtime, 0);
       const cyclesPerCmDay = totalCycle ? availability / totalCycle : 0;
@@ -4054,6 +4063,8 @@
         planTotal,
         weightedRadius,
         weightedNetWeight,
+        weightedT2,
+        weightedT4,
         t1,
         t3,
         totalCycle,
@@ -4150,7 +4161,9 @@
       updateNeedCmText('[data-need-cm-param-output="weightedNetWeight"]', formatNumberFixed(data.weightedNetWeight, 2));
       updateNeedCmText('[data-need-cm-param-output="planTotal"]', formatNumber(data.planTotal));
       updateNeedCmText('[data-need-cm-param-output="t1"]', formatNumberFixed(data.t1, 2));
+      updateNeedCmText('[data-need-cm-param-output="weightedT2"]', formatNumberFixed(data.weightedT2, 2));
       updateNeedCmText('[data-need-cm-param-output="t3"]', formatNumberFixed(data.t3, 2));
+      updateNeedCmText('[data-need-cm-param-output="weightedT4"]', formatNumberFixed(data.weightedT4, 2));
       updateNeedCmText('[data-need-cm-param-output="totalCycle"]', formatNumberFixed(data.totalCycle, 2));
       updateNeedCmText('[data-need-cm-param-output="downtime"]', formatNumber(data.downtime));
       updateNeedCmText('[data-need-cm-param-output="cyclesPerCmDay"]', formatNumberFixed(data.cyclesPerCmDay, 2));
@@ -4178,6 +4191,8 @@
               <th>Vel. Vazio (km/h)</th>
               <th>Vel. Carregado (km/h)</th>
               <th>Ciclo Vazio (Média)</th>
+              <th>T2</th>
+              <th>T4</th>
               <th>Ciclo Carregado (Média)</th>
               <th>Ciclo Total</th>
               <th>Raio atual</th>
@@ -4195,6 +4210,8 @@
                 <td class="sheet-cell-formula" data-need-cm-row-output="${index}:emptySpeed">${formatNumberFixed(row.emptySpeed, 2)}</td>
                 <td class="sheet-cell-input">${needCmInput(row.loadedSpeed, "loadedSpeed", { index, digits: 2 })}</td>
                 <td class="sheet-cell-input">${needCmInput(row.emptyCycle, "emptyCycle", { index, digits: 0 })}</td>
+                <td class="sheet-cell-input">${needCmInput(row.t2, "t2", { index, digits: 0 })}</td>
+                <td class="sheet-cell-input">${needCmInput(row.t4, "t4", { index, digits: 0 })}</td>
                 <td class="sheet-cell-input">${needCmInput(row.loadedCycle, "loadedCycle", { index, digits: 0 })}</td>
                 <td class="sheet-cell-formula" data-need-cm-row-output="${index}:cycleTotal">${formatNumber(row.cycleTotal)}</td>
                 <td class="sheet-cell-input">${needCmInput(row.currentRadius, "currentRadius", { index, digits: 0 })}</td>
@@ -4207,7 +4224,7 @@
               <td class="sheet-cell-total" data-need-cm-total="planTotal">${formatNumber(data.planTotal)}</td>
               <td class="sheet-cell-total" data-need-cm-total="weightedRadius">${formatNumberFixed(data.weightedRadius, 2)}</td>
               <td class="sheet-cell-total" data-need-cm-total="weightedNetWeight">${formatNumberFixed(data.weightedNetWeight, 2)}</td>
-              <td colspan="6"></td>
+              <td colspan="8"></td>
               <td class="sheet-cell-total" data-need-cm-total="totalFieldRoundTrips">${formatNumber(data.totalFieldRoundTrips)}</td>
               <td></td>
             </tr>
@@ -4223,9 +4240,9 @@
             <tr><td class="sheet-cell-label">Densidade (tc)</td><td data-need-cm-param-output="weightedNetWeight">${formatNumberFixed(data.weightedNetWeight, 2)}</td><td class="sheet-cell-input">${needCmInput(data.params.emptySpeed, "emptySpeed", { digits: 0 })}</td></tr>
             <tr><td class="sheet-cell-label">Meta Moagem dia</td><td data-need-cm-param-output="planTotal">${formatNumber(data.planTotal)}</td><td class="sheet-cell-total">Vel. Carregado (km/h)</td></tr>
             <tr><td class="sheet-cell-label">T1</td><td class="sheet-cell-formula" data-need-cm-param-output="t1">${formatNumberFixed(data.t1, 2)}</td><td class="sheet-cell-input">${needCmInput(data.params.loadedSpeed, "loadedSpeed", { digits: 0 })}</td></tr>
-            <tr><td class="sheet-cell-label">T2</td><td>${needCmInput(data.params.t2, "t2", { digits: 0 })}</td><td class="sheet-cell-total">Abast. (min)</td></tr>
+            <tr><td class="sheet-cell-label">T2 médio das frentes</td><td class="sheet-cell-formula" data-need-cm-param-output="weightedT2">${formatNumberFixed(data.weightedT2, 2)}</td><td class="sheet-cell-total">Abast. (min)</td></tr>
             <tr><td class="sheet-cell-label">T3</td><td class="sheet-cell-formula" data-need-cm-param-output="t3">${formatNumberFixed(data.t3, 2)}</td><td class="sheet-cell-input">${needCmInput(data.params.supply, "supply", { digits: 0 })}</td></tr>
-            <tr><td class="sheet-cell-label">T4</td><td>${needCmInput(data.params.t4, "t4", { digits: 0 })}</td><td class="sheet-cell-total">Manutenção</td></tr>
+            <tr><td class="sheet-cell-label">T4 médio das frentes</td><td class="sheet-cell-formula" data-need-cm-param-output="weightedT4">${formatNumberFixed(data.weightedT4, 2)}</td><td class="sheet-cell-total">Manutenção</td></tr>
             <tr><td class="sheet-cell-label">Total</td><td data-need-cm-param-output="totalCycle">${formatNumberFixed(data.totalCycle, 2)}</td><td class="sheet-cell-input">${needCmInput(data.params.maintenance, "maintenance", { digits: 0 })}</td></tr>
             <tr><td class="sheet-cell-label">Indisponibilidade (Min)</td><td data-need-cm-param-output="downtime">${formatNumber(data.downtime)}</td><td class="sheet-cell-total">Troca de Turno (min)</td></tr>
             <tr><td class="sheet-cell-label">Disponibilidade (Min)</td><td>${needCmInput(data.params.availability, "availability", { digits: 0 })}</td><td class="sheet-cell-input">${needCmInput(data.params.shiftChange, "shiftChange", { digits: 0 })}</td></tr>
@@ -4268,6 +4285,8 @@
         emptySpeed: 0,
         loadedSpeed: 0,
         emptyCycle: 0,
+        t2: parseNumber(needCmState.params?.t2 ?? defaultNeedCmState.params.t2),
+        t4: parseNumber(needCmState.params?.t4 ?? defaultNeedCmState.params.t4),
         loadedCycle: 0,
         currentRadius: 0,
         fieldRoundTrips: 0
@@ -5311,6 +5330,7 @@
       const cleanReductionRecords = getCleanReductionRecords(reductionRecords);
       const cleanMachineProductionRecords = prepareMachineProductionRowsForSync(machineProductionRecords);
       const cleanDailyApprovals = getCleanDailyApprovals();
+      const cleanNeedCm = cloneNeedCmState(needCmState);
       const localDates = new Set(cleanRecords.map((record) => record.date));
       const lastRecord = cleanRecords[cleanRecords.length - 1] || null;
       const now = new Date().toISOString();
@@ -5333,6 +5353,8 @@
           reductionRecordCount: cleanReductionRecords.length,
           machineProductionUpdatedAt: now,
           machineProductionRecordCount: cleanMachineProductionRecords.length,
+          needCmUpdatedAt: now,
+          needCmState: cleanNeedCm,
           dailyApprovalsUpdatedAt: now,
           dailyApprovalCount: cleanDailyApprovals.length,
           lastRecordDate: lastRecord ? lastRecord.date : "",
@@ -5369,6 +5391,8 @@
         persistStoppageUpdatedAt(now);
         persistReductionUpdatedAt(now);
         persistMachineProductionRecords({ updatedAt: now });
+        needCmState = cleanNeedCm;
+        persistNeedCmState({ updatedAt: now });
       }, options);
     }
 
@@ -5468,6 +5492,23 @@
       }, options);
     }
 
+    async function syncNeedCmToFirebase(options = {}) {
+      const now = new Date().toISOString();
+      const cleanNeedCm = cloneNeedCmState(needCmState);
+      return runFirebaseTask(async (root) => {
+        await root.set({
+          plant: PLANT,
+          version: APP_VERSION,
+          updatedAt: now,
+          needCmUpdatedAt: now,
+          needCmState: cleanNeedCm,
+          ...firebaseLargeArrayCleanupFields()
+        }, { merge: true });
+        needCmState = cleanNeedCm;
+        persistNeedCmState({ updatedAt: now });
+      }, options);
+    }
+
     function firebaseRemoteTimestamp(meta, key) {
       return String((meta && (meta[key] || meta.updatedAt)) || "");
     }
@@ -5480,6 +5521,7 @@
         stoppageUpdatedAt: stoppageLocalUpdatedAt,
         reductionUpdatedAt: reductionLocalUpdatedAt,
         machineProductionUpdatedAt: machineProductionLocalUpdatedAt,
+        needCmUpdatedAt: needCmLocalUpdatedAt,
         dailyApprovalsUpdatedAt: latestRowsUpdatedAt(getCleanDailyApprovals(dailyApprovals))
       };
     }
@@ -5505,6 +5547,7 @@
         const readStoppage = firebaseShouldDownloadModule(meta, localMeta, "stoppageUpdatedAt", "stoppageRecordCount", getCleanStoppageRecords(stoppageRecords).length, force);
         const readReduction = firebaseShouldDownloadModule(meta, localMeta, "reductionUpdatedAt", "reductionRecordCount", getCleanReductionRecords(reductionRecords).length, force);
         const readMachine = firebaseShouldDownloadModule(meta, localMeta, "machineProductionUpdatedAt", "machineProductionRecordCount", getCleanMachineProductionRecords(machineProductionRecords).length, force);
+        const readNeedCm = force || firebaseRemoteTimestamp(meta, "needCmUpdatedAt").localeCompare(String(localMeta.needCmUpdatedAt || "")) > 0;
         const readApprovals = firebaseShouldDownloadModule(meta, localMeta, "dailyApprovalsUpdatedAt", "dailyApprovalCount", getCleanDailyApprovals(dailyApprovals).length, force);
         const readTargets = force || firebaseRemoteTimestamp(meta, "targetsUpdatedAt").localeCompare(String(localMeta.targetsUpdatedAt || "")) > 0;
 
@@ -5525,6 +5568,7 @@
           readStoppage,
           readReduction,
           readMachine,
+          readNeedCm,
           readApprovals,
           records: recordRows,
           patioRecords: patioRows,
@@ -5547,6 +5591,7 @@
         || downloaded.readStoppage
         || downloaded.readReduction
         || downloaded.readMachine
+        || downloaded.readNeedCm
         || downloaded.readApprovals
       );
       if (!hasChangedRemoteModule) {
@@ -5622,8 +5667,10 @@
         ? getCleanDailyApprovals(remoteApprovalRows)
         : [];
       const hasRemoteApprovalsPayload = Boolean(remoteApprovalRows.length || downloaded.meta && (Array.isArray(downloaded.meta.dailyApprovals) || "dailyApprovalCount" in downloaded.meta || downloaded.meta.dailyApprovalsUpdatedAt));
+      const remoteNeedCmState = downloaded.readNeedCm && downloaded.meta && downloaded.meta.needCmState ? cloneNeedCmState(downloaded.meta.needCmState) : null;
+      const remoteNeedCmUpdatedAt = String((downloaded.meta && (downloaded.meta.needCmUpdatedAt || downloaded.meta.updatedAt)) || "");
 
-      if (!remoteTargets && !remoteRecords.length && !hasRemotePatioPayload && !hasRemoteStoppagePayload && !hasRemoteReductionPayload && !hasRemoteMachineProductionPayload && !hasRemoteApprovalsPayload) {
+      if (!remoteTargets && !remoteRecords.length && !hasRemotePatioPayload && !hasRemoteStoppagePayload && !hasRemoteReductionPayload && !hasRemoteMachineProductionPayload && !remoteNeedCmState && !hasRemoteApprovalsPayload) {
         if (!options.silent) showToast("Nenhum dado encontrado no Firebase.");
         return false;
       }
@@ -5667,6 +5714,11 @@
         persistMachineProductionRecords({ updatedAt: remoteMachineProductionUpdatedAt || new Date().toISOString() });
       }
 
+      if (remoteNeedCmState) {
+        needCmState = remoteNeedCmState;
+        persistNeedCmState({ updatedAt: remoteNeedCmUpdatedAt || new Date().toISOString() });
+      }
+
       if (hasRemoteApprovalsPayload) {
         dailyApprovals = mergeFirebaseRows(dailyApprovals, remoteDailyApprovals, getCleanDailyApprovals);
         persistDailyApprovals();
@@ -5704,6 +5756,7 @@
       renderStoppages();
       renderReductions();
       renderMachineProductions();
+      renderNeedCm();
       renderConference();
       renderFieldMode();
       renderHistory();
@@ -5742,6 +5795,8 @@
         reductionRecords: getCleanReductionRecords(reductionRecords),
         machineProductionUpdatedAt: machineProductionLocalUpdatedAt,
         machineProductionRecords: getCleanMachineProductionRecords(machineProductionRecords),
+        needCmUpdatedAt: needCmLocalUpdatedAt,
+        needCmState: cloneNeedCmState(needCmState),
         dailyApprovals: getCleanDailyApprovals()
       };
 
@@ -5818,6 +5873,11 @@
         persistDailyApprovals();
       }
 
+      if (!Array.isArray(payload) && payload.needCmState) {
+        needCmState = cloneNeedCmState(payload.needCmState);
+        persistNeedCmState({ updatedAt: payload.needCmUpdatedAt || payload.exportedAt || new Date().toISOString() });
+      }
+
       persistRecords();
       renderOptions();
       renderTargets();
@@ -5828,6 +5888,7 @@
       renderStoppages();
       renderReductions();
       renderMachineProductions();
+      renderNeedCm();
       renderConference();
       renderFieldMode();
       renderHistory();
@@ -6252,6 +6313,7 @@
       if (type === "stoppage-sync") return "Paradas da usina aguardando sincronização";
       if (type === "reduction-sync") return "Redução de moagem aguardando sincronização";
       if (type === "machine-production-sync") return "Produção das máquinas aguardando sincronização";
+      if (type === "need-cm-sync") return "Necessidade CM aguardando sincronização";
       if (type === "daily-approvals-sync") return "Fechamentos diários aguardando sincronização";
       if (type === "upload-all") return "Base completa aguardando sincronização";
       return "Sincronização pendente";
@@ -6387,6 +6449,15 @@
           pendingMessage: "Enviando pendencia da produção das máquinas...",
           successStatus: "Pendencia da produção das máquinas sincronizada.",
           errorStatus: "Nao foi possivel sincronizar a produção das máquinas pendente."
+        });
+      }
+
+      if (item.type === "need-cm-sync") {
+        return syncNeedCmToFirebase({
+          silent: true,
+          pendingMessage: "Enviando pendencia da Necessidade CM...",
+          successStatus: "Pendencia da Necessidade CM sincronizada.",
+          errorStatus: "Nao foi possivel sincronizar a Necessidade CM pendente."
         });
       }
 
@@ -18340,7 +18411,7 @@
 
     function needCmWhatsAppText(data = calculateNeedCm()) {
       const frontLines = data.fronts.map((row) => (
-        `• ${row.front}: plano ${formatNumber(row.plan)} t | raio ${formatNumberFixed(row.radius, 0)} km | ciclo ${formatNumber(row.cycleTotal)} min | bate-volta ${formatNumber(row.fieldRoundTrips)}`
+        `• ${row.front}: plano ${formatNumber(row.plan)} t | raio ${formatNumberFixed(row.radius, 0)} km | T2 ${formatNumber(row.t2)} min | T4 ${formatNumber(row.t4)} min | ciclo ${formatNumber(row.cycleTotal)} min | bate-volta ${formatNumber(row.fieldRoundTrips)}`
       ));
       return [
         "*Resumo Necessidade CM*",
@@ -18354,6 +18425,8 @@
         `Meta moagem dia: ${formatNumber(data.planTotal)} t`,
         `Raio médio: ${formatNumberFixed(data.weightedRadius, 2)} km`,
         `Peso líquido médio: ${formatNumberFixed(data.weightedNetWeight, 2)} tc`,
+        `T2 médio: ${formatNumberFixed(data.weightedT2, 2)} min`,
+        `T4 médio: ${formatNumberFixed(data.weightedT4, 2)} min`,
         `Ciclo por CM/dia: ${formatNumberFixed(data.cyclesPerCmDay, 2)}`,
         `Viagens dia/unidade: ${formatNumberFixed(data.tripsPerDayUnit, 2)}`,
         "",
@@ -18431,6 +18504,8 @@
                     <th class="right">Raio</th>
                     <th class="right">Peso líquido</th>
                     <th class="right">Ciclo vazio</th>
+                    <th class="right">T2</th>
+                    <th class="right">T4</th>
                     <th class="right">Ciclo carregado</th>
                     <th class="right">Ciclo total</th>
                     <th class="right">Bate-volta</th>
@@ -18444,6 +18519,8 @@
                       <td class="right">${formatNumberFixed(row.radius, 0)}</td>
                       <td class="right">${formatNumberFixed(row.netWeight, 0)}</td>
                       <td class="right">${formatNumber(row.emptyCycle)}</td>
+                      <td class="right">${formatNumber(row.t2)}</td>
+                      <td class="right">${formatNumber(row.t4)}</td>
                       <td class="right">${formatNumber(row.loadedCycle)}</td>
                       <td class="right">${formatNumber(row.cycleTotal)}</td>
                       <td class="right">${formatNumber(row.fieldRoundTrips)}</td>
@@ -18458,6 +18535,7 @@
                 <tbody>
                   <tr><th>Disponibilidade</th><td class="right">${formatNumber(data.availability)} min</td><th>Ciclo total</th><td class="right">${formatNumberFixed(data.totalCycle, 2)} min</td></tr>
                   <tr><th>Ciclo por CM/dia</th><td class="right">${formatNumberFixed(data.cyclesPerCmDay, 2)}</td><th>Viagens dia/unidade</th><td class="right">${formatNumberFixed(data.tripsPerDayUnit, 2)}</td></tr>
+                  <tr><th>T2 médio</th><td class="right">${formatNumberFixed(data.weightedT2, 2)} min</td><th>T4 médio</th><td class="right">${formatNumberFixed(data.weightedT4, 2)} min</td></tr>
                   <tr><th>Indisponibilidade</th><td class="right">${formatNumber(data.downtime)} min</td><th>% desconto bate-volta</th><td class="right">${formatNumberFixed(data.fieldRoundTripDiscountPercent, 0)}%</td></tr>
                 </tbody>
               </table>
@@ -18522,6 +18600,33 @@
       }
     }
 
+    async function saveNeedCmDatabase() {
+      persistNeedCmState();
+      renderNeedCm();
+      const syncState = await syncOrQueue("need-cm-sync", { source: "need-cm-manual-save" }, () => syncNeedCmToFirebase({
+        silent: true,
+        pendingMessage: "Salvando Necessidade CM no banco...",
+        successStatus: "Necessidade CM salva no banco.",
+        errorStatus: "Necessidade CM salva localmente, mas a sincronização falhou."
+      }));
+      showToast(syncState === "synced"
+        ? "Necessidade CM salva no banco para todos."
+        : syncState === "queued-offline" || syncState === "queued-error"
+          ? "Necessidade CM salva localmente. Banco ficou na fila."
+          : "Configure o Firebase para salvar no banco.");
+    }
+
+    async function refreshNeedCmDatabase() {
+      const loaded = await downloadAllDataFromFirebase({
+        silent: true,
+        force: true,
+        pendingMessage: "Atualizando Necessidade CM pelo banco...",
+        successStatus: "Necessidade CM atualizada pelo banco."
+      });
+      renderNeedCm();
+      showToast(loaded ? "Necessidade CM atualizada pelo banco." : "Nenhuma atualização da Necessidade CM foi encontrada.");
+    }
+
     function downloadFile(filename, content, type) {
       const blob = new Blob([content], { type });
       const url = URL.createObjectURL(blob);
@@ -18583,6 +18688,8 @@
     document.querySelector("#needCmAddFrontBtn").addEventListener("click", addNeedCmFront);
     document.querySelector("#needCmPrintReportBtn").addEventListener("click", printNeedCmReport);
     document.querySelector("#needCmCopyWhatsBtn").addEventListener("click", copyNeedCmWhatsAppSummary);
+    document.querySelector("#needCmSaveDbBtn").addEventListener("click", saveNeedCmDatabase);
+    document.querySelector("#needCmRefreshDbBtn").addEventListener("click", refreshNeedCmDatabase);
     document.querySelector("#needCmResetBtn").addEventListener("click", () => {
       needCmState = cloneNeedCmState(defaultNeedCmState);
       persistNeedCmState();
