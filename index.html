@@ -1796,12 +1796,12 @@
         <article class="stat">
           <span>Frentes próprias</span>
           <strong id="dashOwnHarvest">0</strong>
-          <small id="dashOwnHarvestPercent">0% da moagem</small>
+          <small id="dashOwnHarvestPercent">0% da moagem efetiva</small>
         </article>
         <article class="stat">
           <span>Frentes terceiras</span>
           <strong id="dashThirdHarvest">0</strong>
-          <small id="dashThirdHarvestPercent">0% da moagem</small>
+          <small id="dashThirdHarvestPercent">0% da moagem efetiva</small>
         </article>
         <article class="stat">
           <span>Cana Floresta</span>
@@ -1816,12 +1816,12 @@
         <article class="stat">
           <span>Transporte próprio</span>
           <strong id="dashOwnTransport">0</strong>
-          <small id="dashOwnTransportPercent">0% da moagem</small>
+          <small id="dashOwnTransportPercent">0% da moagem efetiva</small>
         </article>
         <article class="stat">
           <span>Transporte terceiro</span>
           <strong id="dashThirdTransport">0</strong>
-          <small id="dashThirdTransportPercent">0% da moagem</small>
+          <small id="dashThirdTransportPercent">0% da moagem efetiva</small>
         </article>
         <article class="stat">
           <span>KM médio próprio</span>
@@ -3012,12 +3012,12 @@
         <article class="stat">
           <span>Colheita própria</span>
           <strong id="entryOwnHarvest">0</strong>
-          <small id="entryOwnHarvestPercent">0% da moagem</small>
+          <small id="entryOwnHarvestPercent">0% da moagem efetiva</small>
         </article>
         <article class="stat">
           <span>Colheita terceira</span>
           <strong id="entryThirdHarvest">0</strong>
-          <small id="entryThirdHarvestPercent">0% da moagem</small>
+          <small id="entryThirdHarvestPercent">0% da moagem efetiva</small>
         </article>
         <article class="stat">
           <span>Cana Floresta</span>
@@ -3032,12 +3032,12 @@
         <article class="stat">
           <span>Transporte próprio</span>
           <strong id="entryOwnTransport">0</strong>
-          <small id="entryOwnTransportPercent">0% da moagem</small>
+          <small id="entryOwnTransportPercent">0% da moagem efetiva</small>
         </article>
         <article class="stat">
           <span>Transporte terceiro</span>
           <strong id="entryThirdTransport">0</strong>
-          <small id="entryThirdTransportPercent">0% da moagem</small>
+          <small id="entryThirdTransportPercent">0% da moagem efetiva</small>
         </article>
         <article class="stat">
           <span>Transp. / moagem</span>
@@ -7024,6 +7024,11 @@
       return `${detail} · Meta ${formatNumber(planned)} · ${targetBalanceLabel(total, planned)}`;
     }
 
+    function effectiveDailyDetail(total, days, detail) {
+      const dayCount = Math.max(1, Number(days) || 1);
+      return `Moagem efetiva dia ${formatNumber((Number(total) || 0) / dayCount)} · ${detail}`;
+    }
+
     function localIsoFromDate(value) {
       if (!(value instanceof Date) || Number.isNaN(value.getTime())) return "";
       const pad = (number) => String(number).padStart(2, "0");
@@ -8988,6 +8993,57 @@
       `;
     }
 
+    function machineProductionRowsForEffectiveRange(range = machineProductionRange()) {
+      const normalized = normalizeDateRange(range.start, range.end);
+      const front = els.machineFrontFilter.value || "all";
+      return getCleanMachineProductionRecords(machineProductionRecords)
+        .filter((record) => record.date >= normalized.start && record.date <= normalized.end)
+        .filter((record) => front === "all" || record.front === front);
+    }
+
+    function machineProductionEffectiveSummary(rows = [], options = {}) {
+      const production = (items) => items.reduce((sum, row) => sum + (Number(row.production) || 0), 0);
+      const effectiveDays = Math.max(1, Number(options.effectiveDays) || targetDaysForRows(rows) || 1);
+      const ownFrontRows = rows.filter((row) => row.machineType === "Colhedora" && ownHarvestFronts.some((front) => sameText(front, row.front)));
+      const thirdFrontRows = rows.filter((row) => row.machineType === "Colhedora" && thirdHarvestFronts.some((front) => sameText(front, row.front)));
+      const ownTruckRows = rows.filter((row) => row.machineType === "Caminhão Próprio");
+      const thirdTruckRows = rows.filter((row) => row.machineType === "Caminhão Terceiro");
+      const ownFrontEffective = production(ownFrontRows);
+      const thirdFrontEffective = production(thirdFrontRows);
+      const ownTruckEffective = production(ownTruckRows);
+      const thirdTruckEffective = production(thirdTruckRows);
+      const millingTotal = ownFrontEffective + thirdFrontEffective;
+      const truckTotal = ownTruckEffective + thirdTruckEffective;
+      return {
+        ownFrontEffective,
+        thirdFrontEffective,
+        ownTruckEffective,
+        thirdTruckEffective,
+        millingTotal,
+        truckTotal,
+        effectiveDays,
+        transportDifference: truckTotal - millingTotal,
+        ownFrontMachines: new Set(ownFrontRows.map((row) => normalizeKey(row.fleet))).size,
+        thirdFrontMachines: new Set(thirdFrontRows.map((row) => normalizeKey(row.fleet))).size,
+        ownTruckMachines: new Set(ownTruckRows.map((row) => normalizeKey(row.fleet))).size,
+        thirdTruckMachines: new Set(thirdTruckRows.map((row) => normalizeKey(row.fleet))).size
+      };
+    }
+
+    function machineEffectiveCardsHtml(summary) {
+      const differenceLabel = summary.transportDifference >= 0
+        ? `Transporte acima da moagem em ${formatNumber(summary.transportDifference)}`
+        : `Transporte abaixo da moagem em ${formatNumber(Math.abs(summary.transportDifference))}`;
+      return `
+        <div class="summary-grid" style="margin-top: 14px;">
+          ${machineDashboardCard("Moagem efetiva próprias", formatNumber(summary.ownFrontEffective), effectiveDailyDetail(summary.ownFrontEffective, summary.effectiveDays, `${formatPercent(progressFor(summary.ownFrontEffective, summary.millingTotal))} da moagem · ${summary.ownFrontMachines} colhedora${summary.ownFrontMachines === 1 ? "" : "s"}`))}
+          ${machineDashboardCard("Moagem efetiva terceiras", formatNumber(summary.thirdFrontEffective), effectiveDailyDetail(summary.thirdFrontEffective, summary.effectiveDays, `${formatPercent(progressFor(summary.thirdFrontEffective, summary.millingTotal))} da moagem · ${summary.thirdFrontMachines} colhedora${summary.thirdFrontMachines === 1 ? "" : "s"}`))}
+          ${machineDashboardCard("Caminhões próprios", formatNumber(summary.ownTruckEffective), effectiveDailyDetail(summary.ownTruckEffective, summary.effectiveDays, `${formatPercent(progressFor(summary.ownTruckEffective, summary.truckTotal))} do transporte · ${summary.ownTruckMachines} frota${summary.ownTruckMachines === 1 ? "" : "s"}`))}
+          ${machineDashboardCard("Caminhões terceiros", formatNumber(summary.thirdTruckEffective), effectiveDailyDetail(summary.thirdTruckEffective, summary.effectiveDays, `${formatPercent(progressFor(summary.thirdTruckEffective, summary.truckTotal))} do transporte · ${summary.thirdTruckMachines} frota${summary.thirdTruckMachines === 1 ? "" : "s"} · ${differenceLabel}`))}
+        </div>
+      `;
+    }
+
     function machineRankingList(items, total, emptyMessage) {
       if (!items.length) return `<div class="empty-state">${escapeHtml(emptyMessage)}</div>`;
       return `
@@ -9059,10 +9115,17 @@
       const previousDay = dailyRows[dailyRows.length - 2] || null;
       const dayDelta = lastDay && previousDay ? lastDay.production - previousDay.production : 0;
       const modeLabel = machineModeLabel();
+      const effectiveRange = machineProductionRange();
+      const effectiveSummary = machineProductionEffectiveSummary(machineProductionRowsForEffectiveRange(effectiveRange), {
+        effectiveDays: daysBetweenInclusive(effectiveRange.start, effectiveRange.end)
+      });
 
       if (els.machineDashboardMode) els.machineDashboardMode.textContent = modeLabel;
       if (!rows.length) {
-        els.machineDashboardWrap.innerHTML = '<div class="empty-state">Sem dados no período e filtro selecionados para montar o dashboard.</div>';
+        els.machineDashboardWrap.innerHTML = `
+          <div class="empty-state">Sem dados no período e filtro selecionados para montar o dashboard.</div>
+          ${machineEffectiveCardsHtml(effectiveSummary)}
+        `;
         return;
       }
 
@@ -9077,6 +9140,10 @@
           ${machineDashboardCard("Conferências", String(pending.length), pending.length ? "Existem diferenças para revisar" : "Tudo batendo")}
           ${machineDashboardCard("Filtro ativo", els.machineFrontFilter.value === "all" ? "Todas" : els.machineFrontFilter.value, modeLabel)}
         </div>
+        <section style="margin-top: 14px;">
+          <h3>Moagem efetiva e transporte</h3>
+          ${machineEffectiveCardsHtml(effectiveSummary)}
+        </section>
         <div class="dashboard-grid" style="margin-top: 14px;">
           <section>
             <h3>Ranking por equipamento</h3>
@@ -10443,10 +10510,11 @@
       const ownTransportTarget = targetForType(TYPES.OWN_TRANSPORT) * targetDays;
       const thirdTransportTarget = targetForType(TYPES.THIRD_TRANSPORT) * targetDays;
       const transportTarget = ownTransportTarget + thirdTransportTarget;
+      const effectiveDays = Math.max(1, Number(targetDays) || targetDaysForRows(rows) || 1);
       els[`${prefix}OwnHarvest`].textContent = formatNumber(summary.ownHarvest);
-      els[`${prefix}OwnHarvestPercent`].textContent = detailWithTargetBalance(`${formatPercent(summary.ownHarvestPercent)} da moagem`, summary.ownHarvest, ownHarvestTarget);
+      els[`${prefix}OwnHarvestPercent`].textContent = detailWithTargetBalance(effectiveDailyDetail(summary.ownHarvest, effectiveDays, `${formatPercent(summary.ownHarvestPercent)} da moagem efetiva`), summary.ownHarvest, ownHarvestTarget);
       els[`${prefix}ThirdHarvest`].textContent = formatNumber(summary.thirdHarvest);
-      els[`${prefix}ThirdHarvestPercent`].textContent = detailWithTargetBalance(`${formatPercent(summary.thirdHarvestPercent)} da moagem`, summary.thirdHarvest, thirdHarvestTarget);
+      els[`${prefix}ThirdHarvestPercent`].textContent = detailWithTargetBalance(effectiveDailyDetail(summary.thirdHarvest, effectiveDays, `${formatPercent(summary.thirdHarvestPercent)} da moagem efetiva`), summary.thirdHarvest, thirdHarvestTarget);
       els[`${prefix}FlorestaCane`].textContent = formatNumber(summary.florestaCane);
       if (els[`${prefix}FlorestaCaneStatus`]) {
         els[`${prefix}FlorestaCaneStatus`].textContent = detailWithTargetBalance("Recebida em Cambuí", summary.florestaCane, florestaCaneTarget);
@@ -10456,9 +10524,9 @@
         els[`${prefix}ValeCaneStatus`].textContent = detailWithTargetBalance("Recebida em Cambuí", summary.valeCane, valeCaneTarget);
       }
       els[`${prefix}OwnTransport`].textContent = formatNumber(summary.ownTransport);
-      els[`${prefix}OwnTransportPercent`].textContent = detailWithTargetBalance(`${formatPercent(summary.ownTransportPercent)} da moagem`, summary.ownTransport, ownTransportTarget);
+      els[`${prefix}OwnTransportPercent`].textContent = detailWithTargetBalance(effectiveDailyDetail(summary.ownTransport, effectiveDays, `${formatPercent(summary.ownTransportPercent)} da moagem efetiva`), summary.ownTransport, ownTransportTarget);
       els[`${prefix}ThirdTransport`].textContent = formatNumber(summary.thirdTransport);
-      els[`${prefix}ThirdTransportPercent`].textContent = detailWithTargetBalance(`${formatPercent(summary.thirdTransportPercent)} da moagem`, summary.thirdTransport, thirdTransportTarget);
+      els[`${prefix}ThirdTransportPercent`].textContent = detailWithTargetBalance(effectiveDailyDetail(summary.thirdTransport, effectiveDays, `${formatPercent(summary.thirdTransportPercent)} da moagem efetiva`), summary.thirdTransport, thirdTransportTarget);
       if (els[`${prefix}OwnTransportKm`]) {
         els[`${prefix}OwnTransportKm`].textContent = formatKm(summary.ownTransportKmAvg);
         els[`${prefix}OwnTransportKmLabel`].textContent = summary.ownTransportKmRecords
